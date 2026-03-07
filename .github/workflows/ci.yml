@@ -33,11 +33,8 @@ jobs:
           java-version: ${{ matrix.java-version }}
           cache: maven
 
-      - name: Prepare wrapper
-        run: chmod +x mvnw
-
       - name: Verify project
-        run: ./mvnw -B -q verify
+        run: mvn -B -q verify
 
       - name: Verify sample
-        run: ./mvnw -B -q -f samples/vulnerable-sample/pom.xml -DskipTests verify
+        run: mvn -B -q -f samples/vulnerable-sample/pom.xml -DskipTests verify
