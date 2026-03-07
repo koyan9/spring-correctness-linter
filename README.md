@@ -1,12 +1,12 @@
-﻿# spring-correctness-linter
+# spring-correctness-linter
 
 `spring-correctness-linter` is a CI-first Spring correctness linter.
 
 ## Coordinates
 
-- `io.github.koyan9:spring-correctness-linter-parent`
-- `io.github.koyan9:spring-correctness-linter-core`
-- `io.github.koyan9:spring-correctness-linter-maven-plugin`
+- `io.github.koyan9:spring-correctness-linter-parent:0.1.0`
+- `io.github.koyan9:spring-correctness-linter-core:0.1.0`
+- `io.github.koyan9:spring-correctness-linter-maven-plugin:0.1.0`
 
 ## Capabilities
 
@@ -24,9 +24,10 @@
 - `samples/vulnerable-sample/`
 - `CHANGELOG.md`
 - `RELEASE_NOTES_TEMPLATE.md`
+- `RELEASE_NOTES_v0.1.0.md`
 
 ## Commands
 
 - Verify: `./mvnw -q verify`
-- Generate baseline: `./mvnw io.github.koyan9:spring-correctness-linter-maven-plugin:0.1.0-SNAPSHOT:lint -DwriteBaseline=true`
-- Fail on severity: `./mvnw io.github.koyan9:spring-correctness-linter-maven-plugin:0.1.0-SNAPSHOT:lint -DfailOnSeverity=WARNING`
+- Generate baseline: `./mvnw io.github.koyan9:spring-correctness-linter-maven-plugin:0.1.0:lint -DwriteBaseline=true`
+- Fail on severity: `./mvnw io.github.koyan9:spring-correctness-linter-maven-plugin:0.1.0:lint -DfailOnSeverity=WARNING`
