@@ -1,0 +1,43 @@
+﻿# Copyright 2026 koyan9
+# SPDX-License-Identifier: Apache-2.0
+
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        java-version: [17, 21]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java-version }}
+          cache: maven
+
+      - name: Prepare wrapper
+        run: chmod +x mvnw
+
+      - name: Verify project
+        run: ./mvnw -B -q verify
+
+      - name: Verify sample
+        run: ./mvnw -B -q -f samples/vulnerable-sample/pom.xml -DskipTests verify

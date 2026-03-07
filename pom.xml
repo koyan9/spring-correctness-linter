@@ -1,0 +1,135 @@
+<!--
+  Copyright 2026 koyan9
+  SPDX-License-Identifier: Apache-2.0
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>io.github.koyan9</groupId>
+    <artifactId>spring-correctness-linter-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <name>spring-correctness-linter</name>
+    <description>CI-first Spring correctness linter with AST-based analysis, reports, suppression, baseline, and quality gates.</description>
+    <url>https://github.com/koyan9/spring-correctness-linter</url>
+    <inceptionYear>2026</inceptionYear>
+    <organization>
+        <name>koyan9</name>
+        <url>https://github.com/koyan9</url>
+    </organization>
+    <developers>
+        <developer>
+            <id>koyan9</id>
+            <name>koyan9</name>
+            <email>972849752@qq.com</email>
+        </developer>
+    </developers>
+    <licenses>
+        <license>
+            <name>Apache License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+    <scm>
+        <connection>scm:git:https://github.com/koyan9/spring-correctness-linter.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/koyan9/spring-correctness-linter.git</developerConnection>
+        <url>https://github.com/koyan9/spring-correctness-linter</url>
+        <tag>HEAD</tag>
+    </scm>
+    <issueManagement>
+        <system>GitHub Issues</system>
+        <url>https://github.com/koyan9/spring-correctness-linter/issues</url>
+    </issueManagement>
+    <ciManagement>
+        <system>GitHub Actions</system>
+        <url>https://github.com/koyan9/spring-correctness-linter/actions</url>
+    </ciManagement>
+
+    <modules>
+        <module>linter-core</module>
+        <module>linter-maven-plugin</module>
+    </modules>
+
+    <properties>
+        <java.version>17</java.version>
+        <junit.jupiter.version>5.11.4</junit.jupiter.version>
+        <maven.compiler.plugin.version>3.13.0</maven.compiler.plugin.version>
+        <maven.compiler.release>${java.version}</maven.compiler.release>
+        <maven.javadoc.plugin.version>3.10.0</maven.javadoc.plugin.version>
+        <maven.plugin.api.version>3.9.9</maven.plugin.api.version>
+        <maven.plugin.tools.version>3.15.1</maven.plugin.tools.version>
+        <maven.source.plugin.version>3.3.1</maven.source.plugin.version>
+        <maven.surefire.plugin.version>3.3.1</maven.surefire.plugin.version>
+        <project.build.outputTimestamp>2026-03-06T00:00:00Z</project.build.outputTimestamp>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>${maven.compiler.plugin.version}</version>
+                    <configuration>
+                        <release>${maven.compiler.release}</release>
+                        <encoding>${project.build.sourceEncoding}</encoding>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>${maven.surefire.plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-source-plugin</artifactId>
+                    <version>${maven.source.plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-javadoc-plugin</artifactId>
+                    <version>${maven.javadoc.plugin.version}</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+
+    <profiles>
+        <profile>
+            <id>release-artifacts</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-source-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>attach-sources</id>
+                                <goals>
+                                    <goal>jar-no-fork</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-javadoc-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>attach-javadocs</id>
+                                <goals>
+                                    <goal>jar</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+</project>
