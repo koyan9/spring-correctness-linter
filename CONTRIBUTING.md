@@ -22,3 +22,6 @@
 - Run `samples/vulnerable-sample/` when changing report formats, suppressions, baseline behavior, or single-module scanning
 - Run `samples/reactor-sample/` when changing module grouping, reactor scanning, multi-source-root behavior, or per-module baseline/cache output
 - Run `mvnw.cmd -q -DskipTests install` before release-related changes or when local sample installation behavior changes
+- Review JaCoCo output in module `target/site/jacoco/` directories and `target/site/jacoco-aggregate/` when changing analysis or reporting logic
+- Keep `linter-core` JaCoCo line coverage at or above `85%` when adding or refactoring analysis logic
+- Keep `linter-maven-plugin` JaCoCo line coverage at or above `75%` when changing plugin wiring or Maven integration behavior

@@ -1,56 +1,98 @@
 # spring-correctness-linter
 
-`spring-correctness-linter` is a CI-first Spring correctness linter.
+[中文说明](README.zh-CN.md)
 
-## Coordinates
+`spring-correctness-linter` is a Maven-first static analysis tool for Spring applications. It focuses on **correctness and runtime semantics**, not general Java style. The project is designed to catch Spring-specific problems that compile successfully but often fail later in CI, integration testing, or production.
 
-- `io.github.koyan9:spring-correctness-linter-parent:0.1.0`
-- `io.github.koyan9:spring-correctness-linter-core:0.1.0`
-- `io.github.koyan9:spring-correctness-linter-maven-plugin:0.1.0`
+## Why This Project Exists
 
-## Capabilities
+Spring applications can hide risky behavior behind annotations and proxy-based runtime semantics. A codebase may look valid while still containing defects such as:
 
-- AST-based Java source analysis
-- JSON / HTML / SARIF reports
-- Parse problem visibility in reports and plugin logs
-- Inline suppression with reason and scope support
-- Baseline and baseline diff
-- Severity-based quality gates
-- Auto-generated rule reference markdown
+- `@Async` methods that cannot be advised correctly
+- `@Transactional` methods that lose proxy interception because of visibility, `final`, or self-invocation
+- event listeners with unclear transaction boundaries
+- cache annotations that create ambiguous or unsafe cache behavior
+- public controller endpoints without explicit security intent
+- contradictory conditional bean definitions
 
-## Repo Layout
+The goal of this project is to move those checks **earlier** into local development and CI.
 
-- `linter-core/`
-- `linter-maven-plugin/`
-- `samples/vulnerable-sample/`
-- `samples/reactor-sample/`
-- `CHANGELOG.md`
-- `RELEASE_NOTES_TEMPLATE.md`
-- `RELEASE_NOTES_v*.md`
+## Expected Outcomes
 
-## Commands
+With this linter in place, teams can:
 
-- Verify project: `./mvnw -q verify`
-- Install local artifacts: `./mvnw -q -DskipTests install`
-- Generate baseline: `./mvnw io.github.koyan9:spring-correctness-linter-maven-plugin:0.1.0:lint -Dspring.correctness.linter.writeBaseline=true`
-- Fail on severity: `./mvnw io.github.koyan9:spring-correctness-linter-maven-plugin:0.1.0:lint -Dspring.correctness.linter.failOnSeverity=WARNING`
+- catch Spring runtime risks before deployment
+- adopt a baseline and focus only on newly introduced problems
+- enforce severity-based quality gates in CI
+- inspect results in JSON, HTML, SARIF, and baseline diff reports
+- scale checks from a single module to multi-module Maven reactors
 
-## Validation
+## Architecture
 
-- Core regression: `./mvnw -q verify`
-- Single-module sample: `./mvnw -q -f samples/vulnerable-sample/pom.xml -DskipTests verify`
-- Reactor sample: `./mvnw -q -f samples/reactor-sample/pom.xml -DskipTests verify`
-- Release preflight: `./mvnw -q -DskipTests install`
+The repository is split into two main modules:
 
-Recommended pre-merge sequence:
+- `linter-core/`: AST-based analysis engine, rule model, report generation, baseline handling, incremental cache, and module-aware aggregation
+- `linter-maven-plugin/`: Maven plugin that resolves source roots, applies configuration, runs the core engine, and writes reports during `verify`
 
-1. Run `./mvnw -q verify`
-2. Re-run the affected sample:
-   - `samples/vulnerable-sample/` for report, baseline, or single-module changes
-   - `samples/reactor-sample/` for module scanning, per-module baseline/cache, or reactor changes
-3. Run `./mvnw -q -DskipTests install` before release or sample verification changes
+Supporting directories:
 
-## Configuration
+- `samples/vulnerable-sample/`: single-module sample for baseline, reports, and common rule behavior
+- `samples/reactor-sample/`: multi-module reactor sample for module-aware scanning and per-module outputs
+
+## Analysis Flow
+
+At a high level, one lint run works like this:
+
+1. Resolve source roots from the current module, extra configured roots, or the whole Maven reactor.
+2. Load source files and compute content hashes for incremental cache reuse.
+3. Parse Java source into AST-backed structures and collect parse diagnostics when syntax is broken.
+4. Run the enabled rules over each file.
+5. Apply inline suppression rules.
+6. Apply baseline filtering.
+7. Aggregate findings by severity and by module.
+8. Evaluate quality gates.
+9. Write reports and optional baseline/cache files.
+
+## Rule Scope
+
+The default rule set currently focuses on:
+
+- `@Async` misuse
+- `@Transactional` misuse
+- `@EventListener` / `@TransactionalEventListener` boundaries
+- cache key and cache annotation combination risks
+- controller security intent checks
+- conditional bean conflict detection
+
+## Quick Start
+
+### Build and verify
+
+```bash
+./mvnw -q verify
+```
+
+### Install local artifacts
+
+```bash
+./mvnw -q -DskipTests install
+```
+
+### Generate a baseline
+
+```bash
+./mvnw io.github.koyan9:spring-correctness-linter-maven-plugin:0.1.0:lint \
+  -Dspring.correctness.linter.writeBaseline=true
+```
+
+### Fail on severity
+
+```bash
+./mvnw io.github.koyan9:spring-correctness-linter-maven-plugin:0.1.0:lint \
+  -Dspring.correctness.linter.failOnSeverity=WARNING
+```
+
+## Maven Usage
 
 Example plugin configuration:
 
@@ -67,54 +109,158 @@ Example plugin configuration:
     </formats>
     <failOnSeverity>WARNING</failOnSeverity>
   </configuration>
+  <executions>
+    <execution>
+      <goals>
+        <goal>lint</goal>
+      </goals>
+    </execution>
+  </executions>
 </plugin>
 ```
 
-Useful user properties:
+## Main Outputs
 
-- `spring.correctness.linter.sourceDirectory`: override the Java source root.
-- `spring.correctness.linter.reportDirectory`: change the report output directory.
-- `spring.correctness.linter.baselineFile`: change the baseline file location.
-- `spring.correctness.linter.writeBaseline=true`: regenerate the baseline file.
-- `spring.correctness.linter.failOnSeverity=WARNING`: fail the build for matching severities.
-- `spring.correctness.linter.formats=json,html,sarif`: limit generated report formats.
-- `spring.correctness.linter.enabledRules=RULE_A,RULE_B`: run only selected rules.
-- `spring.correctness.linter.disabledRules=RULE_A,RULE_B`: skip specific rules.
-- `spring.correctness.linter.severityOverrides=RULE_A=ERROR,RULE_B=INFO`: override per-rule severities.
-- `spring.correctness.linter.useIncrementalCache=true`: reuse cached file analysis when source content is unchanged.
-- `spring.correctness.linter.cacheFile=target/spring-correctness-linter/analysis-cache.txt`: customize the incremental cache location.
-- `spring.correctness.linter.additionalSourceDirectories=target/generated-sources/foo,src/generated/java`: scan extra source roots in the current module.
-- `spring.correctness.linter.scanReactorModules=true`: scan compile source roots from all Maven reactor modules from the execution root.
-- `spring.correctness.linter.includeTestSourceRoots=true`: include test compile source roots in the scan.
-- `spring.correctness.linter.splitBaselineByModule=true`: write per-module baseline files under `modules/<module>/`.
-- `spring.correctness.linter.splitCacheByModule=true`: write per-module analysis cache files under `modules/<module>/`.
+Reports are written under `target/spring-correctness-linter/` by default:
 
-On PowerShell, quote dotted `-D` properties or invoke Maven through `cmd /c` to avoid argument parsing issues.
+- `lint-report.json`
+- `lint-report.html`
+- `lint-report.sarif.json`
+- `baseline-diff.json`
+- `baseline-diff.html`
+- `rules-reference.md`
+
+When module splitting is enabled, module-specific files can also be written under `modules/<module>/`.
+
+## Baseline and Incremental Cache
+
+The project supports two complementary workflows:
+
+- **Baseline**: accept the current known issues and focus on newly introduced problems
+- **Incremental cache**: skip re-analysis for unchanged files and reuse prior results safely
+
+Available patterns:
+
+- single baseline file
+- per-module baseline files
+- single incremental cache file
+- per-module incremental cache files
+
+## Multi-Module and Reactor Support
+
+The plugin can scan:
+
+- a single module
+- multiple source roots inside one module
+- an entire Maven reactor from the execution root
+
+When reactor scanning is enabled:
+
+- compile source roots from all reactor modules can be collected
+- reports group findings by module
+- quality gate failures mention the affected module IDs
+- baseline and cache files can be split by module
+
+## Key Configuration Properties
+
+- `spring.correctness.linter.sourceDirectory`: override the primary Java source root
+- `spring.correctness.linter.additionalSourceDirectories`: add extra source roots in the current module
+- `spring.correctness.linter.scanReactorModules=true`: scan all reactor modules from the execution root
+- `spring.correctness.linter.includeTestSourceRoots=true`: include test compile source roots
+- `spring.correctness.linter.reportDirectory`: change the report output directory
+- `spring.correctness.linter.baselineFile`: change the baseline file location
+- `spring.correctness.linter.writeBaseline=true`: regenerate baseline
+- `spring.correctness.linter.enabledRules=RULE_A,RULE_B`: run only selected rules
+- `spring.correctness.linter.disabledRules=RULE_A,RULE_B`: skip selected rules
+- `spring.correctness.linter.severityOverrides=RULE_A=ERROR,RULE_B=INFO`: override per-rule severities
+- `spring.correctness.linter.failOnSeverity=WARNING`: fail the build for matching severities
+- `spring.correctness.linter.failOnError=true`: fail the build when any visible issue remains
+- `spring.correctness.linter.useIncrementalCache=true`: enable file-content-based cache reuse
+- `spring.correctness.linter.cacheFile=target/spring-correctness-linter/analysis-cache.txt`: set cache file path
+- `spring.correctness.linter.splitBaselineByModule=true`: write module-scoped baseline files
+- `spring.correctness.linter.splitCacheByModule=true`: write module-scoped cache files
+
+PowerShell note: quote dotted `-Dspring.correctness.linter.*` properties or invoke Maven through `cmd /c`.
 
 ## Inline Suppression
 
-- Preferred prefix: `spring-correctness-linter:disable-next-line RULE_ID reason: explanation`
-- Supported scopes: `disable-file`, `disable-line`, `disable-next-line`, `disable-next-method`, `disable-next-type`
-- Legacy `medical-linter:` directives are still accepted for backward compatibility.
+Preferred syntax:
 
-## Release Notes
+```java
+// spring-correctness-linter:disable-next-line RULE_ID reason: explanation
+```
 
-- Keep `RELEASE_NOTES_TEMPLATE.md` current for the fallback release body.
-- Add versioned notes as `RELEASE_NOTES_vX.Y.Z.md` before cutting a tagged release.
-- The release workflow now prefers the matching versioned file and falls back to the template.
+Supported scopes:
 
-## Rule Reference
+- `disable-file`
+- `disable-line`
+- `disable-next-line`
+- `disable-next-method`
+- `disable-next-type`
 
-- Each lint run can generate `rules-reference.md` alongside other reports.
-- The generated reference now includes a rule index, default severities, rule-specific disable/enable examples, severity override examples, and suppression snippets.
+Legacy `medical-linter:` prefixes remain accepted for compatibility.
 
-## Module Summaries
+## Reports and Quality Gates
 
-- When scanning multiple source roots or Maven reactor modules, JSON and HTML reports group findings by module.
-- Quality gate failures now include the module IDs that triggered the failure threshold.
-- Baseline diff output also includes module summaries, and optional per-module baseline/cache files can be generated for reactor-style workflows.
+Current reports include:
+
+- visible findings
+- parse problem visibility
+- cached file count
+- module summaries
+- baseline diff summaries
+
+Current quality gates support:
+
+- severity thresholds
+- module-aware failure messages
+
+## Validation and Coverage
+
+Recommended validation flow:
+
+1. Run `./mvnw -q verify`
+2. Re-run the affected sample:
+   - `samples/vulnerable-sample/` for single-module, report, suppression, and baseline changes
+   - `samples/reactor-sample/` for reactor, multi-root, module grouping, and per-module baseline/cache changes
+3. Run `./mvnw -q -DskipTests install` before release-sensitive or sample-installation-sensitive changes
+
+Coverage:
+
+- `./mvnw verify` generates module JaCoCo reports under each module’s `target/site/jacoco/`
+- `./mvnw verify` also generates an aggregate JaCoCo report under `target/site/jacoco-aggregate/`
+- `linter-core` currently enforces a minimum JaCoCo line coverage ratio of `85%`
+- `linter-maven-plugin` currently enforces a minimum JaCoCo line coverage ratio of `75%`
 
 ## Samples
 
-- `samples/vulnerable-sample/`: single-module sample for baseline, reports, and common Spring correctness findings.
-- `samples/reactor-sample/`: multi-module Maven reactor sample that exercises `scanReactorModules`, module summaries, and per-module baseline/cache output.
+### `samples/vulnerable-sample/`
+
+A single-module sample with intentionally risky Spring patterns. Use it to inspect baseline generation, report output, and individual rule behavior.
+
+### `samples/reactor-sample/`
+
+A multi-module Maven reactor sample that demonstrates:
+
+- reactor-wide scanning
+- module summaries in reports
+- per-module baseline output
+- per-module incremental cache output
+
+## Repository Structure
+
+- `linter-core/`: core analysis engine and rules
+- `linter-maven-plugin/`: Maven integration
+- `samples/vulnerable-sample/`: single-module validation sample
+- `samples/reactor-sample/`: reactor validation sample
+- `CHANGELOG.md`: release history
+- `RELEASE_NOTES_TEMPLATE.md`: release notes template
+
+## Current Status
+
+The project currently provides a practical Spring correctness linting workflow suitable for:
+
+- local development feedback
+- CI quality gates
+- legacy codebase onboarding with baselines
+- multi-module repository governance with module-aware reporting

@@ -44,3 +44,13 @@ jobs:
 
       - name: Verify reactor sample
         run: mvn -B -q -f samples/reactor-sample/pom.xml -DskipTests verify
+
+      - name: Upload JaCoCo reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-reports-java-${{ matrix.java-version }}
+          path: |
+            target/site/jacoco-aggregate/
+            linter-core/target/site/jacoco/
+            linter-maven-plugin/target/site/jacoco/
+          if-no-files-found: warn
