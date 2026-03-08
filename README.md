@@ -273,3 +273,7 @@ The project currently provides a practical Spring correctness linting workflow s
 - CI quality gates
 - legacy codebase onboarding with baselines
 - multi-module repository governance with module-aware reporting
+
+## Milestones
+
+- For a compact history of the major improvements and project evolution, see `docs/MILESTONES.md`.
