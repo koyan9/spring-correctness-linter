@@ -23,7 +23,7 @@ public final class InlineSuppressions {
 
     private static final int NEXT_LINE_WINDOW = 3;
     private static final Pattern DIRECTIVE_PATTERN = Pattern.compile(
-            "medical-linter:(?<scope>disable-file|disable-line|disable-next-line|disable-next-method|disable-next-type)\\s+(?<rules>[A-Z0-9_,*\\s-]+?)(?:\\s+reason\\s*[:=]\\s*(?<reason>.+))?$",
+            "(?:spring-correctness-linter|medical-linter):(?<scope>disable-file|disable-line|disable-next-line|disable-next-method|disable-next-type)\\s+(?<rules>[A-Z0-9_,*\\s-]+?)(?:\\s+reason\\s*[:=]\\s*(?<reason>.+))?$",
             Pattern.CASE_INSENSITIVE
     );
     private static final InlineSuppressions NONE = new InlineSuppressions(List.of(), Map.of(), List.of());
@@ -126,12 +126,11 @@ public final class InlineSuppressions {
     }
 
     private static Optional<LineRange> resolveNextTypeRange(SourceUnit sourceUnit, int afterLine) {
-        return sourceUnit.compilationUnit()
-                .flatMap(compilationUnit -> JavaSourceInspector.findTypeDeclarations(compilationUnit).stream()
-                        .filter(typeDeclaration -> JavaSourceInspector.lineOf(typeDeclaration) > afterLine)
-                        .sorted(java.util.Comparator.comparingInt(JavaSourceInspector::lineOf))
-                        .findFirst()
-                        .map(InlineSuppressions::toRange));
+        return sourceUnit.structure().typeDeclarations().stream()
+                .filter(typeDeclaration -> JavaSourceInspector.lineOf(typeDeclaration) > afterLine)
+                .sorted(java.util.Comparator.comparingInt(JavaSourceInspector::lineOf))
+                .findFirst()
+                .map(InlineSuppressions::toRange);
     }
 
     private static LineRange toRange(MethodDeclaration methodDeclaration) {

@@ -17,5 +17,13 @@ public interface LintRule {
 
     LintSeverity severity();
 
+    default Class<?> implementationClass() {
+        return getClass();
+    }
+
+    default String implementationIdentity() {
+        return implementationClass().getName();
+    }
+
     List<LintIssue> evaluate(SourceUnit sourceUnit, ProjectContext context);
 }

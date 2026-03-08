@@ -34,14 +34,12 @@ public final class TransactionalEventListenerRule extends AbstractSpringRule {
     @Override
     public List<LintIssue> evaluate(SourceUnit sourceUnit, ProjectContext context) {
         List<LintIssue> issues = new ArrayList<>();
-        sourceUnit.compilationUnit().ifPresent(compilationUnit -> {
-            for (MethodDeclaration method : compilationUnit.findAll(MethodDeclaration.class)) {
-                if (JavaSourceInspector.hasAnnotation(method, "TransactionalEventListener")
-                        && JavaSourceInspector.hasAnnotation(method, "Transactional")) {
-                    issues.add(issue(sourceUnit, JavaSourceInspector.lineOf(method), "Method '" + method.getNameAsString() + "' combines @TransactionalEventListener with @Transactional; review whether listener phase and transaction boundary are both intentional."));
-                }
+        for (MethodDeclaration method : sourceUnit.structure().methods()) {
+            if (JavaSourceInspector.hasAnnotation(method, "TransactionalEventListener")
+                    && JavaSourceInspector.hasAnnotation(method, "Transactional")) {
+                issues.add(issue(sourceUnit, JavaSourceInspector.lineOf(method), "Method '" + method.getNameAsString() + "' combines @TransactionalEventListener with @Transactional; review whether listener phase and transaction boundary are both intentional."));
             }
-        });
+        }
         return issues;
     }
 }

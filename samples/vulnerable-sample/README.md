@@ -1,19 +1,22 @@
 # vulnerable-sample
 
-这个示例故意包含多条 Spring 设计/正确性问题，用来演示 `spring-correctness-linter` 的输出。
+This sample intentionally contains several Spring design and correctness issues to demonstrate `spring-correctness-linter` output.
 
-## 使用方式
+## Usage
 
-1. 先在工作区根目录执行：
-   - `mvn -s .mvn-settings.xml install -DskipTests`
-2. 进入当前目录后执行：
-   - `mvn verify`
-3. 查看生成报告：
-   - `target/medical-linter/lint-report.json`
-   - `target/medical-linter/lint-report.html`
-   - `target/medical-linter/lint-report.sarif.json`
+1. Install the current plugin from the repository root:
+   - Windows: `mvnw.cmd -q -DskipTests install`
+   - macOS / Linux: `./mvnw -q -DskipTests install`
+2. Run verification in this directory:
+   - `mvn -q verify`
+3. Inspect generated reports:
+   - `target/spring-correctness-linter/lint-report.json`
+   - `target/spring-correctness-linter/lint-report.html`
+   - `target/spring-correctness-linter/lint-report.sarif.json`
+   - `target/spring-correctness-linter/baseline-diff.html` (when baseline diff output is enabled)
 
-## baseline 演示
+## Baseline demo
 
-- 生成 baseline：`mvn medical-linter:lint -DwriteBaseline=true`
-- 后续再执行 `mvn verify`，只会留下 baseline 之外的新问题。
+- Generate a baseline: `mvn -q spring-correctness-linter:lint -Dspring.correctness.linter.writeBaseline=true`
+- Default baseline file: `spring-correctness-linter-baseline.txt`
+- Run `mvn -q verify` again to keep only issues not already recorded in the baseline.

@@ -36,18 +36,18 @@ public final class PublicEndpointWithoutSecurityRule extends AbstractSpringRule 
     @Override
     public List<LintIssue> evaluate(SourceUnit sourceUnit, ProjectContext context) {
         List<LintIssue> issues = new ArrayList<>();
-        sourceUnit.compilationUnit().ifPresent(compilationUnit -> collectIssues(sourceUnit, compilationUnit, issues));
+        collectIssues(sourceUnit, issues);
         return issues;
     }
 
-    private void collectIssues(SourceUnit sourceUnit, CompilationUnit compilationUnit, List<LintIssue> issues) {
-        for (TypeDeclaration<?> typeDeclaration : JavaSourceInspector.findTypeDeclarations(compilationUnit)) {
+    private void collectIssues(SourceUnit sourceUnit, List<LintIssue> issues) {
+        for (TypeDeclaration<?> typeDeclaration : sourceUnit.structure().typeDeclarations()) {
             if (!JavaSourceInspector.isController(typeDeclaration)) {
                 continue;
             }
 
             boolean classSecured = hasSecurityAnnotation(JavaSourceInspector.annotationNames(typeDeclaration));
-            for (MethodDeclaration method : JavaSourceInspector.findMethods(typeDeclaration)) {
+            for (MethodDeclaration method : sourceUnit.structure().methodsOf(typeDeclaration)) {
                 boolean mapping = JavaSourceInspector.isRequestMapping(method);
                 boolean methodSecured = hasSecurityAnnotation(JavaSourceInspector.annotationNames(method));
                 if (mapping && method.isPublic() && !classSecured && !methodSecured) {

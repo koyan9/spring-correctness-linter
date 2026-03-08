@@ -48,8 +48,14 @@ jobs:
           cp linter-maven-plugin/target/*.jar release-artifacts/ || true
 
       - name: Generate release notes draft
+        shell: bash
         run: |
-          cp RELEASE_NOTES_v0.1.0.md RELEASE_NOTES.md
+          NOTES_FILE="RELEASE_NOTES_${{ inputs.tag }}.md"
+          if [[ -f "$NOTES_FILE" ]]; then
+            cp "$NOTES_FILE" RELEASE_NOTES.md
+          else
+            cp RELEASE_NOTES_TEMPLATE.md RELEASE_NOTES.md
+          fi
           echo "" >> RELEASE_NOTES.md
           echo "Tag: ${{ inputs.tag }}" >> RELEASE_NOTES.md
 

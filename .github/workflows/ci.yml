@@ -39,5 +39,8 @@ jobs:
       - name: Install project artifacts locally
         run: mvn -B -q -DskipTests install
 
-      - name: Verify sample
+      - name: Verify vulnerable sample
         run: mvn -B -q -f samples/vulnerable-sample/pom.xml -DskipTests verify
+
+      - name: Verify reactor sample
+        run: mvn -B -q -f samples/reactor-sample/pom.xml -DskipTests verify

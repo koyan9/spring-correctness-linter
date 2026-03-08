@@ -36,21 +36,19 @@ public final class EventListenerTransactionalRule extends AbstractSpringRule {
     @Override
     public List<LintIssue> evaluate(SourceUnit sourceUnit, ProjectContext context) {
         List<LintIssue> issues = new ArrayList<>();
-        sourceUnit.compilationUnit().ifPresent(compilationUnit -> {
-            for (TypeDeclaration<?> typeDeclaration : JavaSourceInspector.findTypeDeclarations(compilationUnit)) {
-                boolean classTransactional = JavaSourceInspector.hasAnnotation(typeDeclaration, "Transactional");
-                for (MethodDeclaration method : JavaSourceInspector.findMethods(typeDeclaration)) {
-                    Set<String> methodAnnotations = JavaSourceInspector.annotationNames(method);
-                    if (methodAnnotations.contains("TransactionalEventListener")) {
-                        continue;
-                    }
-                    if (methodAnnotations.contains("EventListener")
-                            && (methodAnnotations.contains("Transactional") || classTransactional)) {
-                        issues.add(issue(sourceUnit, JavaSourceInspector.lineOf(method), "Event listener method '" + method.getNameAsString() + "' runs with @Transactional semantics; if transaction phase matters, prefer @TransactionalEventListener or document the boundary explicitly."));
-                    }
+        for (TypeDeclaration<?> typeDeclaration : sourceUnit.structure().typeDeclarations()) {
+            boolean classTransactional = JavaSourceInspector.hasAnnotation(typeDeclaration, "Transactional");
+            for (MethodDeclaration method : sourceUnit.structure().methodsOf(typeDeclaration)) {
+                Set<String> methodAnnotations = JavaSourceInspector.annotationNames(method);
+                if (methodAnnotations.contains("TransactionalEventListener")) {
+                    continue;
+                }
+                if (methodAnnotations.contains("EventListener")
+                        && (methodAnnotations.contains("Transactional") || classTransactional)) {
+                    issues.add(issue(sourceUnit, JavaSourceInspector.lineOf(method), "Event listener method '" + method.getNameAsString() + "' runs with @Transactional semantics; if transaction phase matters, prefer @TransactionalEventListener or document the boundary explicitly."));
                 }
             }
-        });
+        }
         return issues;
     }
 }

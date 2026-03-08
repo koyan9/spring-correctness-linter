@@ -16,11 +16,14 @@
 
 ## Reports and CI
 
-- 
+- Report format changes:
+- Baseline / baseline diff changes:
+- Multi-module or cache behavior changes:
 
 ## Upgrade Notes
 
-- 
+- New or renamed Maven properties:
+- Sample or CI workflow changes:
 
 ## Verification
 

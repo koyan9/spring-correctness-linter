@@ -34,13 +34,11 @@ public final class AsyncVoidMethodRule extends AbstractSpringRule {
     @Override
     public List<LintIssue> evaluate(SourceUnit sourceUnit, ProjectContext context) {
         List<LintIssue> issues = new ArrayList<>();
-        sourceUnit.compilationUnit().ifPresent(compilationUnit -> {
-            for (MethodDeclaration method : compilationUnit.findAll(MethodDeclaration.class)) {
-                if (JavaSourceInspector.hasAnnotation(method, "Async") && method.getType().isVoidType()) {
-                    issues.add(issue(sourceUnit, JavaSourceInspector.lineOf(method), "@Async method '" + method.getNameAsString() + "' returns void; prefer CompletableFuture or another observable type."));
-                }
+        for (MethodDeclaration method : sourceUnit.structure().methods()) {
+            if (JavaSourceInspector.hasAnnotation(method, "Async") && method.getType().isVoidType()) {
+                issues.add(issue(sourceUnit, JavaSourceInspector.lineOf(method), "@Async method '" + method.getNameAsString() + "' returns void; prefer CompletableFuture or another observable type."));
             }
-        });
+        }
         return issues;
     }
 }

@@ -24,7 +24,7 @@ class BaselineStoreTest {
     @Test
     void writesAndReadsBaselineEntries() throws Exception {
         BaselineStore store = new BaselineStore();
-        Path baselineFile = tempDir.resolve("medical-linter-baseline.txt");
+        Path baselineFile = tempDir.resolve("spring-correctness-linter-baseline.txt");
         Path projectRoot = tempDir;
         Path sourceFile = tempDir.resolve("src/main/java/demo/Sample.java");
         Files.createDirectories(sourceFile.getParent());
@@ -46,7 +46,7 @@ class BaselineStoreTest {
     @Test
     void ignoresMalformedBaselineLines() throws Exception {
         BaselineStore store = new BaselineStore();
-        Path baselineFile = tempDir.resolve("medical-linter-baseline.txt");
+        Path baselineFile = tempDir.resolve("spring-correctness-linter-baseline.txt");
         Files.writeString(baselineFile, """
                 # spring-correctness-linter baseline v1
                 broken-line

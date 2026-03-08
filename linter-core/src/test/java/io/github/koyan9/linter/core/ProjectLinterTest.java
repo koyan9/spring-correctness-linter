@@ -11,6 +11,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -180,7 +181,7 @@ class ProjectLinterTest {
 
                 class AsyncOnly {
 
-                    // medical-linter:disable-next-line SPRING_ASYNC_VOID reason: legacy async contract
+                    // spring-correctness-linter:disable-next-line SPRING_ASYNC_VOID reason: legacy async contract
                     @Async
                     public void suppressedAsync() {
                     }
@@ -192,7 +193,7 @@ class ProjectLinterTest {
                 """);
 
         ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
-        Path baselineFile = tempDir.resolve("medical-linter-baseline.txt");
+        Path baselineFile = tempDir.resolve("spring-correctness-linter-baseline.txt");
 
         LintAnalysisResult firstRun = linter.analyze(
                 tempDir,
@@ -233,7 +234,35 @@ class ProjectLinterTest {
 
         Path diffFile = tempDir.resolve("reports/baseline-diff.json");
         new ReportWriter().writeBaselineDiff(thirdRun.baselineDiffReport(), diffFile);
-        assertTrue(Files.readString(diffFile).contains("staleBaselineCount"));
+        String baselineDiffJson = Files.readString(diffFile);
+        assertTrue(baselineDiffJson.contains("staleBaselineCount"));
+        assertTrue(baselineDiffJson.contains("\"moduleSummaries\""));
+        assertTrue(baselineDiffJson.contains("\"module\""));
+    }
+
+    @Test
+    void acceptsLegacyMedicalLinterSuppressionPrefix() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("LegacyPrefixAsyncOnly.java"), """
+                package demo;
+
+                import org.springframework.scheduling.annotation.Async;
+
+                class LegacyPrefixAsyncOnly {
+
+                    // medical-linter:disable-next-line SPRING_ASYNC_VOID reason: legacy prefix compatibility
+                    @Async
+                    public void suppressedAsync() {
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintAnalysisResult result = linter.analyze(tempDir, tempDir.resolve("src/main/java"), LintOptions.defaults());
+
+        assertEquals(0, result.report().issueCount());
+        assertEquals(1, result.report().suppressedIssueCount());
     }
 
     @Test
@@ -247,7 +276,7 @@ class ProjectLinterTest {
                 import org.springframework.web.bind.annotation.GetMapping;
                 import org.springframework.web.bind.annotation.RestController;
 
-                // medical-linter:disable-next-type SPRING_ENDPOINT_SECURITY reason: internal controller sample
+                // spring-correctness-linter:disable-next-type SPRING_ENDPOINT_SECURITY reason: internal controller sample
                 @RestController
                 class InternalController {
 
@@ -259,7 +288,7 @@ class ProjectLinterTest {
 
                 class AsyncDemo {
 
-                    // medical-linter:disable-next-method SPRING_ASYNC_PRIVATE_METHOD reason: legacy private async adapter
+                    // spring-correctness-linter:disable-next-method SPRING_ASYNC_PRIVATE_METHOD reason: legacy private async adapter
                     @Async
                     private void asyncPrivateWork() {
                     }
@@ -344,6 +373,8 @@ class ProjectLinterTest {
 
         assertEquals(0, report.issueCount());
         assertEquals(13, report.rules().size());
+        assertEquals(1, report.parseProblemFileCount());
+        assertTrue(report.parseProblems().get(0).file().endsWith(Path.of("src/main/java/demo/Broken.java")));
     }
 
     @Test
@@ -394,5 +425,87 @@ class ProjectLinterTest {
         Set<String> issueIds = report.issues().stream().map(LintIssue::ruleId).collect(Collectors.toSet());
 
         assertFalse(issueIds.contains("SPRING_TRANSACTIONAL_EVENT_LISTENER"));
+    }
+
+    @Test
+    void reusesIncrementalCacheForUnchangedFiles() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("AsyncOnly.java"), """
+                package demo;
+
+                import org.springframework.scheduling.annotation.Async;
+
+                class AsyncOnly {
+
+                    @Async
+                    public void runAsync() {
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        Path cacheFile = tempDir.resolve("target/analysis-cache.txt");
+
+        LintReport firstRun = linter.analyze(
+                tempDir,
+                tempDir.resolve("src/main/java"),
+                new LintOptions(true, false, null, cacheFile, true)
+        ).report();
+
+        LintReport secondRun = linter.analyze(
+                tempDir,
+                tempDir.resolve("src/main/java"),
+                new LintOptions(true, false, null, cacheFile, true)
+        ).report();
+
+        assertEquals(1, firstRun.issueCount());
+        assertEquals(0, firstRun.cachedFileCount());
+        assertEquals(1, secondRun.issueCount());
+        assertEquals(1, secondRun.cachedFileCount());
+    }
+
+    @Test
+    void analyzesMultipleSourceRootsInOneRun() throws Exception {
+        Path mainSourceDirectory = tempDir.resolve("src/main/java/demo");
+        Path generatedSourceDirectory = tempDir.resolve("target/generated-sources/demo");
+        Files.createDirectories(mainSourceDirectory);
+        Files.createDirectories(generatedSourceDirectory);
+        Files.writeString(mainSourceDirectory.resolve("AsyncOnly.java"), """
+                package demo;
+
+                import org.springframework.scheduling.annotation.Async;
+
+                class AsyncOnly {
+
+                    @Async
+                    public void runAsync() {
+                    }
+                }
+                """);
+        Files.writeString(generatedSourceDirectory.resolve("PrivateAsyncOnly.java"), """
+                package demo;
+
+                import org.springframework.scheduling.annotation.Async;
+
+                class PrivateAsyncOnly {
+
+                    @Async
+                    private void runAsync() {
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(
+                tempDir,
+                List.of(tempDir.resolve("src/main/java"), tempDir.resolve("target/generated-sources")),
+                new LintOptions(true, false, null)
+        ).report();
+        Set<String> issueIds = report.issues().stream().map(LintIssue::ruleId).collect(Collectors.toSet());
+
+        assertEquals(2, report.sourceDirectoryCount());
+        assertTrue(issueIds.contains("SPRING_ASYNC_VOID"));
+        assertTrue(issueIds.contains("SPRING_ASYNC_PRIVATE_METHOD"));
     }
 }

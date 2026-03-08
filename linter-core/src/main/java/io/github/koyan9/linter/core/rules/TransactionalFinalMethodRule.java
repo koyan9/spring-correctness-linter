@@ -34,13 +34,11 @@ public final class TransactionalFinalMethodRule extends AbstractSpringRule {
     @Override
     public List<LintIssue> evaluate(SourceUnit sourceUnit, ProjectContext context) {
         List<LintIssue> issues = new ArrayList<>();
-        sourceUnit.compilationUnit().ifPresent(compilationUnit -> {
-            for (MethodDeclaration method : compilationUnit.findAll(MethodDeclaration.class)) {
-                if (JavaSourceInspector.hasAnnotation(method, "Transactional") && method.isFinal()) {
-                    issues.add(issue(sourceUnit, JavaSourceInspector.lineOf(method), "@Transactional method '" + method.getNameAsString() + "' is final; class-based proxies cannot advise final methods."));
-                }
+        for (MethodDeclaration method : sourceUnit.structure().methods()) {
+            if (JavaSourceInspector.hasAnnotation(method, "Transactional") && method.isFinal()) {
+                issues.add(issue(sourceUnit, JavaSourceInspector.lineOf(method), "@Transactional method '" + method.getNameAsString() + "' is final; class-based proxies cannot advise final methods."));
             }
-        });
+        }
         return issues;
     }
 }

@@ -36,14 +36,12 @@ public final class ConditionalOnBeanConflictRule extends AbstractSpringRule {
     @Override
     public List<LintIssue> evaluate(SourceUnit sourceUnit, ProjectContext context) {
         List<LintIssue> issues = new ArrayList<>();
-        sourceUnit.compilationUnit().ifPresent(compilationUnit -> {
-            for (TypeDeclaration<?> typeDeclaration : JavaSourceInspector.findTypeDeclarations(compilationUnit)) {
-                check(sourceUnit, JavaSourceInspector.lineOf(typeDeclaration), typeDeclaration.getNameAsString(), JavaSourceInspector.annotationNames(typeDeclaration), issues);
-                for (MethodDeclaration method : JavaSourceInspector.findMethods(typeDeclaration)) {
-                    check(sourceUnit, JavaSourceInspector.lineOf(method), method.getNameAsString(), JavaSourceInspector.annotationNames(method), issues);
-                }
+        for (TypeDeclaration<?> typeDeclaration : sourceUnit.structure().typeDeclarations()) {
+            check(sourceUnit, JavaSourceInspector.lineOf(typeDeclaration), typeDeclaration.getNameAsString(), JavaSourceInspector.annotationNames(typeDeclaration), issues);
+            for (MethodDeclaration method : sourceUnit.structure().methodsOf(typeDeclaration)) {
+                check(sourceUnit, JavaSourceInspector.lineOf(method), method.getNameAsString(), JavaSourceInspector.annotationNames(method), issues);
             }
-        });
+        }
         return issues;
     }
 

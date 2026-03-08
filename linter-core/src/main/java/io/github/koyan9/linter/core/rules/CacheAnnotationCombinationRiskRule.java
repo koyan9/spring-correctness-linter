@@ -35,24 +35,22 @@ public final class CacheAnnotationCombinationRiskRule extends AbstractSpringRule
     @Override
     public List<LintIssue> evaluate(SourceUnit sourceUnit, ProjectContext context) {
         List<LintIssue> issues = new ArrayList<>();
-        sourceUnit.compilationUnit().ifPresent(compilationUnit -> {
-            for (MethodDeclaration method : compilationUnit.findAll(MethodDeclaration.class)) {
-                Set<String> annotations = JavaSourceInspector.annotationNames(method);
-                int count = 0;
-                if (annotations.contains("Cacheable")) {
-                    count++;
-                }
-                if (annotations.contains("CachePut")) {
-                    count++;
-                }
-                if (annotations.contains("CacheEvict")) {
-                    count++;
-                }
-                if (count >= 2) {
-                    issues.add(issue(sourceUnit, JavaSourceInspector.lineOf(method), "Method '" + method.getNameAsString() + "' combines multiple cache annotations; review whether cache population and eviction semantics are explicit and safe."));
-                }
+        for (MethodDeclaration method : sourceUnit.structure().methods()) {
+            Set<String> annotations = JavaSourceInspector.annotationNames(method);
+            int count = 0;
+            if (annotations.contains("Cacheable")) {
+                count++;
             }
-        });
+            if (annotations.contains("CachePut")) {
+                count++;
+            }
+            if (annotations.contains("CacheEvict")) {
+                count++;
+            }
+            if (count >= 2) {
+                issues.add(issue(sourceUnit, JavaSourceInspector.lineOf(method), "Method '" + method.getNameAsString() + "' combines multiple cache annotations; review whether cache population and eviction semantics are explicit and safe."));
+            }
+        }
         return issues;
     }
 }

@@ -40,13 +40,13 @@ public final class TransactionalSelfInvocationRule extends AbstractSpringRule {
     @Override
     public List<LintIssue> evaluate(SourceUnit sourceUnit, ProjectContext context) {
         List<LintIssue> issues = new ArrayList<>();
-        sourceUnit.compilationUnit().ifPresent(compilationUnit -> collectIssues(sourceUnit, compilationUnit, issues));
+        collectIssues(sourceUnit, issues);
         return issues;
     }
 
-    private void collectIssues(SourceUnit sourceUnit, CompilationUnit compilationUnit, List<LintIssue> issues) {
-        for (TypeDeclaration<?> typeDeclaration : JavaSourceInspector.findTypeDeclarations(compilationUnit)) {
-            Set<String> transactionalMethods = JavaSourceInspector.findMethods(typeDeclaration).stream()
+    private void collectIssues(SourceUnit sourceUnit, List<LintIssue> issues) {
+        for (TypeDeclaration<?> typeDeclaration : sourceUnit.structure().typeDeclarations()) {
+            Set<String> transactionalMethods = sourceUnit.structure().methodsOf(typeDeclaration).stream()
                     .filter(method -> JavaSourceInspector.hasAnnotation(method, "Transactional"))
                     .map(MethodDeclaration::getNameAsString)
                     .collect(Collectors.toSet());
@@ -55,7 +55,7 @@ public final class TransactionalSelfInvocationRule extends AbstractSpringRule {
                 continue;
             }
 
-            for (MethodDeclaration method : JavaSourceInspector.findMethods(typeDeclaration)) {
+            for (MethodDeclaration method : sourceUnit.structure().methodsOf(typeDeclaration)) {
                 for (MethodCallExpr methodCall : method.findAll(MethodCallExpr.class)) {
                     if (methodCall.getScope().filter(ThisExpr.class::isInstance).isPresent()
                             && transactionalMethods.contains(methodCall.getNameAsString())) {

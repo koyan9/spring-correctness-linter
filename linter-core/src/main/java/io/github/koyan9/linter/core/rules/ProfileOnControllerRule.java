@@ -35,12 +35,12 @@ public final class ProfileOnControllerRule extends AbstractSpringRule {
     @Override
     public List<LintIssue> evaluate(SourceUnit sourceUnit, ProjectContext context) {
         List<LintIssue> issues = new ArrayList<>();
-        sourceUnit.compilationUnit().ifPresent(compilationUnit -> collectIssues(sourceUnit, compilationUnit, issues));
+        collectIssues(sourceUnit, issues);
         return issues;
     }
 
-    private void collectIssues(SourceUnit sourceUnit, CompilationUnit compilationUnit, List<LintIssue> issues) {
-        for (TypeDeclaration<?> typeDeclaration : JavaSourceInspector.findTypeDeclarations(compilationUnit)) {
+    private void collectIssues(SourceUnit sourceUnit, List<LintIssue> issues) {
+        for (TypeDeclaration<?> typeDeclaration : sourceUnit.structure().typeDeclarations()) {
             if (JavaSourceInspector.hasAnnotation(typeDeclaration, "Profile") && JavaSourceInspector.isController(typeDeclaration)) {
                 issues.add(issue(
                         sourceUnit,

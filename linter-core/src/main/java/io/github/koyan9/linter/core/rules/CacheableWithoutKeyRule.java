@@ -34,14 +34,12 @@ public final class CacheableWithoutKeyRule extends AbstractSpringRule {
     @Override
     public List<LintIssue> evaluate(SourceUnit sourceUnit, ProjectContext context) {
         List<LintIssue> issues = new ArrayList<>();
-        sourceUnit.compilationUnit().ifPresent(compilationUnit -> {
-            for (MethodDeclaration method : compilationUnit.findAll(MethodDeclaration.class)) {
-                if (JavaSourceInspector.hasAnnotation(method, "Cacheable")
-                        && !JavaSourceInspector.annotationDeclaresMember(method, "Cacheable", "key")) {
-                    issues.add(issue(sourceUnit, JavaSourceInspector.lineOf(method), "@Cacheable method '" + method.getNameAsString() + "' does not declare an explicit key."));
-                }
+        for (MethodDeclaration method : sourceUnit.structure().methods()) {
+            if (JavaSourceInspector.hasAnnotation(method, "Cacheable")
+                    && !JavaSourceInspector.annotationDeclaresMember(method, "Cacheable", "key")) {
+                issues.add(issue(sourceUnit, JavaSourceInspector.lineOf(method), "@Cacheable method '" + method.getNameAsString() + "' does not declare an explicit key."));
             }
-        });
+        }
         return issues;
     }
 }

@@ -34,13 +34,11 @@ public final class AsyncPrivateMethodRule extends AbstractSpringRule {
     @Override
     public List<LintIssue> evaluate(SourceUnit sourceUnit, ProjectContext context) {
         List<LintIssue> issues = new ArrayList<>();
-        sourceUnit.compilationUnit().ifPresent(compilationUnit -> {
-            for (MethodDeclaration method : compilationUnit.findAll(MethodDeclaration.class)) {
-                if (JavaSourceInspector.hasAnnotation(method, "Async") && method.isPrivate()) {
-                    issues.add(issue(sourceUnit, JavaSourceInspector.lineOf(method), "@Async method '" + method.getNameAsString() + "' is private and will not be advised by Spring proxies."));
-                }
+        for (MethodDeclaration method : sourceUnit.structure().methods()) {
+            if (JavaSourceInspector.hasAnnotation(method, "Async") && method.isPrivate()) {
+                issues.add(issue(sourceUnit, JavaSourceInspector.lineOf(method), "@Async method '" + method.getNameAsString() + "' is private and will not be advised by Spring proxies."));
             }
-        });
+        }
         return issues;
     }
 }

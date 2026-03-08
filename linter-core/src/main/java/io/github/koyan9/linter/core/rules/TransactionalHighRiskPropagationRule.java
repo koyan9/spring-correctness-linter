@@ -34,16 +34,14 @@ public final class TransactionalHighRiskPropagationRule extends AbstractSpringRu
     @Override
     public List<LintIssue> evaluate(SourceUnit sourceUnit, ProjectContext context) {
         List<LintIssue> issues = new ArrayList<>();
-        sourceUnit.compilationUnit().ifPresent(compilationUnit -> {
-            for (MethodDeclaration method : compilationUnit.findAll(MethodDeclaration.class)) {
-                boolean requiresNew = JavaSourceInspector.annotationMemberContains(method, "Transactional", "propagation", "REQUIRES_NEW");
-                boolean nested = JavaSourceInspector.annotationMemberContains(method, "Transactional", "propagation", "NESTED");
-                if (requiresNew || nested) {
-                    String propagation = requiresNew ? "REQUIRES_NEW" : "NESTED";
-                    issues.add(issue(sourceUnit, JavaSourceInspector.lineOf(method), "@Transactional method '" + method.getNameAsString() + "' uses propagation " + propagation + "; review connection usage, rollback semantics, and calling expectations."));
-                }
+        for (MethodDeclaration method : sourceUnit.structure().methods()) {
+            boolean requiresNew = JavaSourceInspector.annotationMemberContains(method, "Transactional", "propagation", "REQUIRES_NEW");
+            boolean nested = JavaSourceInspector.annotationMemberContains(method, "Transactional", "propagation", "NESTED");
+            if (requiresNew || nested) {
+                String propagation = requiresNew ? "REQUIRES_NEW" : "NESTED";
+                issues.add(issue(sourceUnit, JavaSourceInspector.lineOf(method), "@Transactional method '" + method.getNameAsString() + "' uses propagation " + propagation + "; review connection usage, rollback semantics, and calling expectations."));
             }
-        });
+        }
         return issues;
     }
 }

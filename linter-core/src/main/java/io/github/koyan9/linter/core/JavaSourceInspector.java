@@ -20,8 +20,10 @@ import com.github.javaparser.ast.expr.NormalAnnotationExpr;
 import com.github.javaparser.ast.nodeTypes.NodeWithAnnotations;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -33,8 +35,31 @@ public final class JavaSourceInspector {
     }
 
     public static Optional<CompilationUnit> parseCompilationUnit(String content) {
+        return inspect(content).compilationUnit();
+    }
+
+    public static ParseOutcome inspect(String content) {
         ParseResult<CompilationUnit> result = PARSER.parse(content);
-        return result.getResult();
+        return new ParseOutcome(
+                result.getResult(),
+                result.getProblems().stream().map(problem -> problem.getMessage()).toList()
+        );
+    }
+
+    public static SourceStructure buildStructure(Optional<CompilationUnit> compilationUnit) {
+        if (compilationUnit.isEmpty()) {
+            return SourceStructure.empty();
+        }
+
+        List<TypeDeclaration<?>> typeDeclarations = findTypeDeclarations(compilationUnit.get());
+        List<MethodDeclaration> methods = new ArrayList<>();
+        Map<TypeDeclaration<?>, List<MethodDeclaration>> methodsByType = new LinkedHashMap<>();
+        for (TypeDeclaration<?> typeDeclaration : typeDeclarations) {
+            List<MethodDeclaration> typeMethods = List.copyOf(findMethods(typeDeclaration));
+            methodsByType.put(typeDeclaration, typeMethods);
+            methods.addAll(typeMethods);
+        }
+        return new SourceStructure(typeDeclarations, methods, methodsByType);
     }
 
     public static boolean hasAnnotation(NodeWithAnnotations<?> node, String simpleName) {
@@ -130,5 +155,12 @@ public final class JavaSourceInspector {
 
     private static String expressionText(Expression expression) {
         return expression.toString();
+    }
+
+    public record ParseOutcome(Optional<CompilationUnit> compilationUnit, List<String> problems) {
+
+        public ParseOutcome {
+            problems = List.copyOf(problems);
+        }
     }
 }
