@@ -4,6 +4,15 @@
 
 `spring-correctness-linter` is a Maven-first static analysis tool for Spring applications. It focuses on **correctness and runtime semantics**, not general Java style. The project is designed to catch Spring-specific problems that compile successfully but often fail later in CI, integration testing, or production.
 
+## Highlights
+
+- Spring correctness checks instead of general Java style linting
+- AST-based analysis for proxy, transaction, async, event, cache, and controller-security risks
+- Baseline-friendly adoption for legacy codebases
+- Severity-based CI quality gates with module-aware failure messages
+- Multi-source-root and Maven reactor support for large repositories
+- JSON / HTML / SARIF / baseline diff output for local, CI, and code scanning workflows
+
 ## Why This Project Exists
 
 Spring applications can hide risky behavior behind annotations and proxy-based runtime semantics. A codebase may look valid while still containing defects such as:

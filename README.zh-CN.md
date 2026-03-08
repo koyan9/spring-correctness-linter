@@ -4,6 +4,15 @@
 
 `spring-correctness-linter` 是一个面向 Spring 项目的、以 Maven 为主的静态分析工具。它关注的不是通用 Java 代码风格，而是 **Spring 运行时语义与正确性风险** —— 也就是那些“能够编译通过、但很容易在运行期或集成环境里出问题”的代码模式。
 
+## 亮点
+
+- 聚焦 Spring correctness，而不是通用 Java 风格 lint
+- 基于 AST 分析代理、事务、异步、事件、缓存和控制器安全意图相关风险
+- 支持 baseline，适合遗留项目渐进式治理
+- 支持按严重级别在 CI 中做质量门禁，并带模块级失败提示
+- 支持多 source root 和 Maven reactor，多模块仓库可直接接入
+- 支持 JSON / HTML / SARIF / baseline diff 等多种输出，适配本地、CI 和代码扫描场景
+
 ## 背景与目标
 
 Spring 大量依赖注解、代理和运行时语义。很多问题在编译期不会报错，但在实际运行中会出现行为偏差，例如：
