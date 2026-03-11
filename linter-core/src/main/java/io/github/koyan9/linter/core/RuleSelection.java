@@ -22,6 +22,17 @@ public final class RuleSelection {
             Set<String> disabledRules,
             Map<String, LintSeverity> severityOverrides
     ) {
+        return configure(availableRules, enabledRules, disabledRules, Set.of(), Set.of(), severityOverrides);
+    }
+
+    public static List<LintRule> configure(
+            List<LintRule> availableRules,
+            Set<String> enabledRules,
+            Set<String> disabledRules,
+            Set<RuleDomain> enabledDomains,
+            Set<RuleDomain> disabledDomains,
+            Map<String, LintSeverity> severityOverrides
+    ) {
         Map<String, LintRule> rulesById = new LinkedHashMap<>();
         for (LintRule rule : availableRules) {
             String ruleId = normalizeRuleId(rule.id());
@@ -32,6 +43,8 @@ public final class RuleSelection {
 
         Set<String> normalizedEnabledRules = normalizeRuleIds(enabledRules);
         Set<String> normalizedDisabledRules = normalizeRuleIds(disabledRules);
+        Set<RuleDomain> normalizedEnabledDomains = normalizeRuleDomains(enabledDomains);
+        Set<RuleDomain> normalizedDisabledDomains = normalizeRuleDomains(disabledDomains);
         Map<String, LintSeverity> normalizedSeverityOverrides = normalizeSeverityOverrides(severityOverrides);
 
         validateRuleIds("enabledRules", normalizedEnabledRules, rulesById.keySet());
@@ -44,9 +57,31 @@ public final class RuleSelection {
             throw new IllegalArgumentException("Rules cannot be both enabled and disabled: " + String.join(", ", overlappingRules));
         }
 
-        Set<String> selectedRuleIds = normalizedEnabledRules.isEmpty()
+        Set<RuleDomain> overlappingDomains = new LinkedHashSet<>(normalizedEnabledDomains);
+        overlappingDomains.retainAll(normalizedDisabledDomains);
+        if (!overlappingDomains.isEmpty()) {
+            throw new IllegalArgumentException("Rule domains cannot be both enabled and disabled: "
+                    + overlappingDomains.stream().map(Enum::name).reduce((left, right) -> left + ", " + right).orElse(""));
+        }
+
+        Set<String> selectedRuleIds = normalizedEnabledRules.isEmpty() && normalizedEnabledDomains.isEmpty()
                 ? new LinkedHashSet<>(rulesById.keySet())
-                : new LinkedHashSet<>(normalizedEnabledRules);
+                : new LinkedHashSet<>();
+
+        if (!normalizedEnabledDomains.isEmpty()) {
+            for (Map.Entry<String, LintRule> entry : rulesById.entrySet()) {
+                if (normalizedEnabledDomains.contains(entry.getValue().domain())) {
+                    selectedRuleIds.add(entry.getKey());
+                }
+            }
+        }
+        selectedRuleIds.addAll(normalizedEnabledRules);
+
+        for (Map.Entry<String, LintRule> entry : rulesById.entrySet()) {
+            if (normalizedDisabledDomains.contains(entry.getValue().domain())) {
+                selectedRuleIds.remove(entry.getKey());
+            }
+        }
         selectedRuleIds.removeAll(normalizedDisabledRules);
 
         return rulesById.entrySet().stream()
@@ -91,6 +126,13 @@ public final class RuleSelection {
         return normalized;
     }
 
+    private static Set<RuleDomain> normalizeRuleDomains(Set<RuleDomain> ruleDomains) {
+        if (ruleDomains == null || ruleDomains.isEmpty()) {
+            return new LinkedHashSet<>();
+        }
+        return new LinkedHashSet<>(ruleDomains);
+    }
+
     private static void validateRuleIds(String fieldName, Set<String> requestedRuleIds, Set<String> availableRuleIds) {
         Set<String> unknownRules = new LinkedHashSet<>(requestedRuleIds);
         unknownRules.removeAll(availableRuleIds);
@@ -132,6 +174,11 @@ public final class RuleSelection {
         }
 
         @Override
+        public RuleDomain domain() {
+            return delegate.domain();
+        }
+
+        @Override
         public LintSeverity severity() {
             return severity;
         }
@@ -144,6 +191,21 @@ public final class RuleSelection {
         @Override
         public String implementationIdentity() {
             return delegate.implementationIdentity() + ":" + severity;
+        }
+
+        @Override
+        public List<String> appliesWhen() {
+            return delegate.appliesWhen();
+        }
+
+        @Override
+        public List<String> commonFalsePositiveBoundaries() {
+            return delegate.commonFalsePositiveBoundaries();
+        }
+
+        @Override
+        public List<String> recommendedFixes() {
+            return delegate.recommendedFixes();
         }
 
         @Override

@@ -12,16 +12,43 @@ All notable changes to `spring-correctness-linter` will be documented in this fi
 - Optional per-module baseline and incremental cache output
 - Rule enable / disable selection and per-rule severity overrides
 - Reactor sample project for multi-module validation
+- Runtime metrics in JSON / HTML reports, including phase timing, cache hit rate, and per-module analysis timing
+- Runtime summary logging in the Maven plugin for analyzed vs cached file counts
+- Recommended Maven configuration templates and GitHub SARIF upload guidance in the documentation
 
 ### Changed
 
 - Rule reference markdown now includes configuration and suppression examples
 - Analysis pipeline now caches unchanged files and surfaces cache reuse in reports and logs
 - HTML report now includes module dashboards and grouped issue presentation
+- HTML report findings now link to in-page rule guidance with applicability, false-positive boundaries, and remediation notes
+- JSON reports now expose shared `ruleGuidance` summaries for frontends and downstream tooling
+- Runtime metrics now include per-module cache hit rates and slow-module summaries in JSON and HTML reports
+- Built-in Spring rules are now registered through a lightweight internal registry instead of a single hard-coded list literal
+- Built-in rules now expose lightweight domain groups such as async, transaction, cache, web, events, and configuration
+- Rules can now be enabled or disabled by domain through Maven configuration
+- HTML and JSON reports now surface configured and effective rule-domain selections for easier CI debugging
+- HTML and JSON reports now also show configured rule ids and effective per-domain rule breakdowns
+- Maven plugin logs now print a concise rule-selection summary for faster CI diagnosis
+- Maven plugin logs now include cache hit rate and slow-module summaries for multi-module scans
+- Generated rule reference docs now include recommended domain-based rule bundles for common rollout scenarios
+- Added an initial `SCHEDULED` rule domain covering invalid trigger configuration, scheduled method parameters, and non-void return-value review
+- Expanded `SCHEDULED` coverage with `@Scheduled` + `@Async` and `@Scheduled` + `@Transactional` boundary checks
+- Expanded `SCHEDULED` coverage with repeated-schedule and non-positive-interval checks
+- Added an initial `LIFECYCLE` rule domain covering initialization callbacks combined with `@Async` and `@Transactional`
+- Expanded `LIFECYCLE` coverage to startup callbacks such as `ApplicationRunner` and `SmartInitializingSingleton`
+- `samples/vulnerable-sample/` now includes vulnerable `@Scheduled` examples for end-to-end validation
 - Quality gate failures now report the affected module IDs
+- Incremental cache reuse is now documented with explicit fingerprint-based invalidation semantics
+- `README.zh-CN.md` is aligned with the English README for runtime metrics, cache guidance, and code scanning integration
 
 ### Fixed
 
+- `SPRING_ENDPOINT_SECURITY` now includes class-level composed security annotation coverage in tests
+- `SPRING_CACHEABLE_KEY` respects class-level `@CacheConfig(keyGenerator = ...)` when determining explicit cache key strategy
+- Endpoint security semantic facts now recognize `@PostAuthorize`, `@PreFilter`, and `@PostFilter` alongside existing security annotations
+- `SPRING_CACHEABLE_KEY` no longer flags zero-argument `@Cacheable` methods while still warning on parameterized methods without an explicit key strategy
+- `SPRING_TX_SELF_INVOCATION` now also detects unqualified same-type calls such as `inner()`, covers class-level `@Transactional` public methods, supports multi-level inheritance across source roots, includes interface default-method targets (including final classes), resolves implicit same-package and explicit/wildcard imports for nested types, supports varargs matching, skips final transactional targets already covered by `SPRING_TX_FINAL_METHOD`, and reduces overload noise by matching method arity; ambiguous simple-name inheritance resolves same-package matches first and skips cross-package mismatches
 - Sample naming, report paths, and plugin property documentation are aligned with `spring-correctness-linter`
 - Parse problems are surfaced instead of being silently dropped from analysis output
 

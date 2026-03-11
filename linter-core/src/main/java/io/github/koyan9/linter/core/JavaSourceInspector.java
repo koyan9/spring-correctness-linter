@@ -17,6 +17,7 @@ import com.github.javaparser.ast.body.TypeDeclaration;
 import com.github.javaparser.ast.expr.AnnotationExpr;
 import com.github.javaparser.ast.expr.Expression;
 import com.github.javaparser.ast.expr.NormalAnnotationExpr;
+import com.github.javaparser.ast.expr.SingleMemberAnnotationExpr;
 import com.github.javaparser.ast.nodeTypes.NodeWithAnnotations;
 
 import java.util.ArrayList;
@@ -66,6 +67,19 @@ public final class JavaSourceInspector {
         return findAnnotation(node, simpleName).isPresent();
     }
 
+    public static boolean hasAnnotation(NodeWithAnnotations<?> node, ProjectContext context, String simpleName) {
+        if (hasAnnotation(node, simpleName)) {
+            return true;
+        }
+        return context.annotationMetadataIndex().expandedAnnotationNames(node).contains(simpleName);
+    }
+
+    public static long annotationMatchCount(NodeWithAnnotations<?> node, ProjectContext context, String simpleName) {
+        return node.getAnnotations().stream()
+                .filter(annotationExpr -> context.annotationMetadataIndex().expandedAnnotationNames(annotationExpr).contains(simpleName))
+                .count();
+    }
+
     public static Optional<AnnotationExpr> findAnnotation(NodeWithAnnotations<?> node, String simpleName) {
         return node.getAnnotations().stream()
                 .filter(annotation -> annotationName(annotation).equals(simpleName))
@@ -76,6 +90,26 @@ public final class JavaSourceInspector {
         return findAnnotation(node, annotationName)
                 .map(annotation -> annotationDeclaresMember(annotation, memberName))
                 .orElse(false);
+    }
+
+    public static Optional<String> annotationMemberValue(NodeWithAnnotations<?> node, ProjectContext context, String annotationName, String memberName) {
+        for (AnnotationExpr annotationExpr : node.getAnnotations()) {
+            String currentName = annotationSimpleName(annotationExpr);
+            if (currentName.equals(annotationName)) {
+                Optional<String> directValue = annotationMemberValue(annotationExpr, memberName);
+                if (directValue.isPresent()) {
+                    return directValue;
+                }
+            }
+        }
+        return context.annotationMetadataIndex().annotationMemberValue(node, annotationName, memberName);
+    }
+
+    public static boolean annotationDeclaresMember(NodeWithAnnotations<?> node, ProjectContext context, String annotationName, String memberName) {
+        if (annotationDeclaresMember(node, annotationName, memberName)) {
+            return true;
+        }
+        return context.annotationMetadataIndex().annotationMemberValue(node, annotationName, memberName).isPresent();
     }
 
     public static boolean annotationDeclaresMember(AnnotationExpr annotationExpr, String memberName) {
@@ -92,12 +126,24 @@ public final class JavaSourceInspector {
                 .orElse(false);
     }
 
+    public static boolean annotationMemberContains(NodeWithAnnotations<?> node, ProjectContext context, String annotationName, String memberName, String token) {
+        if (annotationMemberContains(node, annotationName, memberName, token)) {
+            return true;
+        }
+        return context.annotationMetadataIndex().annotationMemberValue(node, annotationName, memberName)
+                .map(value -> value.contains(token))
+                .orElse(false);
+    }
+
     public static Optional<String> annotationMemberValue(AnnotationExpr annotationExpr, String memberName) {
         if (annotationExpr instanceof NormalAnnotationExpr normalAnnotationExpr) {
             return normalAnnotationExpr.getPairs().stream()
                     .filter(pair -> pair.getNameAsString().equals(memberName))
                     .map(pair -> expressionText(pair.getValue()))
                     .findFirst();
+        }
+        if (annotationExpr instanceof SingleMemberAnnotationExpr singleMemberAnnotationExpr && "value".equals(memberName)) {
+            return Optional.of(expressionText(singleMemberAnnotationExpr.getMemberValue()));
         }
         return Optional.empty();
     }
@@ -107,6 +153,12 @@ public final class JavaSourceInspector {
         for (AnnotationExpr annotation : node.getAnnotations()) {
             names.add(annotationName(annotation));
         }
+        return names;
+    }
+
+    public static Set<String> annotationNames(NodeWithAnnotations<?> node, ProjectContext context) {
+        Set<String> names = new LinkedHashSet<>(annotationNames(node));
+        names.addAll(context.annotationMetadataIndex().expandedAnnotationNames(node));
         return names;
     }
 
@@ -135,6 +187,10 @@ public final class JavaSourceInspector {
         return hasAnnotation(typeDeclaration, "RestController") || hasAnnotation(typeDeclaration, "Controller");
     }
 
+    public static boolean isController(TypeDeclaration<?> typeDeclaration, ProjectContext context) {
+        return hasAnnotation(typeDeclaration, context, "RestController") || hasAnnotation(typeDeclaration, context, "Controller");
+    }
+
     public static boolean isRequestMapping(MethodDeclaration methodDeclaration) {
         return hasAnnotation(methodDeclaration, "GetMapping")
                 || hasAnnotation(methodDeclaration, "PostMapping")
@@ -144,13 +200,103 @@ public final class JavaSourceInspector {
                 || hasAnnotation(methodDeclaration, "RequestMapping");
     }
 
+    public static boolean isRequestMapping(MethodDeclaration methodDeclaration, ProjectContext context) {
+        return hasAnnotation(methodDeclaration, context, "GetMapping")
+                || hasAnnotation(methodDeclaration, context, "PostMapping")
+                || hasAnnotation(methodDeclaration, context, "PutMapping")
+                || hasAnnotation(methodDeclaration, context, "DeleteMapping")
+                || hasAnnotation(methodDeclaration, context, "PatchMapping")
+                || hasAnnotation(methodDeclaration, context, "RequestMapping");
+    }
+
+    public static boolean isInitializationCallback(TypeDeclaration<?> typeDeclaration, MethodDeclaration methodDeclaration, ProjectContext context) {
+        return hasAnnotation(methodDeclaration, context, "PostConstruct")
+                || isInitializingBeanCallback(typeDeclaration, methodDeclaration);
+    }
+
+    public static boolean isStartupLifecycleMethod(TypeDeclaration<?> typeDeclaration, MethodDeclaration methodDeclaration, ProjectContext context) {
+        return isInitializationCallback(typeDeclaration, methodDeclaration, context)
+                || isApplicationRunnerCallback(typeDeclaration, methodDeclaration)
+                || isCommandLineRunnerCallback(typeDeclaration, methodDeclaration)
+                || isSmartInitializingSingletonCallback(typeDeclaration, methodDeclaration);
+    }
+
+    public static boolean isInitializingBeanCallback(TypeDeclaration<?> typeDeclaration, MethodDeclaration methodDeclaration) {
+        if (!"afterPropertiesSet".equals(methodDeclaration.getNameAsString())) {
+            return false;
+        }
+        if (!methodDeclaration.getParameters().isEmpty() || !methodDeclaration.getType().isVoidType()) {
+            return false;
+        }
+        if (typeDeclaration instanceof ClassOrInterfaceDeclaration classOrInterfaceDeclaration) {
+            return classOrInterfaceDeclaration.getImplementedTypes().stream()
+                    .map(type -> type.getName().getIdentifier())
+                    .anyMatch(name -> name.equals("InitializingBean"));
+        }
+        return false;
+    }
+
+    public static boolean isApplicationRunnerCallback(TypeDeclaration<?> typeDeclaration, MethodDeclaration methodDeclaration) {
+        if (!"run".equals(methodDeclaration.getNameAsString()) || methodDeclaration.getParameters().size() != 1) {
+            return false;
+        }
+        if (typeDeclaration instanceof ClassOrInterfaceDeclaration classOrInterfaceDeclaration) {
+            return classOrInterfaceDeclaration.getImplementedTypes().stream()
+                    .map(type -> type.getName().getIdentifier())
+                    .anyMatch(name -> name.equals("ApplicationRunner"));
+        }
+        return false;
+    }
+
+    public static boolean isCommandLineRunnerCallback(TypeDeclaration<?> typeDeclaration, MethodDeclaration methodDeclaration) {
+        if (!"run".equals(methodDeclaration.getNameAsString()) || methodDeclaration.getParameters().size() != 1) {
+            return false;
+        }
+        if (typeDeclaration instanceof ClassOrInterfaceDeclaration classOrInterfaceDeclaration) {
+            return classOrInterfaceDeclaration.getImplementedTypes().stream()
+                    .map(type -> type.getName().getIdentifier())
+                    .anyMatch(name -> name.equals("CommandLineRunner"));
+        }
+        return false;
+    }
+
+    public static boolean isSmartInitializingSingletonCallback(TypeDeclaration<?> typeDeclaration, MethodDeclaration methodDeclaration) {
+        if (!"afterSingletonsInstantiated".equals(methodDeclaration.getNameAsString())
+                || !methodDeclaration.getParameters().isEmpty()
+                || !methodDeclaration.getType().isVoidType()) {
+            return false;
+        }
+        if (typeDeclaration instanceof ClassOrInterfaceDeclaration classOrInterfaceDeclaration) {
+            return classOrInterfaceDeclaration.getImplementedTypes().stream()
+                    .map(type -> type.getName().getIdentifier())
+                    .anyMatch(name -> name.equals("SmartInitializingSingleton"));
+        }
+        return false;
+    }
+
     public static int lineOf(Node node) {
         return node.getBegin().map(position -> position.line).orElse(1);
     }
 
-    private static String annotationName(AnnotationExpr annotationExpr) {
+    static String annotationSimpleName(AnnotationExpr annotationExpr) {
         String identifier = annotationExpr.getName().getIdentifier();
         return identifier == null || identifier.isBlank() ? annotationExpr.getNameAsString() : identifier;
+    }
+
+    static Map<String, String> annotationMembers(AnnotationExpr annotationExpr) {
+        if (annotationExpr instanceof NormalAnnotationExpr normalAnnotationExpr) {
+            Map<String, String> members = new LinkedHashMap<>();
+            normalAnnotationExpr.getPairs().forEach(pair -> members.put(pair.getNameAsString(), expressionText(pair.getValue())));
+            return members;
+        }
+        if (annotationExpr instanceof SingleMemberAnnotationExpr singleMemberAnnotationExpr) {
+            return Map.of("value", expressionText(singleMemberAnnotationExpr.getMemberValue()));
+        }
+        return Map.of();
+    }
+
+    private static String annotationName(AnnotationExpr annotationExpr) {
+        return annotationSimpleName(annotationExpr);
     }
 
     private static String expressionText(Expression expression) {

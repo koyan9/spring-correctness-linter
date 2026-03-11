@@ -14,7 +14,10 @@
 - Update README / CHANGELOG / release notes template when needed
 - Validate project-local samples before release if your change affects integration behavior
 - Validate both `samples/vulnerable-sample/` and `samples/reactor-sample/` when changing plugin integration, module scanning, baseline handling, or report generation
-- When preparing a release, add `RELEASE_NOTES_vX.Y.Z.md`; the workflow falls back to `RELEASE_NOTES_TEMPLATE.md` if a versioned file is missing
+- When preparing a release, add `RELEASE_NOTES_vX.Y.Z.md`; if a versioned file is missing, the workflow falls back to `RELEASE_NOTES_TEMPLATE.md` and auto-fills release name / tag metadata
+- Follow `docs/RELEASE_PROCESS.md` for the recommended release checklist, workflow inputs, and release-note expectations
+- Follow `docs/RULE_DEVELOPMENT.md` when adding or refactoring rules so semantic helpers and rule structure stay consistent
+- Check `docs/ACCURACY_BACKLOG.md` when choosing the next rule-hardening or false-positive-reduction task
 
 ## Validation Checklist
 

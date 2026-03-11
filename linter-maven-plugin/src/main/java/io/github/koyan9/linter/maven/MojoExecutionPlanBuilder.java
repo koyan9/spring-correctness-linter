@@ -7,6 +7,7 @@ package io.github.koyan9.linter.maven;
 
 import io.github.koyan9.linter.core.LintOptions;
 import io.github.koyan9.linter.core.LintRule;
+import io.github.koyan9.linter.core.RuleDomain;
 import io.github.koyan9.linter.core.RuleSelection;
 import io.github.koyan9.linter.core.SourceRoot;
 import io.github.koyan9.linter.core.rules.SpringBootRuleSet;
@@ -41,17 +42,25 @@ final class MojoExecutionPlanBuilder {
             boolean includeTestSourceRoots,
             String enabledRules,
             String disabledRules,
+            String enabledRuleDomains,
+            String disabledRuleDomains,
             String severityOverrides
     ) throws MojoExecutionException {
         Path projectRoot = projectBaseDir.toPath();
         Path reportsRoot = reportDirectory.toPath();
         Path baselinePath = baselineFile == null ? null : baselineFile.toPath();
         Path analysisCachePath = cacheFile == null ? null : cacheFile.toPath();
+        java.util.Set<String> parsedEnabledRules = optionParser.parseRuleIds(enabledRules);
+        java.util.Set<String> parsedDisabledRules = optionParser.parseRuleIds(disabledRules);
+        java.util.Set<RuleDomain> parsedEnabledRuleDomains = optionParser.parseRuleDomains(enabledRuleDomains);
+        java.util.Set<RuleDomain> parsedDisabledRuleDomains = optionParser.parseRuleDomains(disabledRuleDomains);
 
         List<LintRule> rules = RuleSelection.configure(
                 SpringBootRuleSet.defaultRules(),
-                optionParser.parseRuleIds(enabledRules),
-                optionParser.parseRuleIds(disabledRules),
+                parsedEnabledRules,
+                parsedDisabledRules,
+                parsedEnabledRuleDomains,
+                parsedDisabledRuleDomains,
                 optionParser.parseSeverityOverrides(severityOverrides)
         );
         List<SourceRoot> sourceRoots = sourceRootResolver.resolve(
@@ -77,7 +86,11 @@ final class MojoExecutionPlanBuilder {
                 splitCacheByModule ? null : analysisCachePath,
                 useIncrementalCache,
                 moduleBaselineFiles,
-                moduleCacheFiles
+                moduleCacheFiles,
+                parsedEnabledRuleDomains,
+                parsedDisabledRuleDomains,
+                parsedEnabledRules,
+                parsedDisabledRules
         );
 
         return new MojoExecutionPlan(projectRoot, reportsRoot, baselinePath, sourceRoots, moduleBaselineFiles, rules, options);

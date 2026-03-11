@@ -5,9 +5,12 @@
 
 package io.github.koyan9.linter.core;
 
+import java.util.List;
 import java.util.Map;
 
 final class LintReportJsonWriter {
+
+    private final RuleGuidanceJsonSupport ruleGuidanceJsonSupport = new RuleGuidanceJsonSupport();
 
     String write(LintReport report) {
         StringBuilder builder = new StringBuilder();
@@ -48,6 +51,65 @@ final class LintReportJsonWriter {
         }
         builder.append("}\n");
         builder.append("  },\n");
+        appendRuleDomainSelection(builder, report.ruleDomainSelection());
+        builder.append(",\n");
+        builder.append("  \"runtimeMetrics\": {\n");
+        builder.append("    \"incrementalCacheEnabled\": ").append(report.runtimeMetrics().incrementalCacheEnabled()).append(",\n");
+        builder.append("    \"cacheScope\": \"").append(ReportWriterSupport.escapeJson(report.runtimeMetrics().cacheScope())).append("\",\n");
+        builder.append("    \"analysisFingerprint\": \"").append(ReportWriterSupport.escapeJson(report.runtimeMetrics().analysisFingerprint())).append("\",\n");
+        builder.append("    \"totalElapsedMillis\": ").append(report.runtimeMetrics().totalElapsedMillis()).append(",\n");
+        builder.append("    \"sourceFileCount\": ").append(report.runtimeMetrics().sourceFileCount()).append(",\n");
+        builder.append("    \"analyzedFileCount\": ").append(report.runtimeMetrics().analyzedFileCount()).append(",\n");
+        builder.append("    \"cachedFileCount\": ").append(report.runtimeMetrics().cachedFileCount()).append(",\n");
+        builder.append("    \"parseProblemFileCount\": ").append(report.runtimeMetrics().parseProblemFileCount()).append(",\n");
+        builder.append("    \"cacheHitRatePercent\": ").append(report.runtimeMetrics().cacheHitRatePercent()).append(",\n");
+        builder.append("    \"phaseMetrics\": {\n");
+        builder.append("      \"contextLoadMillis\": ").append(report.runtimeMetrics().phaseMetrics().contextLoadMillis()).append(",\n");
+        builder.append("      \"cacheLoadMillis\": ").append(report.runtimeMetrics().phaseMetrics().cacheLoadMillis()).append(",\n");
+        builder.append("      \"fileAnalysisMillis\": ").append(report.runtimeMetrics().phaseMetrics().fileAnalysisMillis()).append(",\n");
+        builder.append("      \"cacheWriteMillis\": ").append(report.runtimeMetrics().phaseMetrics().cacheWriteMillis()).append(",\n");
+        builder.append("      \"baselineLoadMillis\": ").append(report.runtimeMetrics().phaseMetrics().baselineLoadMillis()).append(",\n");
+        builder.append("      \"baselineFilterMillis\": ").append(report.runtimeMetrics().phaseMetrics().baselineFilterMillis()).append(",\n");
+        builder.append("      \"reportAssemblyMillis\": ").append(report.runtimeMetrics().phaseMetrics().reportAssemblyMillis()).append(",\n");
+        builder.append("      \"totalTrackedMillis\": ").append(report.runtimeMetrics().phaseMetrics().totalTrackedMillis()).append("\n");
+        builder.append("    },\n");
+        builder.append("    \"moduleMetrics\": [\n");
+        for (int index = 0; index < report.runtimeMetrics().moduleMetrics().size(); index++) {
+            ModuleRuntimeMetrics moduleMetric = report.runtimeMetrics().moduleMetrics().get(index);
+            builder.append("      {\n");
+            builder.append("        \"moduleId\": \"").append(ReportWriterSupport.escapeJson(moduleMetric.moduleId())).append("\",\n");
+            builder.append("        \"sourceFileCount\": ").append(moduleMetric.sourceFileCount()).append(",\n");
+            builder.append("        \"analyzedFileCount\": ").append(moduleMetric.analyzedFileCount()).append(",\n");
+            builder.append("        \"cachedFileCount\": ").append(moduleMetric.cachedFileCount()).append(",\n");
+            builder.append("        \"parseProblemFileCount\": ").append(moduleMetric.parseProblemFileCount()).append(",\n");
+            builder.append("        \"analysisMillis\": ").append(moduleMetric.analysisMillis()).append(",\n");
+            builder.append("        \"cacheHitRatePercent\": ").append(moduleMetric.cacheHitRatePercent()).append('\n');
+            builder.append("      }");
+            if (index < report.runtimeMetrics().moduleMetrics().size() - 1) {
+                builder.append(',');
+            }
+            builder.append('\n');
+        }
+        builder.append("    ],\n");
+        builder.append("    \"slowModules\": [\n");
+        List<ModuleRuntimeMetrics> slowModules = report.runtimeMetrics().slowestModules(5);
+        for (int index = 0; index < slowModules.size(); index++) {
+            ModuleRuntimeMetrics moduleMetric = slowModules.get(index);
+            builder.append("      {\n");
+            builder.append("        \"moduleId\": \"").append(ReportWriterSupport.escapeJson(moduleMetric.moduleId())).append("\",\n");
+            builder.append("        \"analysisMillis\": ").append(moduleMetric.analysisMillis()).append(",\n");
+            builder.append("        \"sourceFileCount\": ").append(moduleMetric.sourceFileCount()).append(",\n");
+            builder.append("        \"analyzedFileCount\": ").append(moduleMetric.analyzedFileCount()).append(",\n");
+            builder.append("        \"cachedFileCount\": ").append(moduleMetric.cachedFileCount()).append(",\n");
+            builder.append("        \"cacheHitRatePercent\": ").append(moduleMetric.cacheHitRatePercent()).append('\n');
+            builder.append("      }");
+            if (index < slowModules.size() - 1) {
+                builder.append(',');
+            }
+            builder.append('\n');
+        }
+        builder.append("    ]\n");
+        builder.append("  },\n");
         builder.append("  \"rules\": [\n");
         for (int index = 0; index < report.rules().size(); index++) {
             RuleDescriptor rule = report.rules().get(index);
@@ -55,7 +117,14 @@ final class LintReportJsonWriter {
             builder.append("      \"id\": \"").append(ReportWriterSupport.escapeJson(rule.id())).append("\",\n");
             builder.append("      \"title\": \"").append(ReportWriterSupport.escapeJson(rule.title())).append("\",\n");
             builder.append("      \"description\": \"").append(ReportWriterSupport.escapeJson(rule.description())).append("\",\n");
-            builder.append("      \"defaultSeverity\": \"").append(rule.defaultSeverity()).append("\"\n");
+            builder.append("      \"domain\": \"").append(rule.domain()).append("\",\n");
+            builder.append("      \"defaultSeverity\": \"").append(rule.defaultSeverity()).append("\",\n");
+            appendStringArray(builder, "appliesWhen", rule.appliesWhen(), 6);
+            builder.append(",\n");
+            appendStringArray(builder, "commonFalsePositiveBoundaries", rule.commonFalsePositiveBoundaries(), 6);
+            builder.append(",\n");
+            appendStringArray(builder, "recommendedFixes", rule.recommendedFixes(), 6);
+            builder.append('\n');
             builder.append("    }");
             if (index < report.rules().size() - 1) {
                 builder.append(',');
@@ -63,6 +132,8 @@ final class LintReportJsonWriter {
             builder.append('\n');
         }
         builder.append("  ],\n");
+        ruleGuidanceJsonSupport.appendRuleGuidanceArray(builder, "ruleGuidance", RuleGuidanceSummaries.forLintReport(report), 2);
+        builder.append(",\n");
         builder.append("  \"moduleSummaries\": [\n");
         for (int index = 0; index < report.moduleSummaries().size(); index++) {
             ModuleSummary moduleSummary = report.moduleSummaries().get(index);
@@ -121,5 +192,51 @@ final class LintReportJsonWriter {
         builder.append("  ]\n");
         builder.append("}\n");
         return builder.toString();
+    }
+
+    private void appendStringArray(StringBuilder builder, String fieldName, java.util.List<String> values, int indentSize) {
+        ruleGuidanceJsonSupport.appendStringArray(builder, fieldName, values, indentSize);
+    }
+
+    private void appendRuleDomainSelection(StringBuilder builder, RuleDomainSelectionSummary summary) {
+        builder.append("  \"ruleDomainSelection\": {\n");
+        appendDomainArray(builder, "enabledDomains", summary.enabledDomains(), 4);
+        builder.append(",\n");
+        appendDomainArray(builder, "disabledDomains", summary.disabledDomains(), 4);
+        builder.append(",\n");
+        appendDomainArray(builder, "effectiveDomains", summary.effectiveDomains(), 4);
+        builder.append(",\n");
+        appendStringArray(builder, "enabledRuleIds", summary.enabledRuleIds(), 4);
+        builder.append(",\n");
+        appendStringArray(builder, "disabledRuleIds", summary.disabledRuleIds(), 4);
+        builder.append(",\n");
+        appendStringArray(builder, "effectiveRuleIds", summary.effectiveRuleIds(), 4);
+        builder.append(",\n");
+        appendRuleDomainBreakdown(builder, summary.effectiveRuleBreakdown(), 4);
+        builder.append("\n  }");
+    }
+
+    private void appendDomainArray(StringBuilder builder, String fieldName, java.util.List<RuleDomain> values, int indentSize) {
+        appendStringArray(builder, fieldName, values.stream().map(Enum::name).toList(), indentSize);
+    }
+
+    private void appendRuleDomainBreakdown(StringBuilder builder, java.util.List<RuleDomainRuleSummary> breakdown, int indentSize) {
+        String indent = " ".repeat(indentSize);
+        String childIndent = " ".repeat(indentSize + 2);
+        builder.append(indent).append("\"effectiveRuleBreakdown\": [\n");
+        for (int index = 0; index < breakdown.size(); index++) {
+            RuleDomainRuleSummary summary = breakdown.get(index);
+            builder.append(childIndent).append("{\n");
+            builder.append(childIndent).append("  \"domain\": \"").append(summary.domain().name()).append("\",\n");
+            builder.append(childIndent).append("  \"ruleCount\": ").append(summary.ruleCount()).append(",\n");
+            appendStringArray(builder, "ruleIds", summary.ruleIds(), indentSize + 4);
+            builder.append('\n');
+            builder.append(childIndent).append("}");
+            if (index < breakdown.size() - 1) {
+                builder.append(',');
+            }
+            builder.append('\n');
+        }
+        builder.append(indent).append(']');
     }
 }

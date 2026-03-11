@@ -25,5 +25,21 @@ public interface LintRule {
         return implementationClass().getName();
     }
 
+    default RuleDomain domain() {
+        return RuleDomain.GENERAL;
+    }
+
+    default List<String> appliesWhen() {
+        return List.of();
+    }
+
+    default List<String> commonFalsePositiveBoundaries() {
+        return List.of();
+    }
+
+    default List<String> recommendedFixes() {
+        return List.of();
+    }
+
     List<LintIssue> evaluate(SourceUnit sourceUnit, ProjectContext context);
 }

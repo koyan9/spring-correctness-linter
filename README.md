@@ -67,11 +67,15 @@ At a high level, one lint run works like this:
 The default rule set currently focuses on:
 
 - `@Async` misuse
+- lifecycle and startup boundary reviews such as `@PostConstruct`, `afterPropertiesSet()`, `ApplicationRunner`, and `SmartInitializingSingleton` with proxy-oriented annotations
+- `@Scheduled` misuse and scheduling boundary reviews
 - `@Transactional` misuse
 - `@EventListener` / `@TransactionalEventListener` boundaries
 - cache key and cache annotation combination risks
 - controller security intent checks
 - conditional bean conflict detection
+
+Some rules that need type resolution (for example `SPRING_TX_SELF_INVOCATION`) use a conservative lookup strategy: same-package matches first, then explicit or wildcard imports, and finally unique simple-name matches when unambiguous. The shared implementation lives in `TypeResolutionIndex` under `linter-core/`. See `docs/RULE_DEVELOPMENT.md` for the current resolution guidance.
 
 ## Quick Start
 
@@ -141,6 +145,17 @@ Reports are written under `target/spring-correctness-linter/` by default:
 
 When module splitting is enabled, module-specific files can also be written under `modules/<module>/`.
 
+JSON and HTML reports now also include runtime metrics so users can inspect:
+
+- total analysis duration
+- analyzed vs cached file counts
+- cache hit rate and cache scope
+- per-phase timing breakdown
+- per-module analysis timing and cache hit rate
+- slowest modules by analysis time
+- configured enabled / disabled rule domains and effective rule domains for the current run
+- configured enabled / disabled rule ids and an effective per-domain rule breakdown for the current run
+
 ## Baseline and Incremental Cache
 
 The project supports two complementary workflows:
@@ -154,6 +169,15 @@ Available patterns:
 - per-module baseline files
 - single incremental cache file
 - per-module incremental cache files
+
+Incremental cache reuse is invalidated automatically when the effective analysis fingerprint changes. In practice that fingerprint includes:
+
+- the enabled rule set
+- per-rule severity overrides
+- inline suppression behavior
+- the current analysis engine implementation
+
+This keeps cache reuse fast without silently reusing findings across materially different analysis configurations.
 
 ## Multi-Module and Reactor Support
 
@@ -181,6 +205,8 @@ When reactor scanning is enabled:
 - `spring.correctness.linter.writeBaseline=true`: regenerate baseline
 - `spring.correctness.linter.enabledRules=RULE_A,RULE_B`: run only selected rules
 - `spring.correctness.linter.disabledRules=RULE_A,RULE_B`: skip selected rules
+- `spring.correctness.linter.enabledRuleDomains=TRANSACTION,CACHE`: run rules from selected domains
+- `spring.correctness.linter.disabledRuleDomains=WEB`: skip rules from selected domains
 - `spring.correctness.linter.severityOverrides=RULE_A=ERROR,RULE_B=INFO`: override per-rule severities
 - `spring.correctness.linter.failOnSeverity=WARNING`: fail the build for matching severities
 - `spring.correctness.linter.failOnError=true`: fail the build when any visible issue remains
@@ -190,6 +216,126 @@ When reactor scanning is enabled:
 - `spring.correctness.linter.splitCacheByModule=true`: write module-scoped cache files
 
 PowerShell note: quote dotted `-Dspring.correctness.linter.*` properties or invoke Maven through `cmd /c`.
+
+Available built-in rule domains currently include `ASYNC`, `LIFECYCLE`, `SCHEDULED`, `CACHE`, `WEB`, `TRANSACTION`, `EVENTS`, and `CONFIGURATION`.
+
+Recommended starter bundles:
+
+- `CI Starter`: `ASYNC,TRANSACTION,WEB`
+- `Lifecycle Focus`: `LIFECYCLE`
+- `Scheduled Focus`: `SCHEDULED`
+- `Transaction Focus`: `TRANSACTION,EVENTS`
+- `Web/API Focus`: `WEB`
+- `Cache Focus`: `CACHE`
+
+The generated `rules-reference.md` expands these bundles into concrete rule IDs, so teams can start with a domain bundle and refine later.
+
+## Recommended Configurations
+
+### Minimal local adoption
+
+```xml
+<configuration>
+  <formats>
+    <format>json</format>
+    <format>html</format>
+  </formats>
+</configuration>
+```
+
+### CI quality gate
+
+```xml
+<configuration>
+  <formats>
+    <format>json</format>
+    <format>html</format>
+    <format>sarif</format>
+  </formats>
+  <failOnSeverity>WARNING</failOnSeverity>
+</configuration>
+```
+
+### Recommended starter bundles
+
+Use these when you want a smaller rollout surface before enabling the full default rule set.
+
+#### CI Starter
+
+```xml
+<configuration>
+  <enabledRuleDomains>ASYNC,TRANSACTION,WEB</enabledRuleDomains>
+  <failOnSeverity>WARNING</failOnSeverity>
+</configuration>
+```
+
+#### Scheduled Focus
+
+```xml
+<configuration>
+  <enabledRuleDomains>SCHEDULED</enabledRuleDomains>
+</configuration>
+```
+
+#### Lifecycle Focus
+
+```xml
+<configuration>
+  <enabledRuleDomains>LIFECYCLE</enabledRuleDomains>
+</configuration>
+```
+
+#### Transaction Focus
+
+```xml
+<configuration>
+  <enabledRuleDomains>TRANSACTION,EVENTS</enabledRuleDomains>
+</configuration>
+```
+
+#### Web/API Focus
+
+```xml
+<configuration>
+  <enabledRuleDomains>WEB</enabledRuleDomains>
+</configuration>
+```
+
+#### Cache Focus
+
+```xml
+<configuration>
+  <enabledRuleDomains>CACHE</enabledRuleDomains>
+</configuration>
+```
+
+### Baseline-first rollout for legacy code
+
+```xml
+<configuration>
+  <writeBaseline>false</writeBaseline>
+  <applyBaseline>true</applyBaseline>
+  <useIncrementalCache>true</useIncrementalCache>
+</configuration>
+```
+
+Generate the first baseline once with:
+
+```bash
+./mvnw io.github.koyan9:spring-correctness-linter-maven-plugin:0.1.0:lint \
+  "-Dspring.correctness.linter.writeBaseline=true"
+```
+
+### Multi-module reactor governance
+
+```xml
+<configuration>
+  <scanReactorModules>true</scanReactorModules>
+  <splitBaselineByModule>true</splitBaselineByModule>
+  <splitCacheByModule>true</splitCacheByModule>
+  <useIncrementalCache>true</useIncrementalCache>
+</configuration>
+```
 
 ## Inline Suppression
 
@@ -223,6 +369,24 @@ Current quality gates support:
 
 - severity thresholds
 - module-aware failure messages
+
+`failOnSeverity` takes precedence when it is configured. `failOnError=true` remains useful as a simple fallback when you want any visible issue to fail the build.
+
+## GitHub Code Scanning
+
+When SARIF output is enabled, GitHub Actions can upload the generated report to code scanning:
+
+```yaml
+- name: Verify project
+  run: mvn -B -q verify
+
+- name: Upload SARIF
+  uses: github/codeql-action/upload-sarif@v3
+  with:
+    sarif_file: target/spring-correctness-linter/lint-report.sarif.json
+```
+
+For multi-module reactors scanned from the execution root, upload the SARIF file generated in the reactor root report directory.
 
 ## Validation and Coverage
 
@@ -264,6 +428,9 @@ A multi-module Maven reactor sample that demonstrates:
 - `samples/reactor-sample/`: reactor validation sample
 - `CHANGELOG.md`: release history
 - `RELEASE_NOTES_TEMPLATE.md`: release notes template
+- `docs/RELEASE_PROCESS.md`: release checklist and workflow guide
+- `docs/RULE_DEVELOPMENT.md`: rule implementation and semantic-facts guide
+- `docs/ACCURACY_BACKLOG.md`: prioritized rule-accuracy and regression-test backlog
 
 ## Current Status
 
@@ -277,3 +444,5 @@ The project currently provides a practical Spring correctness linting workflow s
 ## Milestones
 
 - For a compact history of the major improvements and project evolution, see `docs/MILESTONES.md`.
+- For the current near-term direction, see `docs/ROADMAP.md`.
+- For the current rule-accuracy follow-ups, see `docs/ACCURACY_BACKLOG.md`.

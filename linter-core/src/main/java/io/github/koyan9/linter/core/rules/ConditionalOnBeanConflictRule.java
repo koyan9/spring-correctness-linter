@@ -9,8 +9,12 @@ import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.TypeDeclaration;
 import io.github.koyan9.linter.core.JavaSourceInspector;
 import io.github.koyan9.linter.core.LintIssue;
+import io.github.koyan9.linter.core.MethodSemanticFacts;
+import io.github.koyan9.linter.core.RuleDomain;
 import io.github.koyan9.linter.core.ProjectContext;
 import io.github.koyan9.linter.core.SourceUnit;
+import io.github.koyan9.linter.core.SpringSemanticFacts;
+import io.github.koyan9.linter.core.TypeSemanticFacts;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -34,20 +38,50 @@ public final class ConditionalOnBeanConflictRule extends AbstractSpringRule {
     }
 
     @Override
+    public RuleDomain domain() {
+        return RuleDomain.CONFIGURATION;
+    }
+
+    @Override
+    public List<String> appliesWhen() {
+        return List.of(
+                "The same bean method or type declares both `@ConditionalOnBean` and `@ConditionalOnMissingBean`.",
+                "Bean registration logic becomes difficult to reason about from the annotation combination alone."
+        );
+    }
+
+    @Override
+    public List<String> commonFalsePositiveBoundaries() {
+        return List.of(
+                "The rule does not compare detailed attribute combinations, so rare intentional patterns may still be flagged.",
+                "Projects with additional custom conditions may rely on semantics that are not visible to this check."
+        );
+    }
+
+    @Override
+    public List<String> recommendedFixes() {
+        return List.of(
+                "Split contradictory conditions into separate bean declarations when each branch has a distinct purpose.",
+                "Prefer one clear condition per bean definition and move more complex logic into dedicated configuration code."
+        );
+    }
+
+    @Override
     public List<LintIssue> evaluate(SourceUnit sourceUnit, ProjectContext context) {
         List<LintIssue> issues = new ArrayList<>();
+        SpringSemanticFacts facts = context.springFacts(sourceUnit);
         for (TypeDeclaration<?> typeDeclaration : sourceUnit.structure().typeDeclarations()) {
-            check(sourceUnit, JavaSourceInspector.lineOf(typeDeclaration), typeDeclaration.getNameAsString(), JavaSourceInspector.annotationNames(typeDeclaration), issues);
+            TypeSemanticFacts typeFacts = facts.typeFacts(typeDeclaration);
+            if (typeFacts.hasConflictingConditionalBeanAnnotations()) {
+                issues.add(issue(sourceUnit, JavaSourceInspector.lineOf(typeDeclaration), "Element '" + typeDeclaration.getNameAsString() + "' declares both @ConditionalOnBean and @ConditionalOnMissingBean; review the condition semantics."));
+            }
             for (MethodDeclaration method : sourceUnit.structure().methodsOf(typeDeclaration)) {
-                check(sourceUnit, JavaSourceInspector.lineOf(method), method.getNameAsString(), JavaSourceInspector.annotationNames(method), issues);
+                MethodSemanticFacts methodFacts = facts.methodFacts(typeDeclaration, method);
+                if (methodFacts.hasConflictingConditionalBeanAnnotations()) {
+                    issues.add(issue(sourceUnit, JavaSourceInspector.lineOf(method), "Element '" + method.getNameAsString() + "' declares both @ConditionalOnBean and @ConditionalOnMissingBean; review the condition semantics."));
+                }
             }
         }
         return issues;
-    }
-
-    private void check(SourceUnit sourceUnit, int line, String targetName, Set<String> annotations, List<LintIssue> issues) {
-        if (annotations.contains("ConditionalOnBean") && annotations.contains("ConditionalOnMissingBean")) {
-            issues.add(issue(sourceUnit, line, "Element '" + targetName + "' declares both @ConditionalOnBean and @ConditionalOnMissingBean; review the condition semantics."));
-        }
     }
 }

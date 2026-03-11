@@ -19,7 +19,7 @@ class RuleSelectionTest {
 
     @Test
     void filtersRulesAndOverridesSeverity() throws Exception {
-        LintRule alphaRule = new TestRule("RULE_ALPHA", LintSeverity.WARNING);
+        LintRule alphaRule = new TestRule("RULE_ALPHA", RuleDomain.ASYNC, LintSeverity.WARNING);
         LintRule betaRule = new TestRule("RULE_BETA", LintSeverity.WARNING);
         List<LintRule> configuredRules = RuleSelection.configure(
                 List.of(alphaRule, betaRule),
@@ -38,6 +38,42 @@ class RuleSelectionTest {
         );
         assertEquals(1, issues.size());
         assertEquals(LintSeverity.ERROR, issues.get(0).severity());
+        assertEquals(RuleDomain.ASYNC, configuredRules.get(0).domain());
+    }
+
+    @Test
+    void filtersRulesByEnabledDomainsAndDisabledRules() {
+        List<LintRule> configuredRules = RuleSelection.configure(
+                List.of(
+                        new TestRule("RULE_ASYNC", RuleDomain.ASYNC, LintSeverity.WARNING),
+                        new TestRule("RULE_TX", RuleDomain.TRANSACTION, LintSeverity.WARNING),
+                        new TestRule("RULE_TX_2", RuleDomain.TRANSACTION, LintSeverity.ERROR)
+                ),
+                Set.of(),
+                Set.of("RULE_TX_2"),
+                Set.of(RuleDomain.TRANSACTION),
+                Set.of(),
+                Map.of()
+        );
+
+        assertEquals(List.of("RULE_TX"), configuredRules.stream().map(LintRule::id).toList());
+    }
+
+    @Test
+    void rejectsOverlappingEnabledAndDisabledDomains() {
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> RuleSelection.configure(
+                        List.of(new TestRule("RULE_ALPHA", RuleDomain.ASYNC, LintSeverity.WARNING)),
+                        Set.of(),
+                        Set.of(),
+                        Set.of(RuleDomain.ASYNC),
+                        Set.of(RuleDomain.ASYNC),
+                        Map.of()
+                )
+        );
+
+        assertEquals(true, exception.getMessage().contains("ASYNC"));
     }
 
     @Test
@@ -58,10 +94,16 @@ class RuleSelectionTest {
     private static final class TestRule implements LintRule {
 
         private final String id;
+        private final RuleDomain domain;
         private final LintSeverity severity;
 
         private TestRule(String id, LintSeverity severity) {
+            this(id, RuleDomain.GENERAL, severity);
+        }
+
+        private TestRule(String id, RuleDomain domain, LintSeverity severity) {
             this.id = id;
+            this.domain = domain;
             this.severity = severity;
         }
 
@@ -78,6 +120,11 @@ class RuleSelectionTest {
         @Override
         public String description() {
             return id + " description";
+        }
+
+        @Override
+        public RuleDomain domain() {
+            return domain;
         }
 
         @Override

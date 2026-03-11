@@ -38,6 +38,9 @@ jobs:
           java-version: 17
           cache: maven
 
+      - name: Verify project
+        run: mvn -B -q verify
+
       - name: Build release artifacts
         run: mvn -B -q -Prelease-artifacts package
 
@@ -49,15 +52,37 @@ jobs:
 
       - name: Generate release notes draft
         shell: bash
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_NAME: ${{ inputs.release_name }}
+          RELEASE_PRERELEASE: ${{ inputs.prerelease }}
         run: |
-          NOTES_FILE="RELEASE_NOTES_${{ inputs.tag }}.md"
+          NOTES_FILE="RELEASE_NOTES_${RELEASE_TAG}.md"
           if [[ -f "$NOTES_FILE" ]]; then
             cp "$NOTES_FILE" RELEASE_NOTES.md
+            echo "Using versioned release notes from $NOTES_FILE"
           else
             cp RELEASE_NOTES_TEMPLATE.md RELEASE_NOTES.md
+            python - <<'PY'
+from pathlib import Path
+import os
+
+path = Path("RELEASE_NOTES.md")
+lines = path.read_text(encoding="utf-8").splitlines()
+if lines:
+    lines[0] = f"# {os.environ['RELEASE_NAME']}"
+
+lines.extend([
+    "",
+    "> Drafted automatically from `RELEASE_NOTES_TEMPLATE.md`.",
+    f"> Tag: `{os.environ['RELEASE_TAG']}`",
+    f"> Prerelease: `{os.environ['RELEASE_PRERELEASE']}`",
+])
+
+path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+PY
+            echo "Using templated release notes for ${RELEASE_TAG}"
           fi
-          echo "" >> RELEASE_NOTES.md
-          echo "Tag: ${{ inputs.tag }}" >> RELEASE_NOTES.md
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2

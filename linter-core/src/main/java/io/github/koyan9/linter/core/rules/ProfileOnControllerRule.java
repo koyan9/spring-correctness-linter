@@ -9,8 +9,11 @@ import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.body.TypeDeclaration;
 import io.github.koyan9.linter.core.JavaSourceInspector;
 import io.github.koyan9.linter.core.LintIssue;
+import io.github.koyan9.linter.core.RuleDomain;
 import io.github.koyan9.linter.core.ProjectContext;
 import io.github.koyan9.linter.core.SourceUnit;
+import io.github.koyan9.linter.core.SpringSemanticFacts;
+import io.github.koyan9.linter.core.TypeSemanticFacts;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -33,15 +36,46 @@ public final class ProfileOnControllerRule extends AbstractSpringRule {
     }
 
     @Override
+    public RuleDomain domain() {
+        return RuleDomain.WEB;
+    }
+
+    @Override
+    public List<String> appliesWhen() {
+        return List.of(
+                "A controller type is annotated directly with `@Profile`.",
+                "Different runtime environments may expose different endpoint sets from the same codebase."
+        );
+    }
+
+    @Override
+    public List<String> commonFalsePositiveBoundaries() {
+        return List.of(
+                "Internal-only or temporary operational endpoints may intentionally be profile-gated.",
+                "The rule does not know whether the API difference is already documented and contract-tested elsewhere."
+        );
+    }
+
+    @Override
+    public List<String> recommendedFixes() {
+        return List.of(
+                "Move environment switching into service wiring or delegation instead of hiding the controller itself.",
+                "Use feature flags or explicit routing choices when endpoint visibility is intentionally environment-specific."
+        );
+    }
+
+    @Override
     public List<LintIssue> evaluate(SourceUnit sourceUnit, ProjectContext context) {
         List<LintIssue> issues = new ArrayList<>();
-        collectIssues(sourceUnit, issues);
+        collectIssues(sourceUnit, context, issues);
         return issues;
     }
 
-    private void collectIssues(SourceUnit sourceUnit, List<LintIssue> issues) {
+    private void collectIssues(SourceUnit sourceUnit, ProjectContext context, List<LintIssue> issues) {
+        SpringSemanticFacts facts = context.springFacts(sourceUnit);
         for (TypeDeclaration<?> typeDeclaration : sourceUnit.structure().typeDeclarations()) {
-            if (JavaSourceInspector.hasAnnotation(typeDeclaration, "Profile") && JavaSourceInspector.isController(typeDeclaration)) {
+            TypeSemanticFacts typeFacts = facts.typeFacts(typeDeclaration);
+            if (typeFacts.isProfileScopedController()) {
                 issues.add(issue(
                         sourceUnit,
                         JavaSourceInspector.lineOf(typeDeclaration),

@@ -106,6 +106,7 @@ class CorrectnessLintMojoTest {
 
         String json = Files.readString(reportsDirectory.resolve("lint-report.json"));
         assertTrue(json.contains("\"parseProblemFileCount\": 1"));
+        assertTrue(json.contains("\"runtimeMetrics\""));
         assertTrue(json.contains("Broken.java"));
     }
 
@@ -138,7 +139,78 @@ class CorrectnessLintMojoTest {
 
         String json = Files.readString(reportsDirectory.resolve("lint-report.json"));
         assertTrue(json.contains("\"issueCount\": 0"));
+        assertTrue(json.contains("\"disabledRuleIds\""));
+        assertTrue(json.contains("SPRING_ASYNC_VOID"));
+        assertFalse(json.contains("\"ruleId\": \"SPRING_ASYNC_VOID\""));
+    }
+
+    @Test
+    void enablesConfiguredRuleDomains() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("MixedService.java"), """
+                package demo;
+
+                import org.springframework.scheduling.annotation.Async;
+                import org.springframework.transaction.annotation.Transactional;
+
+                class MixedService {
+
+                    @Async
+                    public void runAsync() {
+                    }
+
+                    @Transactional
+                    private void runTransactional() {
+                    }
+                }
+                """);
+
+        Path reportsDirectory = tempDir.resolve("target/reports-enabled-domains");
+        CorrectnessLintMojo mojo = configuredMojo(
+                tempDir.resolve("src/main/java"),
+                reportsDirectory,
+                tempDir.resolve("spring-correctness-linter-baseline.txt")
+        );
+        setField(mojo, "applyBaseline", false);
+        setField(mojo, "enabledRuleDomains", "transaction");
+        setField(mojo, "formats", new LinkedHashSet<>(Set.of("json")));
+
+        mojo.execute();
+
+        String json = Files.readString(reportsDirectory.resolve("lint-report.json"));
+        assertTrue(json.contains("\"ruleDomainSelection\""));
+        assertTrue(json.contains("\"enabledDomains\""));
+        assertTrue(json.contains("\"TRANSACTION\""));
+        assertTrue(json.contains("SPRING_TX_PRIVATE_METHOD"));
         assertFalse(json.contains("SPRING_ASYNC_VOID"));
+    }
+
+    @Test
+    void rejectsInvalidRuleDomainValues() throws Exception {
+        Path sourceDirectory = writeSource("""
+                package demo;
+
+                import org.springframework.scheduling.annotation.Async;
+
+                class AsyncOnly {
+
+                    @Async
+                    public void runAsync() {
+                    }
+                }
+                """);
+
+        CorrectnessLintMojo mojo = configuredMojo(
+                sourceDirectory,
+                tempDir.resolve("target/reports-invalid-domain"),
+                tempDir.resolve("spring-correctness-linter-baseline.txt")
+        );
+        setField(mojo, "applyBaseline", false);
+        setField(mojo, "enabledRuleDomains", "not-a-domain");
+
+        Exception exception = assertThrows(Exception.class, mojo::execute);
+        assertTrue(exception.getMessage().contains("Invalid rule domain value"));
     }
 
     @Test
@@ -209,6 +281,7 @@ class CorrectnessLintMojoTest {
 
         String json = Files.readString(reportsDirectory.resolve("lint-report.json"));
         assertTrue(json.contains("\"cachedFileCount\": 1"));
+        assertTrue(json.contains("\"cacheScope\": \"shared-file\""));
     }
 
     @Test

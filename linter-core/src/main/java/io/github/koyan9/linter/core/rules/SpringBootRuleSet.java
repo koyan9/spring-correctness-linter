@@ -15,20 +15,6 @@ public final class SpringBootRuleSet {
     }
 
     public static List<LintRule> defaultRules() {
-        return List.of(
-                new AsyncVoidMethodRule(),
-                new AsyncPrivateMethodRule(),
-                new CacheableWithoutKeyRule(),
-                new CacheAnnotationCombinationRiskRule(),
-                new ProfileOnControllerRule(),
-                new TransactionalSelfInvocationRule(),
-                new TransactionalPrivateMethodRule(),
-                new TransactionalFinalMethodRule(),
-                new EventListenerTransactionalRule(),
-                new TransactionalEventListenerRule(),
-                new TransactionalHighRiskPropagationRule(),
-                new ConditionalOnBeanConflictRule(),
-                new PublicEndpointWithoutSecurityRule()
-        );
+        return BuiltInRuleRegistry.defaultRules();
     }
 }

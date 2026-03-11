@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Mojo(name = "lint", defaultPhase = LifecyclePhase.VERIFY, threadSafe = true)
 public class CorrectnessLintMojo extends AbstractMojo {
@@ -32,6 +33,7 @@ public class CorrectnessLintMojo extends AbstractMojo {
     private final MojoExecutionPlanBuilder executionPlanBuilder = new MojoExecutionPlanBuilder();
     private final MojoReportEmitter reportEmitter = new MojoReportEmitter();
     private final MojoFailureMessageBuilder failureMessageBuilder = new MojoFailureMessageBuilder();
+    private final MojoRuleSelectionSummaryFormatter ruleSelectionSummaryFormatter = new MojoRuleSelectionSummaryFormatter();
 
     @Parameter(defaultValue = "${project.basedir}", readonly = true, required = true)
     private java.io.File projectBaseDir;
@@ -87,6 +89,12 @@ public class CorrectnessLintMojo extends AbstractMojo {
     @Parameter(property = "spring.correctness.linter.disabledRules")
     private String disabledRules;
 
+    @Parameter(property = "spring.correctness.linter.enabledRuleDomains")
+    private String enabledRuleDomains;
+
+    @Parameter(property = "spring.correctness.linter.disabledRuleDomains")
+    private String disabledRuleDomains;
+
     @Parameter(property = "spring.correctness.linter.severityOverrides")
     private String severityOverrides;
 
@@ -134,6 +142,8 @@ public class CorrectnessLintMojo extends AbstractMojo {
                     includeTestSourceRoots,
                     enabledRules,
                     disabledRules,
+                    enabledRuleDomains,
+                    disabledRuleDomains,
                     severityOverrides
             );
             ProjectLinter linter = new ProjectLinter(plan.rules());
@@ -150,6 +160,22 @@ public class CorrectnessLintMojo extends AbstractMojo {
                     + " visible issue(s), " + report.suppressedIssueCount() + " inline suppression(s), "
                     + report.baselineMatchedIssueCount() + " baseline match(es), and "
                     + report.staleBaselineEntryCount() + " stale baseline entry(s)");
+            getLog().info("spring-correctness-linter runtime: " + report.runtimeMetrics().totalElapsedMillis()
+                    + " ms across " + report.runtimeMetrics().sourceFileCount() + " source file(s) ("
+                    + report.runtimeMetrics().analyzedFileCount() + " analyzed, "
+                    + report.runtimeMetrics().cachedFileCount() + " cached)");
+            getLog().info("spring-correctness-linter cache: " + report.runtimeMetrics().cacheHitRatePercent()
+                    + "% hit rate (" + report.runtimeMetrics().cacheScope() + ")");
+            if (report.runtimeMetrics().moduleMetrics().size() > 1) {
+                String slowModules = report.runtimeMetrics().slowestModules(5).stream()
+                        .map(metric -> metric.moduleId() + "=" + metric.analysisMillis()
+                                + " ms (" + metric.cacheHitRatePercent() + "% cache)")
+                        .collect(Collectors.joining(", "));
+                if (!slowModules.isBlank()) {
+                    getLog().info("spring-correctness-linter slowest modules: " + slowModules);
+                }
+            }
+            getLog().info(ruleSelectionSummaryFormatter.format(report.ruleDomainSelection()));
             if (report.parseProblemFileCount() > 0) {
                 getLog().warn("spring-correctness-linter observed parse problems in "
                         + report.parseProblemFileCount() + " source file(s); findings may be incomplete. Check generated reports for details.");

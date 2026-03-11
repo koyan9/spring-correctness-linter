@@ -14,6 +14,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 public final class ProjectLinter {
 
@@ -44,38 +45,54 @@ public final class ProjectLinter {
     }
 
     private LintAnalysisResult analyzeInternal(Path projectRoot, List<SourceRoot> sourceRoots, LintOptions options) throws IOException {
+        long totalStartNanos = System.nanoTime();
+
+        long contextLoadStartNanos = System.nanoTime();
         ProjectContext context = ProjectContext.loadSourceRoots(projectRoot, sourceRoots);
+        long contextLoadNanos = System.nanoTime() - contextLoadStartNanos;
+
         List<LintIssue> baselineCandidates = new ArrayList<>();
         List<SourceParseProblem> parseProblems = new ArrayList<>();
         long suppressedIssueCount = 0;
         long cachedFileCount = 0;
         List<CachedFileAnalysis> cacheEntries = new ArrayList<>();
-        Map<String, CachedFileAnalysis> cachedAnalyses = loadCachedAnalyses(options);
+
+        long cacheLoadStartNanos = System.nanoTime();
+        LoadedCachedAnalyses loadedCachedAnalyses = loadCachedAnalyses(options);
+        long cacheLoadNanos = System.nanoTime() - cacheLoadStartNanos;
+        Map<String, CachedFileAnalysis> cachedAnalyses = loadedCachedAnalyses.analyses();
+
         Map<String, String> fileModules = new HashMap<>();
         Map<String, ModuleAccumulator> modules = initializeModules(context);
 
+        long fileAnalysisStartNanos = System.nanoTime();
         for (SourceDocument sourceDocument : context.sourceDocuments()) {
             String relativePath = sourceDocument.relativePath(context.projectRoot());
             fileModules.put(sourceDocument.path().toAbsolutePath().normalize().toString(), sourceDocument.moduleId());
-            modules.computeIfAbsent(sourceDocument.moduleId(), ModuleAccumulator::new).sourceFileCount++;
+            ModuleAccumulator module = modules.computeIfAbsent(sourceDocument.moduleId(), ModuleAccumulator::new);
+            module.sourceFileCount++;
+
+            long fileAnalysisStartedAt = System.nanoTime();
             CachedFileAnalysis cachedAnalysis = cachedAnalyses.get(relativePath);
             if (cachedAnalysis != null && cachedAnalysis.contentHash().equals(sourceDocument.contentHash())) {
                 cachedFileCount++;
-                modules.get(sourceDocument.moduleId()).cachedFileCount++;
+                module.cachedFileCount++;
                 suppressedIssueCount += cachedAnalysis.suppressedIssueCount();
                 baselineCandidates.addAll(cachedAnalysis.restoreIssues(context.projectRoot()));
                 if (!cachedAnalysis.parseProblemMessages().isEmpty()) {
                     parseProblems.add(cachedAnalysis.toParseProblem(context.projectRoot()));
-                    modules.get(sourceDocument.moduleId()).parseProblemFileCount++;
+                    module.parseProblemFileCount++;
                 }
                 cacheEntries.add(cachedAnalysis);
+                module.analysisNanos += System.nanoTime() - fileAnalysisStartedAt;
                 continue;
             }
 
+            module.analyzedFileCount++;
             SourceUnit sourceUnit = sourceDocument.toSourceUnit();
             if (sourceUnit.hasParseProblems()) {
                 parseProblems.add(new SourceParseProblem(sourceUnit.path(), sourceUnit.parseProblems()));
-                modules.get(sourceDocument.moduleId()).parseProblemFileCount++;
+                module.parseProblemFileCount++;
             }
 
             InlineSuppressions inlineSuppressions = options.honorInlineSuppressions()
@@ -102,15 +119,24 @@ public final class ProjectLinter {
                     fileSuppressedIssueCount,
                     sourceUnit.parseProblems()
             ));
+            module.analysisNanos += System.nanoTime() - fileAnalysisStartedAt;
         }
+        long fileAnalysisNanos = System.nanoTime() - fileAnalysisStartNanos;
 
-        writeCachedAnalyses(options, cacheEntries);
+        long cacheWriteStartNanos = System.nanoTime();
+        writeCachedAnalyses(options, loadedCachedAnalyses.analysisFingerprint(), cacheEntries);
+        long cacheWriteNanos = System.nanoTime() - cacheWriteStartNanos;
 
+        long baselineLoadStartNanos = System.nanoTime();
         Set<BaselineEntry> baselineEntries = loadBaselineEntries(options);
+        long baselineLoadNanos = System.nanoTime() - baselineLoadStartNanos;
+
         Set<BaselineEntry> matchedEntries = new HashSet<>();
         List<LintIssue> visibleIssues = new ArrayList<>();
         long baselineMatchedIssueCount = 0;
         Map<String, BaselineDiffAccumulator> baselineModules = initializeBaselineDiffModules(modules.keySet());
+
+        long baselineFilterStartNanos = System.nanoTime();
         for (LintIssue issue : baselineCandidates) {
             BaselineEntry entry = BaselineEntry.from(issue, context.projectRoot());
             String moduleId = fileModules.getOrDefault(issue.file().toAbsolutePath().normalize().toString(), ".");
@@ -138,11 +164,65 @@ public final class ProjectLinter {
         }
 
         List<RuleDescriptor> descriptors = rules.stream()
-                .map(rule -> new RuleDescriptor(rule.id(), rule.title(), rule.description(), rule.severity()))
+                .map(rule -> new RuleDescriptor(
+                        rule.id(),
+                        rule.title(),
+                        rule.description(),
+                        rule.domain(),
+                        rule.severity(),
+                        rule.appliesWhen(),
+                        rule.commonFalsePositiveBoundaries(),
+                        rule.recommendedFixes()
+                ))
                 .toList();
+        RuleDomainSelectionSummary ruleDomainSelection = RuleDomainSelectionSummary.fromConfiguredAndRules(
+                options.enabledRuleDomains(),
+                options.disabledRuleDomains(),
+                options.enabledRuleIds(),
+                options.disabledRuleIds(),
+                descriptors
+        );
         for (LintIssue issue : visibleIssues) {
             modules.computeIfAbsent(fileModules.getOrDefault(issue.file().toAbsolutePath().normalize().toString(), "."), ModuleAccumulator::new).visibleIssueCount++;
         }
+        long baselineFilterNanos = System.nanoTime() - baselineFilterStartNanos;
+
+        long reportAssemblyStartNanos = System.nanoTime();
+        BaselineDiffReport baselineDiffReport = new BaselineDiffReport(
+                visibleIssues,
+                matchedEntries,
+                staleEntries,
+                baselineModules.values().stream().map(BaselineDiffAccumulator::toSummary).toList(),
+                fileModules,
+                baselineEntryModules,
+                descriptors,
+                ruleDomainSelection
+        );
+        List<ModuleRuntimeMetrics> moduleRuntimeMetrics = modules.values().stream()
+                .map(ModuleAccumulator::toRuntimeMetrics)
+                .toList();
+        long reportAssemblyNanos = System.nanoTime() - reportAssemblyStartNanos;
+
+        AnalysisRuntimeMetrics runtimeMetrics = new AnalysisRuntimeMetrics(
+                options.useIncrementalCache(),
+                cacheScope(options),
+                loadedCachedAnalyses.analysisFingerprint(),
+                toMillis(System.nanoTime() - totalStartNanos),
+                context.sourceDocuments().size(),
+                context.sourceDocuments().size() - cachedFileCount,
+                cachedFileCount,
+                parseProblems.size(),
+                new AnalysisPhaseMetrics(
+                        toMillis(contextLoadNanos),
+                        toMillis(cacheLoadNanos),
+                        toMillis(fileAnalysisNanos),
+                        toMillis(cacheWriteNanos),
+                        toMillis(baselineLoadNanos),
+                        toMillis(baselineFilterNanos),
+                        toMillis(reportAssemblyNanos)
+                ),
+                moduleRuntimeMetrics
+        );
 
         LintReport report = new LintReport(
                 context.projectRoot(),
@@ -157,19 +237,14 @@ public final class ProjectLinter {
                 cachedFileCount,
                 modules.values().stream().map(ModuleAccumulator::toSummary).toList(),
                 fileModules,
-                parseProblems
+                parseProblems,
+                runtimeMetrics,
+                ruleDomainSelection
         );
         return new LintAnalysisResult(
                 report,
                 baselineCandidates,
-                new BaselineDiffReport(
-                        visibleIssues,
-                        matchedEntries,
-                        staleEntries,
-                        baselineModules.values().stream().map(BaselineDiffAccumulator::toSummary).toList(),
-                        fileModules,
-                        baselineEntryModules
-                )
+                baselineDiffReport
         );
     }
 
@@ -189,42 +264,66 @@ public final class ProjectLinter {
         return baselineEntries;
     }
 
-    private Map<String, CachedFileAnalysis> loadCachedAnalyses(LintOptions options) throws IOException {
+    private LoadedCachedAnalyses loadCachedAnalyses(LintOptions options) throws IOException {
+        String analysisFingerprint = cacheFingerprint(options);
         if (!options.useIncrementalCache() || options.analysisCacheFile() == null) {
             if (!options.useIncrementalCache() || options.moduleAnalysisCacheFiles().isEmpty()) {
-                return Map.of();
+                return new LoadedCachedAnalyses(Map.of(), analysisFingerprint);
             }
         }
         AnalysisCacheStore cacheStore = new AnalysisCacheStore();
         Map<String, CachedFileAnalysis> cachedAnalyses = new HashMap<>();
-        String fingerprint = cacheStore.fingerprint(rules, options.honorInlineSuppressions());
         if (options.analysisCacheFile() != null) {
-            cachedAnalyses.putAll(cacheStore.load(options.analysisCacheFile(), fingerprint).analyses());
+            cachedAnalyses.putAll(cacheStore.load(options.analysisCacheFile(), analysisFingerprint).analyses());
         }
         for (Path moduleCacheFile : options.moduleAnalysisCacheFiles().values()) {
-            cachedAnalyses.putAll(cacheStore.load(moduleCacheFile, fingerprint).analyses());
+            cachedAnalyses.putAll(cacheStore.load(moduleCacheFile, analysisFingerprint).analyses());
         }
-        return cachedAnalyses;
+        return new LoadedCachedAnalyses(cachedAnalyses, analysisFingerprint);
     }
 
-    private void writeCachedAnalyses(LintOptions options, List<CachedFileAnalysis> analyses) throws IOException {
+    private void writeCachedAnalyses(LintOptions options, String analysisFingerprint, List<CachedFileAnalysis> analyses) throws IOException {
         if (!options.useIncrementalCache()) {
             return;
         }
         AnalysisCacheStore cacheStore = new AnalysisCacheStore();
-        String fingerprint = cacheStore.fingerprint(rules, options.honorInlineSuppressions());
         if (!options.moduleAnalysisCacheFiles().isEmpty()) {
             for (Map.Entry<String, Path> entry : options.moduleAnalysisCacheFiles().entrySet()) {
                 List<CachedFileAnalysis> moduleAnalyses = analyses.stream()
                         .filter(analysis -> analysis.moduleId().equals(entry.getKey()))
                         .toList();
-                cacheStore.write(entry.getValue(), fingerprint, moduleAnalyses);
+                cacheStore.write(entry.getValue(), analysisFingerprint, moduleAnalyses);
             }
             return;
         }
         if (options.analysisCacheFile() != null) {
-            cacheStore.write(options.analysisCacheFile(), fingerprint, analyses);
+            cacheStore.write(options.analysisCacheFile(), analysisFingerprint, analyses);
         }
+    }
+
+    private String cacheFingerprint(LintOptions options) {
+        if (!options.useIncrementalCache()) {
+            return "";
+        }
+        AnalysisCacheStore cacheStore = new AnalysisCacheStore();
+        return cacheStore.fingerprint(rules, options.honorInlineSuppressions());
+    }
+
+    private String cacheScope(LintOptions options) {
+        if (!options.useIncrementalCache()) {
+            return "disabled";
+        }
+        if (!options.moduleAnalysisCacheFiles().isEmpty()) {
+            return "per-module";
+        }
+        if (options.analysisCacheFile() != null) {
+            return "shared-file";
+        }
+        return "disabled";
+    }
+
+    private long toMillis(long nanos) {
+        return TimeUnit.NANOSECONDS.toMillis(nanos);
     }
 
     private Map<String, ModuleAccumulator> initializeModules(ProjectContext context) {
@@ -271,9 +370,11 @@ public final class ProjectLinter {
         private final String moduleId;
         private long sourceDirectoryCount;
         private long sourceFileCount;
+        private long analyzedFileCount;
         private long visibleIssueCount;
         private long parseProblemFileCount;
         private long cachedFileCount;
+        private long analysisNanos;
 
         private ModuleAccumulator(String moduleId) {
             this.moduleId = moduleId;
@@ -281,6 +382,10 @@ public final class ProjectLinter {
 
         private ModuleSummary toSummary() {
             return new ModuleSummary(moduleId, sourceDirectoryCount, sourceFileCount, visibleIssueCount, parseProblemFileCount, cachedFileCount);
+        }
+
+        private ModuleRuntimeMetrics toRuntimeMetrics() {
+            return new ModuleRuntimeMetrics(moduleId, sourceFileCount, analyzedFileCount, cachedFileCount, parseProblemFileCount, TimeUnit.NANOSECONDS.toMillis(analysisNanos));
         }
     }
 
@@ -297,6 +402,14 @@ public final class ProjectLinter {
 
         private BaselineDiffModuleSummary toSummary() {
             return new BaselineDiffModuleSummary(moduleId, newIssueCount, matchedBaselineCount, staleBaselineCount);
+        }
+    }
+
+    private record LoadedCachedAnalyses(Map<String, CachedFileAnalysis> analyses, String analysisFingerprint) {
+
+        private LoadedCachedAnalyses {
+            analyses = Map.copyOf(analyses);
+            analysisFingerprint = analysisFingerprint == null ? "" : analysisFingerprint;
         }
     }
 }

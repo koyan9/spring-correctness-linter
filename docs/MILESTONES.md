@@ -64,3 +64,4 @@
 
 - The project now provides a practical Spring correctness linting workflow suitable for local development, CI enforcement, legacy baseline adoption, and multi-module repository governance.
 - Future work should focus on incremental polish and real-user feedback rather than large new feature batches.
+- For the current near-term direction, see `docs/ROADMAP.md`.

@@ -8,6 +8,7 @@ package io.github.koyan9.linter.core;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -20,12 +21,16 @@ public final class ProjectContext {
     private final Path sourceDirectory;
     private final List<SourceRoot> sourceRoots;
     private final List<SourceDocument> sourceDocuments;
+    private final AnnotationMetadataIndex annotationMetadataIndex;
+    private final Map<SourceUnit, SpringSemanticFacts> semanticFactsBySourceUnit = new IdentityHashMap<>();
+    private volatile TypeResolutionIndex typeResolutionIndex;
 
-    private ProjectContext(Path projectRoot, Path sourceDirectory, List<SourceRoot> sourceRoots, List<SourceDocument> sourceDocuments) {
+    private ProjectContext(Path projectRoot, Path sourceDirectory, List<SourceRoot> sourceRoots, List<SourceDocument> sourceDocuments, AnnotationMetadataIndex annotationMetadataIndex) {
         this.projectRoot = projectRoot;
         this.sourceDirectory = sourceDirectory;
         this.sourceRoots = List.copyOf(sourceRoots);
         this.sourceDocuments = List.copyOf(sourceDocuments);
+        this.annotationMetadataIndex = annotationMetadataIndex;
     }
 
     public static ProjectContext load(Path projectRoot, Path sourceDirectory) throws IOException {
@@ -45,7 +50,7 @@ public final class ProjectContext {
         Path primarySourceDirectory = normalizedSourceRoots.isEmpty() ? normalizedRoot : normalizedSourceRoots.get(0).path();
 
         if (normalizedSourceRoots.isEmpty()) {
-            return new ProjectContext(normalizedRoot, primarySourceDirectory, List.of(), List.of());
+            return new ProjectContext(normalizedRoot, primarySourceDirectory, List.of(), List.of(), AnnotationMetadataIndex.empty());
         }
 
         Map<Path, SourceDocument> documentsByPath = new LinkedHashMap<>();
@@ -67,7 +72,8 @@ public final class ProjectContext {
                 normalizedRoot,
                 primarySourceDirectory,
                 normalizedSourceRoots,
-                documentsByPath.values().stream().collect(Collectors.toList())
+                documentsByPath.values().stream().collect(Collectors.toList()),
+                AnnotationMetadataIndex.build(documentsByPath.values().stream().collect(Collectors.toList()))
         );
     }
 
@@ -101,5 +107,23 @@ public final class ProjectContext {
 
     public List<SourceUnit> sourceUnits() {
         return sourceDocuments.stream().map(SourceDocument::toSourceUnit).toList();
+    }
+
+    public AnnotationMetadataIndex annotationMetadataIndex() {
+        return annotationMetadataIndex;
+    }
+
+    public SpringSemanticFacts springFacts(SourceUnit sourceUnit) {
+        return semanticFactsBySourceUnit.computeIfAbsent(sourceUnit, ignored -> SpringSemanticFacts.create(this));
+    }
+
+    public TypeResolutionIndex typeResolutionIndex() {
+        TypeResolutionIndex cached = typeResolutionIndex;
+        if (cached != null) {
+            return cached;
+        }
+        TypeResolutionIndex built = TypeResolutionIndex.build(this);
+        typeResolutionIndex = built;
+        return built;
     }
 }

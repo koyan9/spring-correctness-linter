@@ -12,11 +12,13 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ProjectLinterTest {
@@ -125,7 +127,7 @@ class ProjectLinterTest {
         LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
         Set<String> issueIds = report.issues().stream().map(LintIssue::ruleId).collect(Collectors.toSet());
 
-        assertEquals(13, report.rules().size());
+        assertEquals(24, report.rules().size());
         assertTrue(issueIds.contains("SPRING_ASYNC_VOID"));
         assertTrue(issueIds.contains("SPRING_ASYNC_PRIVATE_METHOD"));
         assertTrue(issueIds.contains("SPRING_CACHEABLE_KEY"));
@@ -331,6 +333,97 @@ class ProjectLinterTest {
     }
 
     @Test
+    void flagsMissingCacheKeyForOverloadedMethods() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("CacheOverloads.java"), """
+                package demo;
+
+                import org.springframework.cache.annotation.Cacheable;
+
+                class CacheOverloads {
+
+                    @Cacheable(cacheNames = "demo", key = "#id")
+                    public String load(String id) {
+                        return id;
+                    }
+
+                    @Cacheable(cacheNames = "demo")
+                    public String load(String id, int version) {
+                        return id + version;
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
+        List<LintIssue> cacheIssues = report.issues().stream()
+                .filter(issue -> issue.ruleId().equals("SPRING_CACHEABLE_KEY"))
+                .toList();
+
+        assertEquals(1, cacheIssues.size());
+        assertTrue(cacheIssues.get(0).message().contains("load"));
+    }
+
+    @Test
+    void recognizesPostAuthorizeEndpointsAndZeroArgCacheDefaults() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("SemanticAccuracyDemo.java"), """
+                package demo;
+
+                import org.springframework.cache.annotation.CacheConfig;
+                import org.springframework.cache.annotation.Cacheable;
+                import org.springframework.security.access.prepost.PostAuthorize;
+                import org.springframework.web.bind.annotation.GetMapping;
+                import org.springframework.web.bind.annotation.RestController;
+
+                @RestController
+                class SecureController {
+
+                    @GetMapping("/secure")
+                    @PostAuthorize("returnObject != null")
+                    public String secure() {
+                        return "ok";
+                    }
+                }
+
+                class CacheDemo {
+
+                    @Cacheable(cacheNames = "demo")
+                    public String fixedValue() {
+                        return "ok";
+                    }
+
+                    @Cacheable(cacheNames = "demo")
+                    public String byId(String id) {
+                        return id;
+                    }
+                }
+
+                @CacheConfig(cacheNames = "config", keyGenerator = "demoKeyGenerator")
+                class CacheConfigDemo {
+
+                    @Cacheable
+                    public String configuredLoad(String id) {
+                        return id;
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
+        Set<String> issueIds = report.issues().stream().map(LintIssue::ruleId).collect(Collectors.toSet());
+        List<LintIssue> cacheIssues = report.issues().stream()
+                .filter(issue -> issue.ruleId().equals("SPRING_CACHEABLE_KEY"))
+                .toList();
+
+        assertFalse(issueIds.contains("SPRING_ENDPOINT_SECURITY"));
+        assertEquals(1, cacheIssues.size());
+        assertTrue(cacheIssues.get(0).message().contains("byId"));
+    }
+
+    @Test
     void ignoresStringsAndCommentsThatPreviouslyLookedLikeMatches() throws Exception {
         Path sourceDirectory = tempDir.resolve("src/main/java/demo");
         Files.createDirectories(sourceDirectory);
@@ -372,7 +465,7 @@ class ProjectLinterTest {
         LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
 
         assertEquals(0, report.issueCount());
-        assertEquals(13, report.rules().size());
+        assertEquals(24, report.rules().size());
         assertEquals(1, report.parseProblemFileCount());
         assertTrue(report.parseProblems().get(0).file().endsWith(Path.of("src/main/java/demo/Broken.java")));
     }
@@ -463,6 +556,55 @@ class ProjectLinterTest {
         assertEquals(0, firstRun.cachedFileCount());
         assertEquals(1, secondRun.issueCount());
         assertEquals(1, secondRun.cachedFileCount());
+        assertTrue(secondRun.runtimeMetrics().incrementalCacheEnabled());
+        assertEquals("shared-file", secondRun.runtimeMetrics().cacheScope());
+        assertEquals(1, secondRun.runtimeMetrics().cachedFileCount());
+        assertEquals(0, secondRun.runtimeMetrics().analyzedFileCount());
+    }
+
+    @Test
+    void invalidatesIncrementalCacheWhenRuleConfigurationChanges() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("AsyncOnly.java"), """
+                package demo;
+
+                import org.springframework.scheduling.annotation.Async;
+
+                class AsyncOnly {
+
+                    @Async
+                    public void runAsync() {
+                    }
+                }
+                """);
+
+        Path cacheFile = tempDir.resolve("target/analysis-cache.txt");
+        Path rootSourceDirectory = tempDir.resolve("src/main/java");
+
+        ProjectLinter defaultLinter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport firstRun = defaultLinter.analyze(
+                tempDir,
+                rootSourceDirectory,
+                new LintOptions(true, false, null, cacheFile, true)
+        ).report();
+
+        ProjectLinter severityOverrideLinter = new ProjectLinter(RuleSelection.configure(
+                SpringBootRuleSet.defaultRules(),
+                Set.of(),
+                Set.of(),
+                Map.of("SPRING_ASYNC_VOID", LintSeverity.ERROR)
+        ));
+        LintReport secondRun = severityOverrideLinter.analyze(
+                tempDir,
+                rootSourceDirectory,
+                new LintOptions(true, false, null, cacheFile, true)
+        ).report();
+
+        assertEquals(0, firstRun.cachedFileCount());
+        assertEquals(0, secondRun.cachedFileCount());
+        assertNotEquals(firstRun.runtimeMetrics().analysisFingerprint(), secondRun.runtimeMetrics().analysisFingerprint());
+        assertTrue(secondRun.issues().stream().anyMatch(issue -> issue.ruleId().equals("SPRING_ASYNC_VOID") && issue.severity() == LintSeverity.ERROR));
     }
 
     @Test
@@ -508,4 +650,1183 @@ class ProjectLinterTest {
         assertTrue(issueIds.contains("SPRING_ASYNC_VOID"));
         assertTrue(issueIds.contains("SPRING_ASYNC_PRIVATE_METHOD"));
     }
+
+    @Test
+    void recognizesComposedAsyncAnnotationsAcrossFiles() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("BackgroundAsync.java"), """
+                package demo;
+
+                import org.springframework.scheduling.annotation.Async;
+
+                import java.lang.annotation.ElementType;
+                import java.lang.annotation.Retention;
+                import java.lang.annotation.RetentionPolicy;
+                import java.lang.annotation.Target;
+
+                @Target(ElementType.METHOD)
+                @Retention(RetentionPolicy.RUNTIME)
+                @Async
+                @interface BackgroundAsync {
+                }
+                """);
+        Files.writeString(sourceDirectory.resolve("AsyncService.java"), """
+                package demo;
+
+                class AsyncService {
+
+                    @BackgroundAsync
+                    public void runAsync() {
+                    }
+
+                    @BackgroundAsync
+                    private void runPrivateAsync() {
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
+        Set<String> issueIds = report.issues().stream().map(LintIssue::ruleId).collect(Collectors.toSet());
+
+        assertTrue(issueIds.contains("SPRING_ASYNC_VOID"));
+        assertTrue(issueIds.contains("SPRING_ASYNC_PRIVATE_METHOD"));
+    }
+
+    @Test
+    void detectsUnqualifiedTransactionalSelfInvocationButRespectsOverloadArity() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("TransactionalSelfInvocationDemo.java"), """
+                package demo;
+
+                import org.springframework.transaction.annotation.Transactional;
+
+                class TransactionalSelfInvocationDemo {
+
+                    public void outer() {
+                        inner();
+                    }
+
+                    public void overloadedCaller() {
+                        inner("safe");
+                    }
+
+                    @Transactional
+                    public void inner() {
+                    }
+
+                    public void inner(String value) {
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
+        List<LintIssue> selfInvocationIssues = report.issues().stream()
+                .filter(issue -> issue.ruleId().equals("SPRING_TX_SELF_INVOCATION"))
+                .toList();
+
+        assertEquals(1, selfInvocationIssues.size());
+        assertTrue(selfInvocationIssues.get(0).message().contains("inner"));
+    }
+
+    @Test
+    void detectsClassLevelTransactionalSelfInvocation() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("ClassLevelTransactionalSelfInvocation.java"), """
+                package demo;
+
+                import org.springframework.transaction.annotation.Transactional;
+
+                @Transactional
+                class ClassLevelTransactionalSelfInvocation {
+
+                    public void outer() {
+                        inner();
+                        helper();
+                    }
+
+                    public void inner() {
+                    }
+
+                    private void helper() {
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
+        List<LintIssue> selfInvocationIssues = report.issues().stream()
+                .filter(issue -> issue.ruleId().equals("SPRING_TX_SELF_INVOCATION"))
+                .toList();
+
+        assertEquals(1, selfInvocationIssues.size());
+        assertTrue(selfInvocationIssues.get(0).message().contains("inner"));
+    }
+
+    @Test
+    void detectsInheritedTransactionalSelfInvocation() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("InheritedSelfInvocation.java"), """
+                package demo;
+
+                import org.springframework.transaction.annotation.Transactional;
+
+                class BaseService {
+
+                    @Transactional
+                    public void process(String id) {
+                    }
+                }
+
+                class ChildService extends BaseService {
+
+                    public void outer() {
+                        process("id");
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
+        List<LintIssue> selfInvocationIssues = report.issues().stream()
+                .filter(issue -> issue.ruleId().equals("SPRING_TX_SELF_INVOCATION"))
+                .toList();
+
+        assertEquals(1, selfInvocationIssues.size());
+        assertTrue(selfInvocationIssues.get(0).message().contains("process"));
+    }
+
+    @Test
+    void detectsVarargsTransactionalSelfInvocation() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("VarargsSelfInvocation.java"), """
+                package demo;
+
+                import org.springframework.transaction.annotation.Transactional;
+
+                class VarargsSelfInvocation {
+
+                    public void outer() {
+                        record("a", "b");
+                    }
+
+                    @Transactional
+                    public void record(String... values) {
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
+        List<LintIssue> selfInvocationIssues = report.issues().stream()
+                .filter(issue -> issue.ruleId().equals("SPRING_TX_SELF_INVOCATION"))
+                .toList();
+
+        assertEquals(1, selfInvocationIssues.size());
+        assertTrue(selfInvocationIssues.get(0).message().contains("record"));
+    }
+
+    @Test
+    void detectsMultiLevelInheritedTransactionalSelfInvocation() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("MultiLevelInheritedSelfInvocation.java"), """
+                package demo;
+
+                import org.springframework.transaction.annotation.Transactional;
+
+                class BaseService {
+
+                    @Transactional
+                    public void process(String id) {
+                    }
+                }
+
+                class MiddleService extends BaseService {
+                }
+
+                class ChildService extends MiddleService {
+
+                    public void outer() {
+                        process("id");
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
+        List<LintIssue> selfInvocationIssues = report.issues().stream()
+                .filter(issue -> issue.ruleId().equals("SPRING_TX_SELF_INVOCATION"))
+                .toList();
+
+        assertEquals(1, selfInvocationIssues.size());
+        assertTrue(selfInvocationIssues.get(0).message().contains("process"));
+    }
+
+    @Test
+    void detectsCrossSourceRootTransactionalSelfInvocation() throws Exception {
+        Path moduleRoot = tempDir.resolve("module-a/src/main/java");
+        Path rootApp = tempDir.resolve("root-app/src/main/java");
+        Files.createDirectories(moduleRoot.resolve("demo"));
+        Files.createDirectories(rootApp.resolve("demo"));
+        Files.writeString(moduleRoot.resolve("demo/BaseService.java"), """
+                package demo;
+
+                import org.springframework.transaction.annotation.Transactional;
+
+                class BaseService {
+
+                    @Transactional
+                    public void process(String id) {
+                    }
+                }
+                """);
+        Files.writeString(rootApp.resolve("demo/ChildService.java"), """
+                package demo;
+
+                class ChildService extends BaseService {
+
+                    public void outer() {
+                        process("id");
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(tempDir, List.of(rootApp, moduleRoot));
+        List<LintIssue> selfInvocationIssues = report.issues().stream()
+                .filter(issue -> issue.ruleId().equals("SPRING_TX_SELF_INVOCATION"))
+                .toList();
+
+        assertEquals(1, selfInvocationIssues.size());
+        assertTrue(selfInvocationIssues.get(0).message().contains("process"));
+    }
+
+    @Test
+    void detectsInterfaceDefaultTransactionalSelfInvocation() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("InterfaceDefaultSelfInvocation.java"), """
+                package demo;
+
+                import org.springframework.transaction.annotation.Transactional;
+
+                interface TxDefaults {
+
+                    @Transactional
+                    default void process() {
+                    }
+                }
+
+                class DefaultTxService implements TxDefaults {
+
+                    public void outer() {
+                        process();
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
+        List<LintIssue> selfInvocationIssues = report.issues().stream()
+                .filter(issue -> issue.ruleId().equals("SPRING_TX_SELF_INVOCATION"))
+                .toList();
+
+        assertEquals(1, selfInvocationIssues.size());
+        assertTrue(selfInvocationIssues.get(0).message().contains("process"));
+    }
+
+    @Test
+    void detectsGenericInterfaceDefaultTransactionalSelfInvocation() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("GenericInterfaceDefaultSelfInvocation.java"), """
+                package demo;
+
+                import org.springframework.transaction.annotation.Transactional;
+
+                interface TxDefaults<T> {
+
+                    @Transactional
+                    default void process(T value) {
+                    }
+                }
+
+                class DefaultTxService implements TxDefaults<String> {
+
+                    public void outer() {
+                        process("id");
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
+        List<LintIssue> selfInvocationIssues = report.issues().stream()
+                .filter(issue -> issue.ruleId().equals("SPRING_TX_SELF_INVOCATION"))
+                .toList();
+
+        assertEquals(1, selfInvocationIssues.size());
+        assertTrue(selfInvocationIssues.get(0).message().contains("process"));
+    }
+
+    @Test
+    void detectsFinalClassInterfaceDefaultTransactionalSelfInvocation() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("FinalInterfaceDefaultSelfInvocation.java"), """
+                package demo;
+
+                import org.springframework.transaction.annotation.Transactional;
+
+                interface TxDefaults {
+
+                    @Transactional
+                    default void process() {
+                    }
+                }
+
+                final class FinalTxService implements TxDefaults {
+
+                    public void outer() {
+                        process();
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
+        List<LintIssue> selfInvocationIssues = report.issues().stream()
+                .filter(issue -> issue.ruleId().equals("SPRING_TX_SELF_INVOCATION"))
+                .toList();
+
+        assertEquals(1, selfInvocationIssues.size());
+        assertTrue(selfInvocationIssues.get(0).message().contains("process"));
+    }
+
+    @Test
+    void doesNotFlagMethodReferencesForTransactionalSelfInvocation() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("TransactionalSelfInvocationMethodRef.java"), """
+                package demo;
+
+                import org.springframework.transaction.annotation.Transactional;
+
+                class TransactionalSelfInvocationMethodRef {
+
+                    public void outer() {
+                        Runnable task = this::inner;
+                        task.run();
+                    }
+
+                    @Transactional
+                    public void inner() {
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
+        List<LintIssue> selfInvocationIssues = report.issues().stream()
+                .filter(issue -> issue.ruleId().equals("SPRING_TX_SELF_INVOCATION"))
+                .toList();
+
+        assertEquals(0, selfInvocationIssues.size());
+    }
+
+    @Test
+    void resolvesSamePackageEvenWhenSimpleNameIsAmbiguousAcrossPackages() throws Exception {
+        Path rootApp = tempDir.resolve("root-app/src/main/java");
+        Path moduleA = tempDir.resolve("module-a/src/main/java");
+        Path moduleB = tempDir.resolve("module-b/src/main/java");
+        Files.createDirectories(rootApp.resolve("demo"));
+        Files.createDirectories(moduleA.resolve("demo"));
+        Files.createDirectories(moduleB.resolve("other"));
+        Files.writeString(moduleA.resolve("demo/BaseService.java"), """
+                package demo;
+
+                import org.springframework.transaction.annotation.Transactional;
+
+                class BaseService {
+
+                    @Transactional
+                    public void process(String id) {
+                    }
+                }
+                """);
+        Files.writeString(moduleB.resolve("other/BaseService.java"), """
+                package other;
+
+                import org.springframework.transaction.annotation.Transactional;
+
+                class BaseService {
+
+                    @Transactional
+                    public void process(String id) {
+                    }
+                }
+                """);
+        Files.writeString(rootApp.resolve("demo/ChildService.java"), """
+                package demo;
+
+                class ChildService extends BaseService {
+
+                    public void outer() {
+                        process("id");
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(tempDir, List.of(rootApp, moduleA, moduleB));
+        List<LintIssue> selfInvocationIssues = report.issues().stream()
+                .filter(issue -> issue.ruleId().equals("SPRING_TX_SELF_INVOCATION"))
+                .toList();
+
+        assertEquals(1, selfInvocationIssues.size());
+        assertTrue(selfInvocationIssues.get(0).message().contains("process"));
+    }
+
+    @Test
+    void resolvesWildcardImportInheritanceAcrossPackages() throws Exception {
+        Path rootApp = tempDir.resolve("root-app/src/main/java");
+        Path moduleA = tempDir.resolve("module-a/src/main/java");
+        Files.createDirectories(rootApp.resolve("demo"));
+        Files.createDirectories(moduleA.resolve("other"));
+        Files.writeString(moduleA.resolve("other/BaseService.java"), """
+                package other;
+
+                import org.springframework.transaction.annotation.Transactional;
+
+                class BaseService {
+
+                    @Transactional
+                    public void process(String id) {
+                    }
+                }
+                """);
+        Files.writeString(rootApp.resolve("demo/ChildService.java"), """
+                package demo;
+
+                import other.*;
+
+                class ChildService extends BaseService {
+
+                    public void outer() {
+                        process("id");
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(tempDir, List.of(rootApp, moduleA));
+        List<LintIssue> selfInvocationIssues = report.issues().stream()
+                .filter(issue -> issue.ruleId().equals("SPRING_TX_SELF_INVOCATION"))
+                .toList();
+
+        assertEquals(1, selfInvocationIssues.size());
+        assertTrue(selfInvocationIssues.get(0).message().contains("process"));
+    }
+
+    @Test
+    void resolvesNestedTypeInheritanceAcrossPackages() throws Exception {
+        Path rootApp = tempDir.resolve("root-app/src/main/java");
+        Path moduleA = tempDir.resolve("module-a/src/main/java");
+        Files.createDirectories(rootApp.resolve("demo"));
+        Files.createDirectories(moduleA.resolve("other"));
+        Files.writeString(moduleA.resolve("other/Outer.java"), """
+                package other;
+
+                import org.springframework.transaction.annotation.Transactional;
+
+                class Outer {
+
+                    static class BaseService {
+
+                        @Transactional
+                        public void process(String id) {
+                        }
+                    }
+                }
+                """);
+        Files.writeString(rootApp.resolve("demo/ChildService.java"), """
+                package demo;
+
+                import other.Outer;
+
+                class ChildService extends Outer.BaseService {
+
+                    public void outer() {
+                        process("id");
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(tempDir, List.of(rootApp, moduleA));
+        List<LintIssue> selfInvocationIssues = report.issues().stream()
+                .filter(issue -> issue.ruleId().equals("SPRING_TX_SELF_INVOCATION"))
+                .toList();
+
+        assertEquals(1, selfInvocationIssues.size());
+        assertTrue(selfInvocationIssues.get(0).message().contains("process"));
+    }
+
+    @Test
+    void resolvesSamePackageNestedTypeInheritanceWithoutImport() throws Exception {
+        Path rootApp = tempDir.resolve("root-app/src/main/java");
+        Path moduleA = tempDir.resolve("module-a/src/main/java");
+        Files.createDirectories(rootApp.resolve("demo"));
+        Files.createDirectories(moduleA.resolve("demo"));
+        Files.writeString(moduleA.resolve("demo/Outer.java"), """
+                package demo;
+
+                import org.springframework.transaction.annotation.Transactional;
+
+                class Outer {
+
+                    static class BaseService {
+
+                        @Transactional
+                        public void process(String id) {
+                        }
+                    }
+                }
+                """);
+        Files.writeString(rootApp.resolve("demo/ChildService.java"), """
+                package demo;
+
+                class ChildService extends Outer.BaseService {
+
+                    public void outer() {
+                        process("id");
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(tempDir, List.of(rootApp, moduleA));
+        List<LintIssue> selfInvocationIssues = report.issues().stream()
+                .filter(issue -> issue.ruleId().equals("SPRING_TX_SELF_INVOCATION"))
+                .toList();
+
+        assertEquals(1, selfInvocationIssues.size());
+        assertTrue(selfInvocationIssues.get(0).message().contains("process"));
+    }
+
+    @Test
+    void resolvesExplicitNestedTypeImportInheritanceAcrossPackages() throws Exception {
+        Path rootApp = tempDir.resolve("root-app/src/main/java");
+        Path moduleA = tempDir.resolve("module-a/src/main/java");
+        Files.createDirectories(rootApp.resolve("demo"));
+        Files.createDirectories(moduleA.resolve("other"));
+        Files.writeString(moduleA.resolve("other/Outer.java"), """
+                package other;
+
+                import org.springframework.transaction.annotation.Transactional;
+
+                class Outer {
+
+                    static class BaseService {
+
+                        @Transactional
+                        public void process(String id) {
+                        }
+                    }
+                }
+                """);
+        Files.writeString(rootApp.resolve("demo/ChildService.java"), """
+                package demo;
+
+                import other.Outer.BaseService;
+
+                class ChildService extends BaseService {
+
+                    public void outer() {
+                        process("id");
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(tempDir, List.of(rootApp, moduleA));
+        List<LintIssue> selfInvocationIssues = report.issues().stream()
+                .filter(issue -> issue.ruleId().equals("SPRING_TX_SELF_INVOCATION"))
+                .toList();
+
+        assertEquals(1, selfInvocationIssues.size());
+        assertTrue(selfInvocationIssues.get(0).message().contains("process"));
+    }
+
+    @Test
+    void doesNotResolveAmbiguousWildcardNestedTypes() throws Exception {
+        Path rootApp = tempDir.resolve("root-app/src/main/java");
+        Path moduleA = tempDir.resolve("module-a/src/main/java");
+        Path moduleB = tempDir.resolve("module-b/src/main/java");
+        Files.createDirectories(rootApp.resolve("demo"));
+        Files.createDirectories(moduleA.resolve("other"));
+        Files.createDirectories(moduleB.resolve("another"));
+        Files.writeString(moduleA.resolve("other/Outer.java"), """
+                package other;
+
+                import org.springframework.transaction.annotation.Transactional;
+
+                class Outer {
+
+                    static class BaseService {
+
+                        @Transactional
+                        public void process(String id) {
+                        }
+                    }
+                }
+                """);
+        Files.writeString(moduleB.resolve("another/Outer.java"), """
+                package another;
+
+                import org.springframework.transaction.annotation.Transactional;
+
+                class Outer {
+
+                    static class BaseService {
+
+                        @Transactional
+                        public void process(String id) {
+                        }
+                    }
+                }
+                """);
+        Files.writeString(rootApp.resolve("demo/ChildService.java"), """
+                package demo;
+
+                import other.*;
+                import another.*;
+
+                class ChildService extends Outer.BaseService {
+
+                    public void outer() {
+                        process("id");
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(tempDir, List.of(rootApp, moduleA, moduleB));
+        List<LintIssue> selfInvocationIssues = report.issues().stream()
+                .filter(issue -> issue.ruleId().equals("SPRING_TX_SELF_INVOCATION"))
+                .toList();
+
+        assertEquals(0, selfInvocationIssues.size());
+    }
+
+    @Test
+    void doesNotResolveCrossPackageInheritanceWithoutExplicitTypeMatch() throws Exception {
+        Path rootApp = tempDir.resolve("root-app/src/main/java");
+        Path moduleA = tempDir.resolve("module-a/src/main/java");
+        Files.createDirectories(rootApp.resolve("demo"));
+        Files.createDirectories(moduleA.resolve("other"));
+        Files.writeString(moduleA.resolve("other/BaseService.java"), """
+                package other;
+
+                import org.springframework.transaction.annotation.Transactional;
+
+                class BaseService {
+
+                    @Transactional
+                    public void process(String id) {
+                    }
+                }
+                """);
+        Files.writeString(rootApp.resolve("demo/ChildService.java"), """
+                package demo;
+
+                class ChildService extends BaseService {
+
+                    public void outer() {
+                        process("id");
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(tempDir, List.of(rootApp, moduleA));
+        List<LintIssue> selfInvocationIssues = report.issues().stream()
+                .filter(issue -> issue.ruleId().equals("SPRING_TX_SELF_INVOCATION"))
+                .toList();
+
+        assertEquals(0, selfInvocationIssues.size());
+    }
+
+    @Test
+    void ignoresProxyInjectionPatternsButFlagsExplicitSelfCalls() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("TransactionalSelfInvocationProxy.java"), """
+                package demo;
+
+                import org.springframework.beans.factory.annotation.Autowired;
+                import org.springframework.context.ApplicationContext;
+                import org.springframework.transaction.annotation.Transactional;
+
+                class TransactionalSelfInvocationProxy {
+
+                    @Autowired
+                    private TransactionalSelfInvocationProxy self;
+
+                    @Autowired
+                    private ApplicationContext context;
+
+                    public void outer() {
+                        self.inner();
+                        context.getBean(TransactionalSelfInvocationProxy.class).inner();
+                        this.inner();
+                    }
+
+                    @Transactional
+                    public void inner() {
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
+        List<LintIssue> selfInvocationIssues = report.issues().stream()
+                .filter(issue -> issue.ruleId().equals("SPRING_TX_SELF_INVOCATION"))
+                .toList();
+
+        assertEquals(1, selfInvocationIssues.size());
+        assertTrue(selfInvocationIssues.get(0).message().contains("inner"));
+    }
+
+    @Test
+    void doesNotFlagFinalTransactionalSelfCalls() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("FinalTransactionalSelfInvocation.java"), """
+                package demo;
+
+                import org.springframework.transaction.annotation.Transactional;
+
+                class FinalTransactionalSelfInvocation {
+
+                    public void outer() {
+                        finalInner();
+                    }
+
+                    @Transactional
+                    public final void finalInner() {
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
+        List<LintIssue> selfInvocationIssues = report.issues().stream()
+                .filter(issue -> issue.ruleId().equals("SPRING_TX_SELF_INVOCATION"))
+                .toList();
+        List<LintIssue> finalMethodIssues = report.issues().stream()
+                .filter(issue -> issue.ruleId().equals("SPRING_TX_FINAL_METHOD"))
+                .toList();
+
+        assertEquals(0, selfInvocationIssues.size());
+        assertEquals(1, finalMethodIssues.size());
+    }
+
+    @Test
+    void recognizesComposedTransactionalControllerAndSecurityAnnotations() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("MetaAnnotations.java"), """
+                package demo;
+
+                import org.springframework.core.annotation.AliasFor;
+                import org.springframework.scheduling.annotation.Async;
+                import org.springframework.security.access.prepost.PreAuthorize;
+                import org.springframework.transaction.annotation.Propagation;
+                import org.springframework.transaction.annotation.Transactional;
+                import org.springframework.web.bind.annotation.GetMapping;
+                import org.springframework.web.bind.annotation.RestController;
+
+                import java.lang.annotation.ElementType;
+                import java.lang.annotation.Retention;
+                import java.lang.annotation.RetentionPolicy;
+                import java.lang.annotation.Target;
+
+                @Target(ElementType.TYPE)
+                @Retention(RetentionPolicy.RUNTIME)
+                @RestController
+                @interface ApiController {
+                }
+
+                @Target(ElementType.METHOD)
+                @Retention(RetentionPolicy.RUNTIME)
+                @GetMapping
+                @interface ApiGet {
+                }
+
+                @Target(ElementType.METHOD)
+                @Retention(RetentionPolicy.RUNTIME)
+                @PreAuthorize("hasRole('ADMIN')")
+                @interface ProtectedEndpoint {
+                }
+
+                @Target(ElementType.METHOD)
+                @Retention(RetentionPolicy.RUNTIME)
+                @Transactional
+                @interface RequiresNewTx {
+
+                    @AliasFor(annotation = Transactional.class, attribute = "propagation")
+                    Propagation propagation() default Propagation.REQUIRES_NEW;
+                }
+
+                @Target(ElementType.METHOD)
+                @Retention(RetentionPolicy.RUNTIME)
+                @org.springframework.cache.annotation.Cacheable(cacheNames = "demo")
+                @interface KeyedCacheable {
+
+                    @AliasFor(annotation = org.springframework.cache.annotation.Cacheable.class, attribute = "key")
+                    String key() default "";
+                }
+
+                @Target(ElementType.METHOD)
+                @Retention(RetentionPolicy.RUNTIME)
+                @org.springframework.cache.annotation.Cacheable(cacheNames = "demo")
+                @interface GeneratorCacheable {
+
+                    @AliasFor(annotation = org.springframework.cache.annotation.Cacheable.class, attribute = "keyGenerator")
+                    String keyGenerator() default "";
+                }
+                """);
+        Files.writeString(sourceDirectory.resolve("ComposedUsage.java"), """
+                package demo;
+
+                import org.springframework.context.annotation.Profile;
+
+                @ApiController
+                @Profile("demo")
+                class DemoController {
+
+                    @ApiGet
+                    @ProtectedEndpoint
+                    public String secureOpen() {
+                        return "ok";
+                    }
+                }
+
+                class TransactionalService {
+
+                    public void outer() {
+                        this.inner();
+                    }
+
+                    @RequiresNewTx(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+                    private void inner() {
+                    }
+
+                    @RequiresNewTx(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+                    public final void finalTransactional() {
+                    }
+
+                    @KeyedCacheable(key = "#id")
+                    public String cacheLoad(String id) {
+                        return id;
+                    }
+
+                    @GeneratorCacheable(keyGenerator = "demoKeyGenerator")
+                    public String cacheLoadWithGenerator(String id) {
+                        return id;
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
+        Set<String> issueIds = report.issues().stream().map(LintIssue::ruleId).collect(Collectors.toSet());
+
+        assertTrue(issueIds.contains("SPRING_PROFILE_CONTROLLER"));
+        assertTrue(issueIds.contains("SPRING_TX_SELF_INVOCATION"));
+        assertTrue(issueIds.contains("SPRING_TX_PRIVATE_METHOD"));
+        assertTrue(issueIds.contains("SPRING_TX_FINAL_METHOD"));
+        assertTrue(issueIds.contains("SPRING_TX_HIGH_RISK_PROPAGATION"));
+        assertFalse(issueIds.contains("SPRING_ENDPOINT_SECURITY"));
+        assertFalse(issueIds.contains("SPRING_CACHEABLE_KEY"));
+    }
+
+    @Test
+    void recognizesClassLevelComposedSecurityAnnotations() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("ClassLevelSecurityMeta.java"), """
+                package demo;
+
+                import org.springframework.security.access.prepost.PreAuthorize;
+                import org.springframework.web.bind.annotation.GetMapping;
+                import org.springframework.web.bind.annotation.RestController;
+
+                import java.lang.annotation.ElementType;
+                import java.lang.annotation.Retention;
+                import java.lang.annotation.RetentionPolicy;
+                import java.lang.annotation.Target;
+
+                @Target(ElementType.TYPE)
+                @Retention(RetentionPolicy.RUNTIME)
+                @RestController
+                @PreAuthorize("hasRole('ADMIN')")
+                @interface SecureController {
+                }
+
+                @SecureController
+                class SecureEndpointController {
+
+                    @GetMapping("/secure")
+                    public String secure() {
+                        return "ok";
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
+        Set<String> issueIds = report.issues().stream().map(LintIssue::ruleId).collect(Collectors.toSet());
+
+        assertFalse(issueIds.contains("SPRING_ENDPOINT_SECURITY"));
+    }
+
+    @Test
+    void recognizesAdditionalMethodSecurityAnnotationsAndAliasForwarding() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("MethodLevelSecurityMeta.java"), """
+                package demo;
+
+                import org.springframework.core.annotation.AliasFor;
+                import org.springframework.security.access.prepost.PreAuthorize;
+                import org.springframework.security.access.prepost.PreFilter;
+                import org.springframework.web.bind.annotation.GetMapping;
+                import org.springframework.web.bind.annotation.RestController;
+
+                import java.lang.annotation.ElementType;
+                import java.lang.annotation.Retention;
+                import java.lang.annotation.RetentionPolicy;
+                import java.lang.annotation.Target;
+
+                @Target(ElementType.METHOD)
+                @Retention(RetentionPolicy.RUNTIME)
+                @PreAuthorize("hasRole('ADMIN')")
+                @interface SecurePolicy {
+
+                    @AliasFor(annotation = PreAuthorize.class, attribute = "value")
+                    String value() default "";
+                }
+
+                @RestController
+                class SecureController {
+
+                    @GetMapping("/filtered")
+                    @PreFilter("filterObject != null")
+                    public String filtered() {
+                        return "ok";
+                    }
+
+                    @GetMapping("/alias")
+                    @SecurePolicy("hasRole('ADMIN')")
+                    public String aliasSecured() {
+                        return "ok";
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
+        Set<String> issueIds = report.issues().stream().map(LintIssue::ruleId).collect(Collectors.toSet());
+
+        assertFalse(issueIds.contains("SPRING_ENDPOINT_SECURITY"));
+    }
+
+    @Test
+    void flagsComposedCacheableWithoutExplicitKeyStrategy() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("ComposedCacheDefaults.java"), """
+                package demo;
+
+                import org.springframework.cache.annotation.Cacheable;
+
+                import java.lang.annotation.ElementType;
+                import java.lang.annotation.Retention;
+                import java.lang.annotation.RetentionPolicy;
+                import java.lang.annotation.Target;
+
+                @Target(ElementType.METHOD)
+                @Retention(RetentionPolicy.RUNTIME)
+                @Cacheable(cacheNames = "demo")
+                @interface BasicCacheable {
+                }
+
+                class CacheDefaults {
+
+                    @BasicCacheable
+                    public String lookup(String id) {
+                        return id;
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
+        List<LintIssue> cacheIssues = report.issues().stream()
+                .filter(issue -> issue.ruleId().equals("SPRING_CACHEABLE_KEY"))
+                .toList();
+
+        assertEquals(1, cacheIssues.size());
+        assertTrue(cacheIssues.get(0).message().contains("lookup"));
+    }
+
+    @Test
+    void detectsScheduledMethodRisks() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("ScheduledService.java"), """
+                package demo;
+
+                import org.springframework.scheduling.annotation.Scheduled;
+
+                class ScheduledService {
+
+                    @Scheduled
+                    public void missingTrigger() {
+                    }
+
+                    @Scheduled(fixedRate = 1000, cron = "0 * * * * *")
+                    public void conflictingTrigger() {
+                    }
+
+                    @Scheduled(fixedDelay = 1000)
+                    public void withArgument(String input) {
+                    }
+
+                    @Scheduled(fixedRate = 1000)
+                    public String returningValue() {
+                        return "ok";
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
+        Set<String> issueIds = report.issues().stream().map(LintIssue::ruleId).collect(Collectors.toSet());
+
+        assertTrue(issueIds.contains("SPRING_SCHEDULED_TRIGGER_CONFIGURATION"));
+        assertTrue(issueIds.contains("SPRING_SCHEDULED_METHOD_PARAMETERS"));
+        assertTrue(issueIds.contains("SPRING_SCHEDULED_RETURN_VALUE"));
+    }
+
+    @Test
+    void detectsScheduledAsyncAndTransactionalBoundaries() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("ScheduledBoundaryService.java"), """
+                package demo;
+
+                import org.springframework.scheduling.annotation.Async;
+                import org.springframework.scheduling.annotation.Scheduled;
+                import org.springframework.transaction.annotation.Transactional;
+
+                @Transactional
+                class ScheduledBoundaryService {
+
+                    @Scheduled(fixedRate = 1000)
+                    @Async
+                    public void asyncScheduled() {
+                    }
+
+                    @Scheduled(fixedDelay = 1000)
+                    public void transactionalScheduled() {
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
+        Set<String> issueIds = report.issues().stream().map(LintIssue::ruleId).collect(Collectors.toSet());
+
+        assertTrue(issueIds.contains("SPRING_SCHEDULED_ASYNC_BOUNDARY"));
+        assertTrue(issueIds.contains("SPRING_SCHEDULED_TRANSACTIONAL_BOUNDARY"));
+    }
+
+    @Test
+    void detectsRepeatedSchedulesAndNonPositiveIntervals() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("ScheduledAdvancedService.java"), """
+                package demo;
+
+                import org.springframework.scheduling.annotation.Scheduled;
+
+                class ScheduledAdvancedService {
+
+                    @Scheduled(fixedRate = 1000)
+                    @Scheduled(cron = "0 * * * * *")
+                    public void repeatedSchedule() {
+                    }
+
+                    @Scheduled(fixedDelay = 0)
+                    public void zeroDelay() {
+                    }
+
+                    @Scheduled(initialDelayString = "-5")
+                    public void negativeInitialDelay() {
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
+        Set<String> issueIds = report.issues().stream().map(LintIssue::ruleId).collect(Collectors.toSet());
+
+        assertTrue(issueIds.contains("SPRING_SCHEDULED_REPEATED_TRIGGER"));
+        assertTrue(issueIds.contains("SPRING_SCHEDULED_NON_POSITIVE_INTERVAL"));
+    }
+
+    @Test
+    void detectsLifecycleAsyncAndTransactionalBoundaries() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("LifecycleService.java"), """
+                package demo;
+
+                import jakarta.annotation.PostConstruct;
+                import org.springframework.beans.factory.InitializingBean;
+                import org.springframework.scheduling.annotation.Async;
+                import org.springframework.transaction.annotation.Transactional;
+
+                @Transactional
+                class LifecycleService implements InitializingBean {
+
+                    @PostConstruct
+                    @Async
+                    public void initializeAsync() {
+                    }
+
+                    @Override
+                    public void afterPropertiesSet() {
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
+        Set<String> issueIds = report.issues().stream().map(LintIssue::ruleId).collect(Collectors.toSet());
+
+        assertTrue(issueIds.contains("SPRING_LIFECYCLE_ASYNC_BOUNDARY"));
+        assertTrue(issueIds.contains("SPRING_LIFECYCLE_TRANSACTIONAL_BOUNDARY"));
+    }
+
 }

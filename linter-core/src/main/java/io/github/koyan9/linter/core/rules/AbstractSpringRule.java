@@ -20,8 +20,11 @@ public abstract class AbstractSpringRule implements LintRule {
 
     protected boolean hasSecurityAnnotation(Set<String> annotations) {
         return annotations.contains("PreAuthorize")
+                || annotations.contains("PostAuthorize")
                 || annotations.contains("Secured")
                 || annotations.contains("RolesAllowed")
+                || annotations.contains("PreFilter")
+                || annotations.contains("PostFilter")
                 || annotations.contains("DenyAll")
                 || annotations.contains("PermitAll");
     }

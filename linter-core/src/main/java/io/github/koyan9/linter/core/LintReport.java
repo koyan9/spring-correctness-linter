@@ -25,7 +25,9 @@ public record LintReport(
         long cachedFileCount,
         List<ModuleSummary> moduleSummaries,
         Map<String, String> fileModules,
-        List<SourceParseProblem> parseProblems
+        List<SourceParseProblem> parseProblems,
+        AnalysisRuntimeMetrics runtimeMetrics,
+        RuleDomainSelectionSummary ruleDomainSelection
 ) {
 
     public LintReport(
@@ -51,7 +53,9 @@ public record LintReport(
                 0,
                 List.of(),
                 Map.of(),
-                List.of()
+                List.of(),
+                AnalysisRuntimeMetrics.empty(),
+                RuleDomainSelectionSummary.empty()
         );
     }
 
@@ -79,7 +83,9 @@ public record LintReport(
                 0,
                 List.of(),
                 Map.of(),
-                parseProblems
+                parseProblems,
+                AnalysisRuntimeMetrics.empty(),
+                RuleDomainSelectionSummary.empty()
         );
     }
 
@@ -107,7 +113,9 @@ public record LintReport(
                 0,
                 List.of(),
                 Map.of(),
-                List.of()
+                List.of(),
+                AnalysisRuntimeMetrics.empty(),
+                RuleDomainSelectionSummary.empty()
         );
     }
 
@@ -136,7 +144,44 @@ public record LintReport(
                 0,
                 List.of(),
                 Map.of(),
-                parseProblems
+                parseProblems,
+                AnalysisRuntimeMetrics.empty(),
+                RuleDomainSelectionSummary.empty()
+        );
+    }
+
+    public LintReport(
+            Path projectRoot,
+            Path sourceDirectory,
+            List<Path> sourceDirectories,
+            Instant generatedAt,
+            List<RuleDescriptor> rules,
+            List<LintIssue> issues,
+            long suppressedIssueCount,
+            long baselineMatchedIssueCount,
+            long staleBaselineEntryCount,
+            long cachedFileCount,
+            List<ModuleSummary> moduleSummaries,
+            Map<String, String> fileModules,
+            List<SourceParseProblem> parseProblems,
+            AnalysisRuntimeMetrics runtimeMetrics
+    ) {
+        this(
+                projectRoot,
+                sourceDirectory,
+                sourceDirectories,
+                generatedAt,
+                rules,
+                issues,
+                suppressedIssueCount,
+                baselineMatchedIssueCount,
+                staleBaselineEntryCount,
+                cachedFileCount,
+                moduleSummaries,
+                fileModules,
+                parseProblems,
+                runtimeMetrics,
+                RuleDomainSelectionSummary.empty()
         );
     }
 
@@ -155,6 +200,8 @@ public record LintReport(
         parseProblems = parseProblems.stream()
                 .sorted(Comparator.comparing((SourceParseProblem problem) -> problem.file().toString()))
                 .toList();
+        runtimeMetrics = runtimeMetrics == null ? AnalysisRuntimeMetrics.empty() : runtimeMetrics;
+        ruleDomainSelection = ruleDomainSelection == null ? RuleDomainSelectionSummary.fromRules(rules) : ruleDomainSelection;
     }
 
     public long issueCount() {

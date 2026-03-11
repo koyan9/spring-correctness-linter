@@ -5,6 +5,7 @@
 
 package io.github.koyan9.linter.maven;
 
+import io.github.koyan9.linter.core.RuleDomain;
 import io.github.koyan9.linter.core.LintSeverity;
 import org.apache.maven.plugin.MojoExecutionException;
 
@@ -28,6 +29,21 @@ final class MojoOptionParser {
             }
         }
         return ruleIds;
+    }
+
+    Set<RuleDomain> parseRuleDomains(String value) throws MojoExecutionException {
+        Set<RuleDomain> domains = new LinkedHashSet<>();
+        if (value == null || value.isBlank()) {
+            return domains;
+        }
+
+        for (String token : value.split("[,;]")) {
+            if (token.isBlank()) {
+                continue;
+            }
+            domains.add(parseRuleDomain(token.trim()));
+        }
+        return domains;
     }
 
     Map<String, LintSeverity> parseSeverityOverrides(String value) throws MojoExecutionException {
@@ -60,6 +76,19 @@ final class MojoOptionParser {
             return LintSeverity.valueOf(value.trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException exception) {
             throw new MojoExecutionException("Invalid failOnSeverity value: " + value + ". Expected INFO, WARNING, or ERROR.", exception);
+        }
+    }
+
+    private RuleDomain parseRuleDomain(String value) throws MojoExecutionException {
+        String normalized = value.trim().toUpperCase(Locale.ROOT).replace('-', '_').replace(' ', '_');
+        try {
+            return RuleDomain.valueOf(normalized);
+        } catch (IllegalArgumentException exception) {
+            String availableDomains = java.util.Arrays.stream(RuleDomain.values())
+                    .map(Enum::name)
+                    .reduce((left, right) -> left + ", " + right)
+                    .orElse("");
+            throw new MojoExecutionException("Invalid rule domain value: " + value + ". Expected one of: " + availableDomains + ".", exception);
         }
     }
 }
