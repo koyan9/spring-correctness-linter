@@ -1916,6 +1916,126 @@ class ProjectLinterTest {
     }
 
     @Test
+    void honorsComposedScheduledTriggerConfiguration() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("ComposedScheduled.java"), """
+                package demo;
+
+                import org.springframework.core.annotation.AliasFor;
+                import org.springframework.scheduling.annotation.Scheduled;
+
+                import java.lang.annotation.ElementType;
+                import java.lang.annotation.Retention;
+                import java.lang.annotation.RetentionPolicy;
+                import java.lang.annotation.Target;
+
+                @Target(ElementType.METHOD)
+                @Retention(RetentionPolicy.RUNTIME)
+                @Scheduled
+                @interface CronScheduled {
+
+                    @AliasFor(annotation = Scheduled.class, attribute = "cron")
+                    String cron() default "";
+                }
+
+                class CronService {
+
+                    @CronScheduled(cron = "0 * * * * *")
+                    public void cron() {
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
+        Set<String> issueIds = report.issues().stream().map(LintIssue::ruleId).collect(Collectors.toSet());
+
+        assertFalse(issueIds.contains("SPRING_SCHEDULED_TRIGGER_CONFIGURATION"));
+    }
+
+    @Test
+    void flagsRepeatedScheduledTriggersWithComposedConfiguration() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("RepeatedScheduled.java"), """
+                package demo;
+
+                import org.springframework.core.annotation.AliasFor;
+                import org.springframework.scheduling.annotation.Scheduled;
+
+                import java.lang.annotation.ElementType;
+                import java.lang.annotation.Retention;
+                import java.lang.annotation.RetentionPolicy;
+                import java.lang.annotation.Target;
+
+                @Target(ElementType.METHOD)
+                @Retention(RetentionPolicy.RUNTIME)
+                @Scheduled
+                @interface CronScheduled {
+
+                    @AliasFor(annotation = Scheduled.class, attribute = "cron")
+                    String cron() default "";
+                }
+
+                class RepeatedService {
+
+                    @CronScheduled(cron = "0 * * * * *")
+                    @Scheduled(fixedRate = 1000)
+                    public void mixed() {
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
+        Set<String> issueIds = report.issues().stream().map(LintIssue::ruleId).collect(Collectors.toSet());
+
+        assertTrue(issueIds.contains("SPRING_SCHEDULED_TRIGGER_CONFIGURATION"));
+    }
+
+    @Test
+    void honorsComposedCacheNamesViaAliasFor() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("ComposedCacheNames.java"), """
+                package demo;
+
+                import org.springframework.cache.annotation.Cacheable;
+                import org.springframework.core.annotation.AliasFor;
+
+                import java.lang.annotation.ElementType;
+                import java.lang.annotation.Retention;
+                import java.lang.annotation.RetentionPolicy;
+                import java.lang.annotation.Target;
+
+                @Target(ElementType.METHOD)
+                @Retention(RetentionPolicy.RUNTIME)
+                @Cacheable
+                @interface LocalCache {
+
+                    @AliasFor(annotation = Cacheable.class, attribute = "cacheNames")
+                    String[] cacheNames() default {};
+                }
+
+                class CacheService {
+
+                    @LocalCache(cacheNames = "safe")
+                    public String load(String id) {
+                        return id;
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintOptions options = LintOptions.defaults().withCacheDefaultKeyCacheNames(Set.of("safe"));
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"), options).report();
+        Set<String> issueIds = report.issues().stream().map(LintIssue::ruleId).collect(Collectors.toSet());
+
+        assertFalse(issueIds.contains("SPRING_CACHEABLE_KEY"));
+    }
+
+    @Test
     void detectsScheduledAsyncAndTransactionalBoundaries() throws Exception {
         Path sourceDirectory = tempDir.resolve("src/main/java/demo");
         Files.createDirectories(sourceDirectory);

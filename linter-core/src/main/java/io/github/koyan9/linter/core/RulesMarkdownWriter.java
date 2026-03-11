@@ -51,6 +51,9 @@ final class RulesMarkdownWriter {
         builder.append("- Enable rule domains: `-Dspring.correctness.linter.enabledRuleDomains=TRANSACTION,CACHE`\n");
         builder.append("- Disable rule domains: `-Dspring.correctness.linter.disabledRuleDomains=WEB`\n");
         builder.append("- Override severities: `-Dspring.correctness.linter.severityOverrides=RULE_A=ERROR,RULE_B=INFO`\n");
+        builder.append("- Centralized security: `-Dspring.correctness.linter.assumeCentralizedSecurity=true`\n");
+        builder.append("- Custom security annotations: `-Dspring.correctness.linter.securityAnnotations=CustomSecured,TeamSecure`\n");
+        builder.append("- Allow default cache keys: `-Dspring.correctness.linter.cacheDefaultKeyCacheNames=users,orders`\n");
         builder.append("- Suppress one finding: `// spring-correctness-linter:disable-next-line RULE_ID reason: explanation`\n\n");
         appendRecommendedBundles(builder, descriptors);
         appendRuleDomains(builder, descriptors);

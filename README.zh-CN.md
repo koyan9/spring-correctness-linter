@@ -216,6 +216,27 @@ JSON 和 HTML 报告现在还会包含运行期指标，便于观察：
 - `spring.correctness.linter.cacheDefaultKeyCacheNames=users,orders`：指定 cache 名称允许默认 key（`*` 表示全部允许）
 - `spring.correctness.linter.failOnSeverity=WARNING`：按严重级别失败
 - `spring.correctness.linter.failOnError=true`：只要还有可见问题就失败
+
+### 集中式安全意图
+
+如果安全策略主要在 `SecurityFilterChain`、网关或其他基础设施中统一控制，可以通过配置减少噪声，或补充项目内的安全注解：
+
+```xml
+<configuration>
+  <assumeCentralizedSecurity>true</assumeCentralizedSecurity>
+  <securityAnnotations>InternalEndpoint,TeamSecure</securityAnnotations>
+</configuration>
+```
+
+### 允许部分 cache 使用默认 key
+
+如果部分 cache 明确依赖 Spring 默认 key 规则，可以按 cache 名称放行：
+
+```xml
+<configuration>
+  <cacheDefaultKeyCacheNames>users,orders</cacheDefaultKeyCacheNames>
+</configuration>
+```
 - `spring.correctness.linter.useIncrementalCache=true`：启用增量缓存
 - `spring.correctness.linter.cacheFile=target/spring-correctness-linter/analysis-cache.txt`：设置 cache 文件路径
 - `spring.correctness.linter.splitBaselineByModule=true`：按模块拆分 baseline
@@ -393,6 +414,7 @@ PowerShell 下，建议对带点号的 `-Dspring.correctness.linter.*` 参数加
 ```
 
 如果是从 reactor 执行根扫描多模块项目，请上传 reactor 根报告目录中的 SARIF 文件。
+SARIF 结果中还包含 `moduleId` 字段，方便按模块定位问题。
 
 ## 验证与覆盖率
 

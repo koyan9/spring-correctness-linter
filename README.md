@@ -213,6 +213,28 @@ When reactor scanning is enabled:
 - `spring.correctness.linter.cacheDefaultKeyCacheNames=users,orders`: allow default cache keys for selected cache names (`*` to allow all)
 - `spring.correctness.linter.failOnSeverity=WARNING`: fail the build for matching severities
 - `spring.correctness.linter.failOnError=true`: fail the build when any visible issue remains
+
+### Centralized security intent
+
+If endpoint security is enforced in infrastructure such as `SecurityFilterChain`, gateways, or sidecars, you can reduce noise by
+disabling the endpoint-security rule globally or by providing your internal security annotations:
+
+```xml
+<configuration>
+  <assumeCentralizedSecurity>true</assumeCentralizedSecurity>
+  <securityAnnotations>InternalEndpoint,TeamSecure</securityAnnotations>
+</configuration>
+```
+
+### Allow default cache keys for specific caches
+
+If some caches intentionally rely on Spring's default key generation, you can allow them by name:
+
+```xml
+<configuration>
+  <cacheDefaultKeyCacheNames>users,orders</cacheDefaultKeyCacheNames>
+</configuration>
+```
 - `spring.correctness.linter.useIncrementalCache=true`: enable file-content-based cache reuse
 - `spring.correctness.linter.cacheFile=target/spring-correctness-linter/analysis-cache.txt`: set cache file path
 - `spring.correctness.linter.splitBaselineByModule=true`: write module-scoped baseline files
@@ -390,6 +412,7 @@ When SARIF output is enabled, GitHub Actions can upload the generated report to 
 ```
 
 For multi-module reactors scanned from the execution root, upload the SARIF file generated in the reactor root report directory.
+SARIF results also include a `moduleId` property so code scanning views can be grouped by module when needed.
 
 ## Validation and Coverage
 

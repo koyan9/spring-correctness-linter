@@ -40,7 +40,7 @@ Remaining accuracy gaps:
 Recommended next tests:
 - [done] Parameterized methods that intentionally rely on default key generation
 - [done] Overloaded `@Cacheable` methods with shared cache names
-- [pending] Additional `@AliasFor` forwarding for cache-name conventions
+- [done] Additional `@AliasFor` forwarding for cache-name conventions
 
 ### `SPRING_TX_SELF_INVOCATION`
 
@@ -71,8 +71,8 @@ scheduled-trigger helper if more schedule-oriented rules are added.
 
 Recommended next tests:
 - [done] Placeholder and property-driven trigger values
-- Composed `@Scheduled` annotations with forwarded members
-- Interactions between repeated schedules and trigger counting
+- [done] Composed `@Scheduled` annotations with forwarded members
+- [done] Interactions between repeated schedules and trigger counting
 
 ## Working heuristics
 
