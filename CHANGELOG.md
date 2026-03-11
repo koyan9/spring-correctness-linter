@@ -33,7 +33,10 @@ All notable changes to `spring-correctness-linter` will be documented in this fi
 - HTML and JSON reports now also show configured rule ids and effective per-domain rule breakdowns
 - Maven plugin logs now print a concise rule-selection summary for faster CI diagnosis
 - Maven plugin logs now include cache hit rate and slow-module summaries for multi-module scans
+- Slow-module summaries now focus on analyzed time to avoid cache-only skew
 - Scheduled trigger configuration checks now treat placeholder values as configured to reduce false positives
+- SARIF output now includes module identifiers for multi-module repositories
+- Annotation meta-resolution now prefers same-package and import-based matches when simple names are ambiguous
 - Generated rule reference docs now include recommended domain-based rule bundles for common rollout scenarios
 - Added an initial `SCHEDULED` rule domain covering invalid trigger configuration, scheduled method parameters, and non-void return-value review
 - Expanded `SCHEDULED` coverage with `@Scheduled` + `@Async` and `@Scheduled` + `@Transactional` boundary checks

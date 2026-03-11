@@ -170,6 +170,7 @@ class ProjectLinterTest {
         assertTrue(sarif.contains("\"version\": \"2.1.0\""));
         assertTrue(sarif.contains("SPRING_ASYNC_VOID"));
         assertTrue(sarif.contains("src/main/java/demo/AsyncOnly.java"));
+        assertTrue(sarif.contains("\"moduleId\": \"src/main/java\""));
     }
 
     @Test
@@ -1719,6 +1720,86 @@ class ProjectLinterTest {
         Set<String> issueIds = report.issues().stream().map(LintIssue::ruleId).collect(Collectors.toSet());
 
         assertFalse(issueIds.contains("SPRING_ENDPOINT_SECURITY"));
+    }
+
+    @Test
+    void resolvesAmbiguousSecurityAnnotationsByImports() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java");
+        Files.createDirectories(sourceDirectory.resolve("a"));
+        Files.createDirectories(sourceDirectory.resolve("b"));
+        Files.createDirectories(sourceDirectory.resolve("demo"));
+        Files.writeString(sourceDirectory.resolve("a/Secure.java"), """
+                package a;
+
+                import org.springframework.security.access.prepost.PreAuthorize;
+
+                import java.lang.annotation.ElementType;
+                import java.lang.annotation.Retention;
+                import java.lang.annotation.RetentionPolicy;
+                import java.lang.annotation.Target;
+
+                @Target(ElementType.METHOD)
+                @Retention(RetentionPolicy.RUNTIME)
+                @PreAuthorize("hasRole('ADMIN')")
+                public @interface Secure {
+                }
+                """);
+        Files.writeString(sourceDirectory.resolve("b/Secure.java"), """
+                package b;
+
+                import java.lang.annotation.ElementType;
+                import java.lang.annotation.Retention;
+                import java.lang.annotation.RetentionPolicy;
+                import java.lang.annotation.Target;
+
+                @Target(ElementType.METHOD)
+                @Retention(RetentionPolicy.RUNTIME)
+                public @interface Secure {
+                }
+                """);
+        Files.writeString(sourceDirectory.resolve("demo/SecureControllerA.java"), """
+                package demo;
+
+                import a.Secure;
+                import org.springframework.web.bind.annotation.GetMapping;
+                import org.springframework.web.bind.annotation.RestController;
+
+                @RestController
+                class SecureControllerA {
+
+                    @GetMapping("/a")
+                    @Secure
+                    public String secure() {
+                        return "ok";
+                    }
+                }
+                """);
+        Files.writeString(sourceDirectory.resolve("demo/SecureControllerB.java"), """
+                package demo;
+
+                import b.Secure;
+                import org.springframework.web.bind.annotation.GetMapping;
+                import org.springframework.web.bind.annotation.RestController;
+
+                @RestController
+                class SecureControllerB {
+
+                    @GetMapping("/b")
+                    @Secure
+                    public String open() {
+                        return "ok";
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
+        List<LintIssue> issues = report.issues().stream()
+                .filter(issue -> issue.ruleId().equals("SPRING_ENDPOINT_SECURITY"))
+                .toList();
+
+        assertEquals(1, issues.size());
+        assertTrue(issues.get(0).file().toString().contains("SecureControllerB"));
     }
 
     @Test

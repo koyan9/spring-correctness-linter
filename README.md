@@ -152,7 +152,7 @@ JSON and HTML reports now also include runtime metrics so users can inspect:
 - cache hit rate and cache scope
 - per-phase timing breakdown
 - per-module analysis timing and cache hit rate
-- slowest modules by analysis time
+- slowest modules by analyzed time
 - configured enabled / disabled rule domains and effective rule domains for the current run
 - configured enabled / disabled rule ids and an effective per-domain rule breakdown for the current run
 

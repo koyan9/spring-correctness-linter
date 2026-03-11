@@ -11,7 +11,9 @@ public record ModuleRuntimeMetrics(
         long analyzedFileCount,
         long cachedFileCount,
         long parseProblemFileCount,
-        long analysisMillis
+        long analysisMillis,
+        long analyzedMillis,
+        long cachedMillis
 ) {
 
     public long cacheHitRatePercent() {

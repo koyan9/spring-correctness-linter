@@ -180,11 +180,11 @@ public class CorrectnessLintMojo extends AbstractMojo {
                     + "% hit rate (" + report.runtimeMetrics().cacheScope() + ")");
             if (report.runtimeMetrics().moduleMetrics().size() > 1) {
                 String slowModules = report.runtimeMetrics().slowestModules(5).stream()
-                        .map(metric -> metric.moduleId() + "=" + metric.analysisMillis()
+                        .map(metric -> metric.moduleId() + "=" + metric.analyzedMillis()
                                 + " ms (" + metric.cacheHitRatePercent() + "% cache)")
                         .collect(Collectors.joining(", "));
                 if (!slowModules.isBlank()) {
-                    getLog().info("spring-correctness-linter slowest modules: " + slowModules);
+                    getLog().info("spring-correctness-linter slowest analyzed modules: " + slowModules);
                 }
             }
             getLog().info(ruleSelectionSummaryFormatter.format(report.ruleDomainSelection()));

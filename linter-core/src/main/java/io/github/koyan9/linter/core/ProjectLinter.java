@@ -84,7 +84,9 @@ public final class ProjectLinter {
                     module.parseProblemFileCount++;
                 }
                 cacheEntries.add(cachedAnalysis);
-                module.analysisNanos += System.nanoTime() - fileAnalysisStartedAt;
+                long elapsed = System.nanoTime() - fileAnalysisStartedAt;
+                module.analysisNanos += elapsed;
+                module.cachedNanos += elapsed;
                 continue;
             }
 
@@ -119,7 +121,9 @@ public final class ProjectLinter {
                     fileSuppressedIssueCount,
                     sourceUnit.parseProblems()
             ));
-            module.analysisNanos += System.nanoTime() - fileAnalysisStartedAt;
+            long elapsed = System.nanoTime() - fileAnalysisStartedAt;
+            module.analysisNanos += elapsed;
+            module.analyzedNanos += elapsed;
         }
         long fileAnalysisNanos = System.nanoTime() - fileAnalysisStartNanos;
 
@@ -375,6 +379,8 @@ public final class ProjectLinter {
         private long parseProblemFileCount;
         private long cachedFileCount;
         private long analysisNanos;
+        private long analyzedNanos;
+        private long cachedNanos;
 
         private ModuleAccumulator(String moduleId) {
             this.moduleId = moduleId;
@@ -385,7 +391,10 @@ public final class ProjectLinter {
         }
 
         private ModuleRuntimeMetrics toRuntimeMetrics() {
-            return new ModuleRuntimeMetrics(moduleId, sourceFileCount, analyzedFileCount, cachedFileCount, parseProblemFileCount, TimeUnit.NANOSECONDS.toMillis(analysisNanos));
+            long analysisMillis = TimeUnit.NANOSECONDS.toMillis(analysisNanos);
+            long analyzedMillis = TimeUnit.NANOSECONDS.toMillis(analyzedNanos);
+            long cachedMillis = TimeUnit.NANOSECONDS.toMillis(cachedNanos);
+            return new ModuleRuntimeMetrics(moduleId, sourceFileCount, analyzedFileCount, cachedFileCount, parseProblemFileCount, analysisMillis, analyzedMillis, cachedMillis);
         }
     }
 

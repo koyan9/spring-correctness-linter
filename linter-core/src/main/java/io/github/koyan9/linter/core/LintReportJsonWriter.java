@@ -83,6 +83,8 @@ final class LintReportJsonWriter {
             builder.append("        \"cachedFileCount\": ").append(moduleMetric.cachedFileCount()).append(",\n");
             builder.append("        \"parseProblemFileCount\": ").append(moduleMetric.parseProblemFileCount()).append(",\n");
             builder.append("        \"analysisMillis\": ").append(moduleMetric.analysisMillis()).append(",\n");
+            builder.append("        \"analyzedMillis\": ").append(moduleMetric.analyzedMillis()).append(",\n");
+            builder.append("        \"cachedMillis\": ").append(moduleMetric.cachedMillis()).append(",\n");
             builder.append("        \"cacheHitRatePercent\": ").append(moduleMetric.cacheHitRatePercent()).append('\n');
             builder.append("      }");
             if (index < report.runtimeMetrics().moduleMetrics().size() - 1) {
@@ -98,6 +100,8 @@ final class LintReportJsonWriter {
             builder.append("      {\n");
             builder.append("        \"moduleId\": \"").append(ReportWriterSupport.escapeJson(moduleMetric.moduleId())).append("\",\n");
             builder.append("        \"analysisMillis\": ").append(moduleMetric.analysisMillis()).append(",\n");
+            builder.append("        \"analyzedMillis\": ").append(moduleMetric.analyzedMillis()).append(",\n");
+            builder.append("        \"cachedMillis\": ").append(moduleMetric.cachedMillis()).append(",\n");
             builder.append("        \"sourceFileCount\": ").append(moduleMetric.sourceFileCount()).append(",\n");
             builder.append("        \"analyzedFileCount\": ").append(moduleMetric.analyzedFileCount()).append(",\n");
             builder.append("        \"cachedFileCount\": ").append(moduleMetric.cachedFileCount()).append(",\n");

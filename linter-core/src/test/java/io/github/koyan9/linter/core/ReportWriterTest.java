@@ -106,8 +106,8 @@ class ReportWriterTest {
                         1,
                         new AnalysisPhaseMetrics(1, 2, 3, 4, 5, 6, 7),
                         List.of(
-                                new ModuleRuntimeMetrics("root-app", 1, 1, 0, 1, 11),
-                                new ModuleRuntimeMetrics("module-a", 1, 0, 1, 0, 9)
+                                new ModuleRuntimeMetrics("root-app", 1, 1, 0, 1, 11, 11, 0),
+                                new ModuleRuntimeMetrics("module-a", 1, 0, 1, 0, 9, 0, 9)
                         )
                 ),
                 new RuleDomainSelectionSummary(

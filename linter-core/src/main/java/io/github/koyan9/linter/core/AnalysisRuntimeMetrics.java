@@ -51,7 +51,8 @@ public record AnalysisRuntimeMetrics(
             return List.of();
         }
         return moduleMetrics.stream()
-                .sorted(Comparator.comparingLong(ModuleRuntimeMetrics::analysisMillis).reversed())
+                .filter(metric -> metric.analyzedMillis() > 0)
+                .sorted(Comparator.comparingLong(ModuleRuntimeMetrics::analyzedMillis).reversed())
                 .limit(limit)
                 .toList();
     }

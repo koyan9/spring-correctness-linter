@@ -42,6 +42,9 @@ final class SarifReportWriter {
             builder.append("          \"ruleId\": \"").append(ReportWriterSupport.escapeJson(issue.ruleId())).append("\",\n");
             builder.append("          \"level\": \"").append(ReportWriterSupport.toSarifLevel(issue.severity())).append("\",\n");
             builder.append("          \"message\": { \"text\": \"").append(ReportWriterSupport.escapeJson(issue.message())).append("\" },\n");
+            builder.append("          \"properties\": { \"moduleId\": \"")
+                    .append(ReportWriterSupport.escapeJson(report.moduleFor(issue.file())))
+                    .append("\" },\n");
             builder.append("          \"locations\": [\n");
             builder.append("            {\n");
             builder.append("              \"physicalLocation\": {\n");

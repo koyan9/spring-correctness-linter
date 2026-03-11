@@ -60,15 +60,16 @@ final class LintReportHtmlWriter {
         appendPhaseRow(builder, "Tracked total", report.runtimeMetrics().phaseMetrics().totalTrackedMillis());
         builder.append("    </tbody>\n");
         builder.append("  </table>\n");
-        if (!report.runtimeMetrics().moduleMetrics().isEmpty()) {
+        java.util.List<ModuleRuntimeMetrics> slowModules = report.runtimeMetrics().slowestModules(5);
+        if (!slowModules.isEmpty()) {
             builder.append("  <h3>Slowest Modules</h3>\n");
             builder.append("  <table>\n");
-            builder.append("    <thead><tr><th>Module</th><th>Analysis ms</th><th>Cache hit rate</th><th>Analyzed files</th><th>Cached files</th></tr></thead>\n");
+            builder.append("    <thead><tr><th>Module</th><th>Analyzed ms</th><th>Cache hit rate</th><th>Analyzed files</th><th>Cached files</th></tr></thead>\n");
             builder.append("    <tbody>\n");
-            for (ModuleRuntimeMetrics moduleMetric : report.runtimeMetrics().slowestModules(5)) {
+            for (ModuleRuntimeMetrics moduleMetric : slowModules) {
                 builder.append("      <tr>")
                         .append("<td><code>").append(ReportWriterSupport.escapeHtml(moduleMetric.moduleId())).append("</code></td>")
-                        .append("<td>").append(moduleMetric.analysisMillis()).append("</td>")
+                        .append("<td>").append(moduleMetric.analyzedMillis()).append("</td>")
                         .append("<td>").append(moduleMetric.cacheHitRatePercent()).append("%</td>")
                         .append("<td>").append(moduleMetric.analyzedFileCount()).append("</td>")
                         .append("<td>").append(moduleMetric.cachedFileCount()).append("</td>")
@@ -80,7 +81,7 @@ final class LintReportHtmlWriter {
         if (!report.moduleSummaries().isEmpty()) {
             builder.append("  <h2>Modules</h2>\n");
             builder.append("  <table>\n");
-            builder.append("    <thead><tr><th>Module</th><th>Source roots</th><th>Source files</th><th>Analyzed files</th><th>Visible issues</th><th>Parse problem files</th><th>Cached files</th><th>Cache hit rate</th><th>Analysis ms</th></tr></thead>\n");
+            builder.append("    <thead><tr><th>Module</th><th>Source roots</th><th>Source files</th><th>Analyzed files</th><th>Visible issues</th><th>Parse problem files</th><th>Cached files</th><th>Cache hit rate</th><th>Analyzed ms</th><th>Cached ms</th><th>Total ms</th></tr></thead>\n");
             builder.append("    <tbody>\n");
             for (ModuleSummary moduleSummary : report.moduleSummaries()) {
                 ModuleRuntimeMetrics moduleMetric = report.runtimeMetrics().moduleMetric(moduleSummary.moduleId());
@@ -93,6 +94,8 @@ final class LintReportHtmlWriter {
                         .append("<td>").append(moduleSummary.parseProblemFileCount()).append("</td>")
                         .append("<td>").append(moduleSummary.cachedFileCount()).append("</td>")
                         .append("<td>").append(moduleMetric == null ? 0 : moduleMetric.cacheHitRatePercent()).append("%</td>")
+                        .append("<td>").append(moduleMetric == null ? 0 : moduleMetric.analyzedMillis()).append("</td>")
+                        .append("<td>").append(moduleMetric == null ? 0 : moduleMetric.cachedMillis()).append("</td>")
                         .append("<td>").append(moduleMetric == null ? 0 : moduleMetric.analysisMillis()).append("</td>")
                         .append("</tr>\n");
             }
