@@ -98,6 +98,15 @@ public class CorrectnessLintMojo extends AbstractMojo {
     @Parameter(property = "spring.correctness.linter.severityOverrides")
     private String severityOverrides;
 
+    @Parameter(property = "spring.correctness.linter.assumeCentralizedSecurity", defaultValue = "false")
+    private boolean assumeCentralizedSecurity;
+
+    @Parameter(property = "spring.correctness.linter.securityAnnotations")
+    private String securityAnnotations;
+
+    @Parameter(property = "spring.correctness.linter.cacheDefaultKeyCacheNames")
+    private String cacheDefaultKeyCacheNames;
+
     @Parameter(property = "spring.correctness.linter.cacheFile", defaultValue = "${project.build.directory}/spring-correctness-linter/analysis-cache.txt")
     private java.io.File cacheFile;
 
@@ -144,7 +153,10 @@ public class CorrectnessLintMojo extends AbstractMojo {
                     disabledRules,
                     enabledRuleDomains,
                     disabledRuleDomains,
-                    severityOverrides
+                    severityOverrides,
+                    assumeCentralizedSecurity,
+                    securityAnnotations,
+                    cacheDefaultKeyCacheNames
             );
             ProjectLinter linter = new ProjectLinter(plan.rules());
             LintAnalysisResult result = linter.analyzeSourceRoots(plan.projectRoot(), plan.sourceRoots(), plan.options());

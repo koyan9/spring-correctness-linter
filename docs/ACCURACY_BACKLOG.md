@@ -70,7 +70,7 @@ This rule still uses direct annotation-member reads for good reasons, but it is 
 scheduled-trigger helper if more schedule-oriented rules are added.
 
 Recommended next tests:
-- Placeholder and property-driven trigger values
+- [done] Placeholder and property-driven trigger values
 - Composed `@Scheduled` annotations with forwarded members
 - Interactions between repeated schedules and trigger counting
 

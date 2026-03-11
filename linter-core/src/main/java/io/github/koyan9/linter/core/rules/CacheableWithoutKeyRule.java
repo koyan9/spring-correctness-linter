@@ -62,7 +62,8 @@ public final class CacheableWithoutKeyRule extends AbstractSpringRule {
         return List.of(
                 "Declare an explicit SpEL `key` when cache identity should be obvious at the method declaration site.",
                 "Use a shared `keyGenerator` when the project already has a stable cache-key convention.",
-                "If relying on Spring's default key is intentional, suppress the finding with a reason that documents that convention."
+                "If relying on Spring's default key is intentional, suppress the finding with a reason that documents that convention.",
+                "To allow specific caches to keep the default key, use `spring.correctness.linter.cacheDefaultKeyCacheNames`."
         );
     }
 
@@ -74,10 +75,32 @@ public final class CacheableWithoutKeyRule extends AbstractSpringRule {
             for (MethodDeclaration method : sourceUnit.structure().methodsOf(typeDeclaration)) {
                 MethodSemanticFacts methodFacts = facts.methodFacts(typeDeclaration, method);
                 if (methodFacts.shouldDeclareExplicitCacheKey()) {
+                    if (isDefaultCacheKeyAllowed(method, facts, context.options().cacheDefaultKeyCacheNames())) {
+                        continue;
+                    }
                     issues.add(issue(sourceUnit, JavaSourceInspector.lineOf(method), "@Cacheable method '" + method.getNameAsString() + "' does not declare an explicit cache key strategy."));
                 }
             }
         }
         return issues;
+    }
+
+    private boolean isDefaultCacheKeyAllowed(MethodDeclaration method, SpringSemanticFacts facts, java.util.Set<String> cacheNames) {
+        if (cacheNames.isEmpty()) {
+            return false;
+        }
+        if (cacheNames.contains("*")) {
+            return true;
+        }
+        for (String cacheName : cacheNames) {
+            if (cacheName.isBlank()) {
+                continue;
+            }
+            if (facts.annotationMemberContains(method, "Cacheable", "cacheNames", cacheName)
+                    || facts.annotationMemberContains(method, "Cacheable", "value", cacheName)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

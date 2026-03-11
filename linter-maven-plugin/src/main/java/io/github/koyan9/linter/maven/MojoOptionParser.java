@@ -18,17 +18,21 @@ import java.util.Set;
 final class MojoOptionParser {
 
     Set<String> parseRuleIds(String value) {
-        Set<String> ruleIds = new LinkedHashSet<>();
+        return parseStringSet(value);
+    }
+
+    Set<String> parseStringSet(String value) {
+        Set<String> items = new LinkedHashSet<>();
         if (value == null || value.isBlank()) {
-            return ruleIds;
+            return items;
         }
 
         for (String token : value.split("[,;]")) {
             if (!token.isBlank()) {
-                ruleIds.add(token.trim());
+                items.add(token.trim());
             }
         }
-        return ruleIds;
+        return items;
     }
 
     Set<RuleDomain> parseRuleDomains(String value) throws MojoExecutionException {

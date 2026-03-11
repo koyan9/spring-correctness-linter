@@ -1651,6 +1651,77 @@ class ProjectLinterTest {
     }
 
     @Test
+    void honorsCentralizedSecurityConfiguration() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("PublicController.java"), """
+                package demo;
+
+                import org.springframework.web.bind.annotation.GetMapping;
+                import org.springframework.web.bind.annotation.RestController;
+
+                @RestController
+                class PublicController {
+
+                    @GetMapping("/open")
+                    public String open() {
+                        return "ok";
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport defaultReport = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
+        Set<String> defaultIssueIds = defaultReport.issues().stream().map(LintIssue::ruleId).collect(Collectors.toSet());
+        assertTrue(defaultIssueIds.contains("SPRING_ENDPOINT_SECURITY"));
+
+        LintOptions options = LintOptions.defaults().withAssumeCentralizedSecurity(true);
+        LintReport configuredReport = linter.analyze(tempDir, tempDir.resolve("src/main/java"), options).report();
+        Set<String> configuredIssueIds = configuredReport.issues().stream().map(LintIssue::ruleId).collect(Collectors.toSet());
+
+        assertFalse(configuredIssueIds.contains("SPRING_ENDPOINT_SECURITY"));
+    }
+
+    @Test
+    void honorsCustomSecurityAnnotations() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("CustomSecurity.java"), """
+                package demo;
+
+                import org.springframework.web.bind.annotation.GetMapping;
+                import org.springframework.web.bind.annotation.RestController;
+
+                import java.lang.annotation.ElementType;
+                import java.lang.annotation.Retention;
+                import java.lang.annotation.RetentionPolicy;
+                import java.lang.annotation.Target;
+
+                @Target(ElementType.METHOD)
+                @Retention(RetentionPolicy.RUNTIME)
+                @interface InternalEndpoint {
+                }
+
+                @RestController
+                class InternalController {
+
+                    @GetMapping("/internal")
+                    @InternalEndpoint
+                    public String internal() {
+                        return "ok";
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintOptions options = LintOptions.defaults().withCustomSecurityAnnotations(Set.of("InternalEndpoint"));
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"), options).report();
+        Set<String> issueIds = report.issues().stream().map(LintIssue::ruleId).collect(Collectors.toSet());
+
+        assertFalse(issueIds.contains("SPRING_ENDPOINT_SECURITY"));
+    }
+
+    @Test
     void flagsComposedCacheableWithoutExplicitKeyStrategy() throws Exception {
         Path sourceDirectory = tempDir.resolve("src/main/java/demo");
         Files.createDirectories(sourceDirectory);
@@ -1729,6 +1800,41 @@ class ProjectLinterTest {
     }
 
     @Test
+    void treatsScheduledPlaceholdersAsConfigured() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("ScheduledPlaceholders.java"), """
+                package demo;
+
+                import org.springframework.scheduling.annotation.Scheduled;
+
+                class ScheduledPlaceholders {
+
+                    @Scheduled(cron = "${demo.cron}")
+                    public void cronPlaceholder() {
+                    }
+
+                    @Scheduled(cron = "${demo.cron}", fixedRateString = "${demo.rate}")
+                    public void mixedPlaceholders() {
+                    }
+
+                    @Scheduled
+                    public void missingTrigger() {
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
+        List<LintIssue> issues = report.issues().stream()
+                .filter(issue -> issue.ruleId().equals("SPRING_SCHEDULED_TRIGGER_CONFIGURATION"))
+                .toList();
+
+        assertEquals(1, issues.size());
+        assertTrue(issues.get(0).message().contains("missingTrigger"));
+    }
+
+    @Test
     void detectsScheduledAsyncAndTransactionalBoundaries() throws Exception {
         Path sourceDirectory = tempDir.resolve("src/main/java/demo");
         Files.createDirectories(sourceDirectory);
@@ -1759,6 +1865,32 @@ class ProjectLinterTest {
 
         assertTrue(issueIds.contains("SPRING_SCHEDULED_ASYNC_BOUNDARY"));
         assertTrue(issueIds.contains("SPRING_SCHEDULED_TRANSACTIONAL_BOUNDARY"));
+    }
+
+    @Test
+    void allowsDefaultCacheKeyForConfiguredCaches() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("CacheAllowlist.java"), """
+                package demo;
+
+                import org.springframework.cache.annotation.Cacheable;
+
+                class CacheAllowlist {
+
+                    @Cacheable(cacheNames = "safe")
+                    public String load(String id) {
+                        return id;
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintOptions options = LintOptions.defaults().withCacheDefaultKeyCacheNames(Set.of("safe"));
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"), options).report();
+        Set<String> issueIds = report.issues().stream().map(LintIssue::ruleId).collect(Collectors.toSet());
+
+        assertFalse(issueIds.contains("SPRING_CACHEABLE_KEY"));
     }
 
     @Test

@@ -22,26 +22,39 @@ public final class ProjectContext {
     private final List<SourceRoot> sourceRoots;
     private final List<SourceDocument> sourceDocuments;
     private final AnnotationMetadataIndex annotationMetadataIndex;
+    private final LintOptions options;
     private final Map<SourceUnit, SpringSemanticFacts> semanticFactsBySourceUnit = new IdentityHashMap<>();
     private volatile TypeResolutionIndex typeResolutionIndex;
 
-    private ProjectContext(Path projectRoot, Path sourceDirectory, List<SourceRoot> sourceRoots, List<SourceDocument> sourceDocuments, AnnotationMetadataIndex annotationMetadataIndex) {
+    private ProjectContext(
+            Path projectRoot,
+            Path sourceDirectory,
+            List<SourceRoot> sourceRoots,
+            List<SourceDocument> sourceDocuments,
+            AnnotationMetadataIndex annotationMetadataIndex,
+            LintOptions options
+    ) {
         this.projectRoot = projectRoot;
         this.sourceDirectory = sourceDirectory;
         this.sourceRoots = List.copyOf(sourceRoots);
         this.sourceDocuments = List.copyOf(sourceDocuments);
         this.annotationMetadataIndex = annotationMetadataIndex;
+        this.options = options == null ? LintOptions.defaults() : options;
     }
 
     public static ProjectContext load(Path projectRoot, Path sourceDirectory) throws IOException {
-        return loadSourceRoots(projectRoot, List.of(SourceRoot.of(projectRoot, sourceDirectory)));
+        return loadSourceRoots(projectRoot, List.of(SourceRoot.of(projectRoot, sourceDirectory)), LintOptions.defaults());
     }
 
     public static ProjectContext load(Path projectRoot, List<Path> sourceDirectories) throws IOException {
-        return loadSourceRoots(projectRoot, sourceDirectories.stream().map(path -> SourceRoot.of(projectRoot, path)).toList());
+        return loadSourceRoots(projectRoot, sourceDirectories.stream().map(path -> SourceRoot.of(projectRoot, path)).toList(), LintOptions.defaults());
     }
 
     public static ProjectContext loadSourceRoots(Path projectRoot, List<SourceRoot> sourceRoots) throws IOException {
+        return loadSourceRoots(projectRoot, sourceRoots, LintOptions.defaults());
+    }
+
+    public static ProjectContext loadSourceRoots(Path projectRoot, List<SourceRoot> sourceRoots, LintOptions options) throws IOException {
         Path normalizedRoot = projectRoot.toAbsolutePath().normalize();
         List<SourceRoot> normalizedSourceRoots = sourceRoots.stream()
                 .map(sourceRoot -> new SourceRoot(sourceRoot.path().toAbsolutePath().normalize(), sourceRoot.moduleId()))
@@ -50,7 +63,7 @@ public final class ProjectContext {
         Path primarySourceDirectory = normalizedSourceRoots.isEmpty() ? normalizedRoot : normalizedSourceRoots.get(0).path();
 
         if (normalizedSourceRoots.isEmpty()) {
-            return new ProjectContext(normalizedRoot, primarySourceDirectory, List.of(), List.of(), AnnotationMetadataIndex.empty());
+            return new ProjectContext(normalizedRoot, primarySourceDirectory, List.of(), List.of(), AnnotationMetadataIndex.empty(), options);
         }
 
         Map<Path, SourceDocument> documentsByPath = new LinkedHashMap<>();
@@ -73,7 +86,8 @@ public final class ProjectContext {
                 primarySourceDirectory,
                 normalizedSourceRoots,
                 documentsByPath.values().stream().collect(Collectors.toList()),
-                AnnotationMetadataIndex.build(documentsByPath.values().stream().collect(Collectors.toList()))
+                AnnotationMetadataIndex.build(documentsByPath.values().stream().collect(Collectors.toList())),
+                options
         );
     }
 
@@ -111,6 +125,10 @@ public final class ProjectContext {
 
     public AnnotationMetadataIndex annotationMetadataIndex() {
         return annotationMetadataIndex;
+    }
+
+    public LintOptions options() {
+        return options;
     }
 
     public SpringSemanticFacts springFacts(SourceUnit sourceUnit) {

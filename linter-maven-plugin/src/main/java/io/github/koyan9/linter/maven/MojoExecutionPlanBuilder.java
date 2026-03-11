@@ -15,8 +15,10 @@ import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.project.MavenProject;
 
 import java.nio.file.Path;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 final class MojoExecutionPlanBuilder {
 
@@ -44,7 +46,10 @@ final class MojoExecutionPlanBuilder {
             String disabledRules,
             String enabledRuleDomains,
             String disabledRuleDomains,
-            String severityOverrides
+            String severityOverrides,
+            boolean assumeCentralizedSecurity,
+            String securityAnnotations,
+            String cacheDefaultKeyCacheNames
     ) throws MojoExecutionException {
         Path projectRoot = projectBaseDir.toPath();
         Path reportsRoot = reportDirectory.toPath();
@@ -54,6 +59,8 @@ final class MojoExecutionPlanBuilder {
         java.util.Set<String> parsedDisabledRules = optionParser.parseRuleIds(disabledRules);
         java.util.Set<RuleDomain> parsedEnabledRuleDomains = optionParser.parseRuleDomains(enabledRuleDomains);
         java.util.Set<RuleDomain> parsedDisabledRuleDomains = optionParser.parseRuleDomains(disabledRuleDomains);
+        Set<String> parsedSecurityAnnotations = normalizeAnnotationNames(optionParser.parseStringSet(securityAnnotations));
+        Set<String> parsedCacheDefaultKeyCacheNames = optionParser.parseStringSet(cacheDefaultKeyCacheNames);
 
         List<LintRule> rules = RuleSelection.configure(
                 SpringBootRuleSet.defaultRules(),
@@ -90,7 +97,10 @@ final class MojoExecutionPlanBuilder {
                 parsedEnabledRuleDomains,
                 parsedDisabledRuleDomains,
                 parsedEnabledRules,
-                parsedDisabledRules
+                parsedDisabledRules,
+                assumeCentralizedSecurity,
+                parsedSecurityAnnotations,
+                parsedCacheDefaultKeyCacheNames
         );
 
         return new MojoExecutionPlan(projectRoot, reportsRoot, baselinePath, sourceRoots, moduleBaselineFiles, rules, options);
@@ -98,5 +108,21 @@ final class MojoExecutionPlanBuilder {
 
     MojoOptionParser optionParser() {
         return optionParser;
+    }
+
+    private Set<String> normalizeAnnotationNames(Set<String> values) {
+        Set<String> normalized = new LinkedHashSet<>();
+        for (String value : values) {
+            if (value == null || value.isBlank()) {
+                continue;
+            }
+            String trimmed = value.trim();
+            if (trimmed.startsWith("@")) {
+                trimmed = trimmed.substring(1).trim();
+            }
+            int dotIndex = trimmed.lastIndexOf('.');
+            normalized.add(dotIndex >= 0 ? trimmed.substring(dotIndex + 1) : trimmed);
+        }
+        return normalized;
     }
 }

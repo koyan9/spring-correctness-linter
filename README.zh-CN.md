@@ -211,6 +211,9 @@ JSON 和 HTML 报告现在还会包含运行期指标，便于观察：
 - `spring.correctness.linter.enabledRuleDomains=TRANSACTION,CACHE`：按规则域启用规则
 - `spring.correctness.linter.disabledRuleDomains=WEB`：按规则域禁用规则
 - `spring.correctness.linter.severityOverrides=RULE_A=ERROR,RULE_B=INFO`：覆盖规则默认严重级别
+- `spring.correctness.linter.assumeCentralizedSecurity=true`：安全策略集中配置时跳过 `SPRING_ENDPOINT_SECURITY`
+- `spring.correctness.linter.securityAnnotations=CustomSecured,TeamSecure`：额外安全注解视为显式安全意图
+- `spring.correctness.linter.cacheDefaultKeyCacheNames=users,orders`：指定 cache 名称允许默认 key（`*` 表示全部允许）
 - `spring.correctness.linter.failOnSeverity=WARNING`：按严重级别失败
 - `spring.correctness.linter.failOnError=true`：只要还有可见问题就失败
 - `spring.correctness.linter.useIncrementalCache=true`：启用增量缓存

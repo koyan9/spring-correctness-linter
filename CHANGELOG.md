@@ -11,6 +11,8 @@ All notable changes to `spring-correctness-linter` will be documented in this fi
 - `baseline-diff.html` report generation
 - Optional per-module baseline and incremental cache output
 - Rule enable / disable selection and per-rule severity overrides
+- Configuration for centralized endpoint security and custom security annotations
+- Configuration to allow default cache keys for selected cache names
 - Reactor sample project for multi-module validation
 - Runtime metrics in JSON / HTML reports, including phase timing, cache hit rate, and per-module analysis timing
 - Runtime summary logging in the Maven plugin for analyzed vs cached file counts
@@ -31,6 +33,7 @@ All notable changes to `spring-correctness-linter` will be documented in this fi
 - HTML and JSON reports now also show configured rule ids and effective per-domain rule breakdowns
 - Maven plugin logs now print a concise rule-selection summary for faster CI diagnosis
 - Maven plugin logs now include cache hit rate and slow-module summaries for multi-module scans
+- Scheduled trigger configuration checks now treat placeholder values as configured to reduce false positives
 - Generated rule reference docs now include recommended domain-based rule bundles for common rollout scenarios
 - Added an initial `SCHEDULED` rule domain covering invalid trigger configuration, scheduled method parameters, and non-void return-value review
 - Expanded `SCHEDULED` coverage with `@Scheduled` + `@Async` and `@Scheduled` + `@Transactional` boundary checks

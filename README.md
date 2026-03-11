@@ -208,6 +208,9 @@ When reactor scanning is enabled:
 - `spring.correctness.linter.enabledRuleDomains=TRANSACTION,CACHE`: run rules from selected domains
 - `spring.correctness.linter.disabledRuleDomains=WEB`: skip rules from selected domains
 - `spring.correctness.linter.severityOverrides=RULE_A=ERROR,RULE_B=INFO`: override per-rule severities
+- `spring.correctness.linter.assumeCentralizedSecurity=true`: skip `SPRING_ENDPOINT_SECURITY` when security is enforced centrally
+- `spring.correctness.linter.securityAnnotations=CustomSecured,TeamSecure`: treat additional annotations as explicit security intent
+- `spring.correctness.linter.cacheDefaultKeyCacheNames=users,orders`: allow default cache keys for selected cache names (`*` to allow all)
 - `spring.correctness.linter.failOnSeverity=WARNING`: fail the build for matching severities
 - `spring.correctness.linter.failOnError=true`: fail the build when any visible issue remains
 - `spring.correctness.linter.useIncrementalCache=true`: enable file-content-based cache reuse

@@ -64,12 +64,16 @@ public final class PublicEndpointWithoutSecurityRule extends AbstractSpringRule 
         return List.of(
                 "Add explicit method-level or class-level security annotations when that is the project convention.",
                 "If security is intentionally centralized elsewhere, suppress the finding with a reason that points to that policy location.",
-                "If the project uses custom security annotations, compose them with `@PreAuthorize`, `@Secured`, or related Spring Security annotations."
+                "If the project uses custom security annotations, compose them with `@PreAuthorize`, `@Secured`, or related Spring Security annotations.",
+                "If centralized security is the default, set `spring.correctness.linter.assumeCentralizedSecurity=true` or configure `spring.correctness.linter.securityAnnotations`."
         );
     }
 
     @Override
     public List<LintIssue> evaluate(SourceUnit sourceUnit, ProjectContext context) {
+        if (context.options().assumeCentralizedSecurity()) {
+            return List.of();
+        }
         List<LintIssue> issues = new ArrayList<>();
         collectIssues(sourceUnit, context, issues);
         return issues;
@@ -83,14 +87,28 @@ public final class PublicEndpointWithoutSecurityRule extends AbstractSpringRule 
                 continue;
             }
 
-            boolean classSecured = typeFacts.hasExplicitSecurityIntent();
+            boolean classSecured = typeFacts.hasExplicitSecurityIntent()
+                    || hasCustomSecurityIntent(typeFacts.annotationNames(), context.options().customSecurityAnnotations());
             for (MethodDeclaration method : sourceUnit.structure().methodsOf(typeDeclaration)) {
                 MethodSemanticFacts methodFacts = facts.methodFacts(typeDeclaration, method);
-                boolean methodSecured = methodFacts.hasExplicitSecurityIntent();
+                boolean methodSecured = methodFacts.hasExplicitSecurityIntent()
+                        || hasCustomSecurityIntent(methodFacts.annotationNames(), context.options().customSecurityAnnotations());
                 if (methodFacts.isPublicRequestMapping() && !classSecured && !methodSecured) {
                     issues.add(issue(sourceUnit, JavaSourceInspector.lineOf(method), "Endpoint method '" + method.getNameAsString() + "' is public and mapped but has no explicit security annotation."));
                 }
             }
         }
+    }
+
+    private boolean hasCustomSecurityIntent(java.util.Set<String> annotationNames, java.util.Set<String> customSecurityAnnotations) {
+        if (customSecurityAnnotations.isEmpty()) {
+            return false;
+        }
+        for (String annotation : customSecurityAnnotations) {
+            if (annotationNames.contains(annotation)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

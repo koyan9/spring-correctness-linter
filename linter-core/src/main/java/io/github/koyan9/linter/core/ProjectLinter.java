@@ -48,7 +48,7 @@ public final class ProjectLinter {
         long totalStartNanos = System.nanoTime();
 
         long contextLoadStartNanos = System.nanoTime();
-        ProjectContext context = ProjectContext.loadSourceRoots(projectRoot, sourceRoots);
+        ProjectContext context = ProjectContext.loadSourceRoots(projectRoot, sourceRoots, options);
         long contextLoadNanos = System.nanoTime() - contextLoadStartNanos;
 
         List<LintIssue> baselineCandidates = new ArrayList<>();
