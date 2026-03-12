@@ -127,7 +127,7 @@ class ProjectLinterTest {
         LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
         Set<String> issueIds = report.issues().stream().map(LintIssue::ruleId).collect(Collectors.toSet());
 
-        assertEquals(25, report.rules().size());
+        assertEquals(26, report.rules().size());
         assertTrue(issueIds.contains("SPRING_ASYNC_VOID"));
         assertTrue(issueIds.contains("SPRING_ASYNC_PRIVATE_METHOD"));
         assertTrue(issueIds.contains("SPRING_CACHEABLE_KEY"));
@@ -176,6 +176,35 @@ class ProjectLinterTest {
         assertTrue(issues.get(0).message().contains("asyncWork"));
     }
 
+
+    @Test
+    void detectsAsyncTransactionalBoundary() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("AsyncTransactionalBoundary.java"), """
+                package demo;
+
+                import org.springframework.scheduling.annotation.Async;
+                import org.springframework.transaction.annotation.Transactional;
+
+                @Transactional
+                class AsyncTransactionalBoundary {
+
+                    @Async
+                    public void runAsyncTransactional() {
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
+        List<LintIssue> issues = report.issues().stream()
+                .filter(issue -> issue.ruleId().equals("SPRING_ASYNC_TRANSACTIONAL_BOUNDARY"))
+                .toList();
+
+        assertEquals(1, issues.size());
+        assertTrue(issues.get(0).message().contains("runAsyncTransactional"));
+    }
     @Test
     void writesSarifReport() throws Exception {
         Path sourceDirectory = tempDir.resolve("src/main/java/demo");
@@ -499,7 +528,7 @@ class ProjectLinterTest {
         LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
 
         assertEquals(0, report.issueCount());
-        assertEquals(25, report.rules().size());
+        assertEquals(26, report.rules().size());
         assertEquals(1, report.parseProblemFileCount());
         assertTrue(report.parseProblems().get(0).file().endsWith(Path.of("src/main/java/demo/Broken.java")));
     }

@@ -17,8 +17,9 @@ All notable changes to `spring-correctness-linter` will be documented in this fi
 - Runtime metrics in JSON / HTML reports, including phase timing, cache hit rate, and per-module analysis timing
 - Runtime summary logging in the Maven plugin for analyzed vs cached file counts
 - Recommended Maven configuration templates and GitHub SARIF upload guidance in the documentation
-
 - Added async self-invocation detection for @Async proxy bypass scenarios
+- Added async transactional boundary detection for @Async + @Transactional combinations
+
 ### Changed
 
 - Rule reference markdown now includes configuration and suppression examples
