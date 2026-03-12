@@ -127,7 +127,7 @@ class ProjectLinterTest {
         LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
         Set<String> issueIds = report.issues().stream().map(LintIssue::ruleId).collect(Collectors.toSet());
 
-        assertEquals(24, report.rules().size());
+        assertEquals(25, report.rules().size());
         assertTrue(issueIds.contains("SPRING_ASYNC_VOID"));
         assertTrue(issueIds.contains("SPRING_ASYNC_PRIVATE_METHOD"));
         assertTrue(issueIds.contains("SPRING_CACHEABLE_KEY"));
@@ -141,6 +141,39 @@ class ProjectLinterTest {
         assertTrue(issueIds.contains("SPRING_TX_HIGH_RISK_PROPAGATION"));
         assertTrue(issueIds.contains("SPRING_CONDITIONAL_BEAN_CONFLICT"));
         assertTrue(issueIds.contains("SPRING_ENDPOINT_SECURITY"));
+    }
+
+
+    @Test
+    void detectsAsyncSelfInvocation() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("AsyncSelfInvocation.java"), """
+                package demo;
+
+                import org.springframework.scheduling.annotation.Async;
+
+                class AsyncSelfInvocation {
+
+                    public void outer() {
+                        asyncWork();
+                    }
+
+                    @Async
+                    public String asyncWork() {
+                        return "ok";
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
+        List<LintIssue> issues = report.issues().stream()
+                .filter(issue -> issue.ruleId().equals("SPRING_ASYNC_SELF_INVOCATION"))
+                .toList();
+
+        assertEquals(1, issues.size());
+        assertTrue(issues.get(0).message().contains("asyncWork"));
     }
 
     @Test
@@ -466,7 +499,7 @@ class ProjectLinterTest {
         LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
 
         assertEquals(0, report.issueCount());
-        assertEquals(24, report.rules().size());
+        assertEquals(25, report.rules().size());
         assertEquals(1, report.parseProblemFileCount());
         assertTrue(report.parseProblems().get(0).file().endsWith(Path.of("src/main/java/demo/Broken.java")));
     }

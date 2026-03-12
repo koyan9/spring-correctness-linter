@@ -43,6 +43,9 @@ final class AnnotationMetadataIndex {
         Map<String, List<AnnotationDefinition>> definitionsBySimpleName = new LinkedHashMap<>();
         Map<String, AnnotationDefinition> definitionsByQualifiedName = new LinkedHashMap<>();
         for (SourceDocument sourceDocument : sourceDocuments) {
+            if (!sourceDocument.content().contains("@interface")) {
+                continue;
+            }
             JavaSourceInspector.ParseOutcome parseOutcome = JavaSourceInspector.inspect(sourceDocument.content());
             if (parseOutcome.compilationUnit().isEmpty()) {
                 continue;
