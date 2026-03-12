@@ -77,7 +77,20 @@ final class RulesMarkdownWriter {
             builder.append("- Override severity: `-Dspring.correctness.linter.severityOverrides=").append(rule.id()).append("=ERROR`\n");
             builder.append("- Suppress next line: `// spring-correctness-linter:disable-next-line ").append(rule.id()).append(" reason: explain why`\n");
             builder.append("- Suppress next method: `// spring-correctness-linter:disable-next-method ").append(rule.id()).append(" reason: explain why`\n");
-            appendSection(builder, "Applies when", rule.appliesWhen(), "- No additional applicability notes.");
+            
+            if ("SPRING_ENDPOINT_SECURITY".equals(rule.id())) {
+                                            }
+            if ("SPRING_CACHEABLE_KEY".equals(rule.id())) {
+                            }
+
+            if ("SPRING_ENDPOINT_SECURITY".equals(rule.id())) {
+                builder.append("- Config: `-Dspring.correctness.linter.assumeCentralizedSecurity=true` to skip when security is centralized.\n");
+                builder.append("- Config: `-Dspring.correctness.linter.securityAnnotations=InternalEndpoint,TeamSecure` to register custom security annotations.\n");
+            }
+            if ("SPRING_CACHEABLE_KEY".equals(rule.id())) {
+                builder.append("- Config: `-Dspring.correctness.linter.cacheDefaultKeyCacheNames=users,orders` to allow default keys for selected caches.\n");
+            }
+                        appendSection(builder, "Applies when", rule.appliesWhen(), "- No additional applicability notes.");
             appendSection(builder, "Common false-positive boundaries", rule.commonFalsePositiveBoundaries(), "- No common false-positive boundary notes are currently documented.");
             appendSection(builder, "Recommended fixes", rule.recommendedFixes(), "- No rule-specific remediation guidance is currently documented.");
             builder.append('\n');
