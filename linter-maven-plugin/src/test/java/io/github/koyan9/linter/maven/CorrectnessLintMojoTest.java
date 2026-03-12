@@ -434,6 +434,121 @@ class CorrectnessLintMojoTest {
         assertTrue(json.contains("\"cachedFileCount\": 2"));
     }
 
+
+    @Test
+    void honorsCentralizedSecurityConfiguration() throws Exception {
+        Path sourceDirectory = writeSource("""
+                package demo;
+
+                import org.springframework.web.bind.annotation.GetMapping;
+                import org.springframework.web.bind.annotation.RestController;
+
+                @RestController
+                class OpenController {
+
+                    @GetMapping("/open")
+                    public String open() {
+                        return "ok";
+                    }
+                }
+                """);
+        Path reportsDirectory = tempDir.resolve("target/reports-centralized-security");
+
+        CorrectnessLintMojo mojo = configuredMojo(
+                sourceDirectory,
+                reportsDirectory,
+                tempDir.resolve("spring-correctness-linter-baseline.txt")
+        );
+        setField(mojo, "applyBaseline", false);
+        setField(mojo, "assumeCentralizedSecurity", true);
+        setField(mojo, "formats", new LinkedHashSet<>(Set.of("json")));
+
+        mojo.execute();
+
+        String json = Files.readString(reportsDirectory.resolve("lint-report.json"));
+        assertTrue(json.contains("\"issueCount\": 0"));
+        assertFalse(json.contains("\"ruleId\": \"SPRING_ENDPOINT_SECURITY\""));
+    }
+
+    @Test
+    void honorsConfiguredSecurityAnnotations() throws Exception {
+        Path sourceDirectory = writeSource("""
+                package demo;
+
+                import org.springframework.web.bind.annotation.GetMapping;
+                import org.springframework.web.bind.annotation.RestController;
+
+                import java.lang.annotation.ElementType;
+                import java.lang.annotation.Retention;
+                import java.lang.annotation.RetentionPolicy;
+                import java.lang.annotation.Target;
+
+                @Target(ElementType.METHOD)
+                @Retention(RetentionPolicy.RUNTIME)
+                @interface InternalEndpoint {
+                }
+
+                @RestController
+                class InternalController {
+
+                    @GetMapping("/internal")
+                    @InternalEndpoint
+                    public String internal() {
+                        return "ok";
+                    }
+                }
+                """);
+        Path reportsDirectory = tempDir.resolve("target/reports-custom-security");
+
+        CorrectnessLintMojo mojo = configuredMojo(
+                sourceDirectory,
+                reportsDirectory,
+                tempDir.resolve("spring-correctness-linter-baseline.txt")
+        );
+        setField(mojo, "applyBaseline", false);
+        setField(mojo, "securityAnnotations", "InternalEndpoint");
+        setField(mojo, "formats", new LinkedHashSet<>(Set.of("json")));
+
+        mojo.execute();
+
+        String json = Files.readString(reportsDirectory.resolve("lint-report.json"));
+        assertTrue(json.contains("\"issueCount\": 0"));
+        assertFalse(json.contains("\"ruleId\": \"SPRING_ENDPOINT_SECURITY\""));
+    }
+
+    @Test
+    void honorsCacheDefaultKeyAllowlist() throws Exception {
+        Path sourceDirectory = writeSource("""
+                package demo;
+
+                import org.springframework.cache.annotation.Cacheable;
+
+                class CacheService {
+
+                    @Cacheable(cacheNames = "safe")
+                    public String load(String id) {
+                        return id;
+                    }
+                }
+                """);
+        Path reportsDirectory = tempDir.resolve("target/reports-cache-allowlist");
+
+        CorrectnessLintMojo mojo = configuredMojo(
+                sourceDirectory,
+                reportsDirectory,
+                tempDir.resolve("spring-correctness-linter-baseline.txt")
+        );
+        setField(mojo, "applyBaseline", false);
+        setField(mojo, "cacheDefaultKeyCacheNames", "safe");
+        setField(mojo, "formats", new LinkedHashSet<>(Set.of("json")));
+
+        mojo.execute();
+
+        String json = Files.readString(reportsDirectory.resolve("lint-report.json"));
+        assertTrue(json.contains("\"issueCount\": 0"));
+        assertFalse(json.contains("\"ruleId\": \"SPRING_CACHEABLE_KEY\""));
+    }
+
     private Path writeSource(String content) throws Exception {
         Path sourceDirectory = tempDir.resolve("src/main/java/demo");
         Files.createDirectories(sourceDirectory);

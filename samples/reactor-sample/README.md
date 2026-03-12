@@ -14,7 +14,7 @@ This sample demonstrates multi-module scanning with `spring-correctness-linter`.
    - `samples/reactor-sample/target/spring-correctness-linter/lint-report.html`
    - `samples/reactor-sample/target/spring-correctness-linter/baseline-diff.html`
 
-The reactor report includes runtime metrics, per-module cache hit rates, and a slowest-modules summary, which makes it easier
+The reactor report includes runtime metrics, per-module cache hit rates, analyzed vs cached timing, and a slowest-modules summary, which makes it easier
 to confirm cache reuse and identify slower modules.
 
 ## Recommended bundles

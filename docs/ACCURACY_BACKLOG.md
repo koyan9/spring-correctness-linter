@@ -22,7 +22,7 @@ Remaining accuracy gaps:
 
 Recommended next tests:
 - [done] Method-level composed security annotations, including `@AliasFor` forwarding and `@PreFilter` usage
-- [pending] Suppression guidance for teams with centralized security policy
+- [done] Suppression guidance for teams with centralized security policy
 
 ### `SPRING_CACHEABLE_KEY`
 

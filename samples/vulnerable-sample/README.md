@@ -38,6 +38,15 @@ Example commands:
 - `mvn -q verify "-Dspring.correctness.linter.enabledRuleDomains=TRANSACTION,EVENTS"`
 - `mvn -q verify "-Dspring.correctness.linter.enabledRuleDomains=WEB"`
 
+
+## Optional configuration
+
+- Centralized security intent:
+  - `mvn -q verify "-Dspring.correctness.linter.assumeCentralizedSecurity=true"`
+  - `mvn -q verify "-Dspring.correctness.linter.securityAnnotations=InternalEndpoint"`
+- Allow default cache keys for selected caches:
+  - `mvn -q verify "-Dspring.correctness.linter.cacheDefaultKeyCacheNames=users,orders"`
+
 ## Baseline demo
 
 - Generate a baseline: `mvn -q spring-correctness-linter:lint -Dspring.correctness.linter.writeBaseline=true`

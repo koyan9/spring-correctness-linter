@@ -22,6 +22,7 @@ In practice, this means:
 
 - `JavaSourceInspector`: low-level AST and annotation inspection
 - `AnnotationMetadataIndex`: composed annotations, meta-annotations, and `@AliasFor` support
+- `AnnotationMetadataIndex` only expands annotations defined in the current source tree; external dependency annotations are not resolved.
 - `SpringSemanticFacts`: shared Spring-aware semantic queries for a `SourceUnit`
 - `TypeSemanticFacts`: structured type-level semantics
 - `MethodSemanticFacts`: structured method-level semantics
