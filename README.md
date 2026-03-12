@@ -224,6 +224,7 @@ disabling the endpoint-security rule globally or by providing your internal secu
 <configuration>
   <assumeCentralizedSecurity>true</assumeCentralizedSecurity>
   <securityAnnotations>InternalEndpoint,TeamSecure</securityAnnotations>
+  <!-- Also supported: @InternalEndpoint or com.example.InternalEndpoint -->
 </configuration>
 ```
 
@@ -234,6 +235,7 @@ If some caches intentionally rely on Spring's default key generation, you can al
 ```xml
 <configuration>
   <cacheDefaultKeyCacheNames>users,orders</cacheDefaultKeyCacheNames>
+  <!-- Use '*' to allow default keys for all caches -->
 </configuration>
 ```
 - `spring.correctness.linter.useIncrementalCache=true`: enable file-content-based cache reuse

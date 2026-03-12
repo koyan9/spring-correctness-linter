@@ -226,6 +226,7 @@ JSON 和 HTML 报告现在还会包含运行期指标，便于观察：
 <configuration>
   <assumeCentralizedSecurity>true</assumeCentralizedSecurity>
   <securityAnnotations>InternalEndpoint,TeamSecure</securityAnnotations>
+  <!-- ??? @InternalEndpoint ? com.example.InternalEndpoint -->
 </configuration>
 ```
 
@@ -236,6 +237,7 @@ JSON 和 HTML 报告现在还会包含运行期指标，便于观察：
 ```xml
 <configuration>
   <cacheDefaultKeyCacheNames>users,orders</cacheDefaultKeyCacheNames>
+  <!-- ?? '*' ???? cache ????? key -->
 </configuration>
 ```
 - `spring.correctness.linter.useIncrementalCache=true`：启用增量缓存

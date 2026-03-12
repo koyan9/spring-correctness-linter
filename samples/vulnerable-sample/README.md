@@ -47,6 +47,14 @@ Example commands:
 - Allow default cache keys for selected caches:
   - `mvn -q verify "-Dspring.correctness.linter.cacheDefaultKeyCacheNames=users,orders"`
 
+
+## Centralized security example
+
+If the sample is used in an environment where security is enforced in a gateway or shared `SecurityFilterChain`, you can run:
+
+- `mvn -q verify "-Dspring.correctness.linter.assumeCentralizedSecurity=true"`
+- `mvn -q verify "-Dspring.correctness.linter.securityAnnotations=InternalEndpoint"`
+
 ## Baseline demo
 
 - Generate a baseline: `mvn -q spring-correctness-linter:lint -Dspring.correctness.linter.writeBaseline=true`
