@@ -448,6 +448,136 @@ lint:
 - 优先使用带理由的 inline suppression，而不是长期关闭规则域。
 - 版本升级后查看 `rules-reference.md`，评估新增规则并更新治理策略。
 
+## 参数示例
+
+仅输出 JSON，自定义报告目录，不生成规则文档：
+
+```xml
+<configuration>
+  <reportDirectory>${project.build.directory}/lint</reportDirectory>
+  <formats>
+    <format>json</format>
+  </formats>
+  <writeRuleDocs>false</writeRuleDocs>
+</configuration>
+```
+
+只跑少量规则并覆盖严重级别：
+
+```xml
+<configuration>
+  <enabledRules>SPRING_ASYNC_VOID,SPRING_TX_SELF_INVOCATION</enabledRules>
+  <severityOverrides>SPRING_ASYNC_VOID=ERROR</severityOverrides>
+  <failOnSeverity>WARNING</failOnSeverity>
+</configuration>
+```
+
+启用规则域组合并禁用一个噪声规则：
+
+```xml
+<configuration>
+  <enabledRuleDomains>ASYNC,TRANSACTION,WEB</enabledRuleDomains>
+  <disabledRules>SPRING_ENDPOINT_SECURITY</disabledRules>
+</configuration>
+```
+
+Reactor 扫描并按模块拆分 baseline/cache：
+
+```xml
+<configuration>
+  <scanReactorModules>true</scanReactorModules>
+  <splitBaselineByModule>true</splitBaselineByModule>
+  <splitCacheByModule>true</splitCacheByModule>
+  <useIncrementalCache>true</useIncrementalCache>
+</configuration>
+```
+
+允许指定 cache 使用默认 key：
+
+```xml
+<configuration>
+  <cacheDefaultKeyCacheNames>users,orders</cacheDefaultKeyCacheNames>
+</configuration>
+```
+
+把自定义安全注解视作显式安全意图：
+
+```xml
+<configuration>
+  <securityAnnotations>InternalEndpoint,com.example.TeamSecure</securityAnnotations>
+</configuration>
+```
+
+## 常见问题 FAQ
+
+Q: 为什么会报 “Unknown rule id(s)”？
+A: 规则 ID 会统一转成大写，并且会校验有效性。请确认 ID 存在于 `rules-reference.md` 中。
+
+Q: 设置了 `failOnError=true` 但仍然没有失败？
+A: 如果设置了 `failOnSeverity`，它会优先生效。需要移除或降低阈值。
+
+Q: baseline 没有生效，问题仍然出现？
+A: 确认 `applyBaseline=true` 且 baseline 路径与生成路径一致。
+
+Q: 缓存命中率一直是 0%？
+A: 确保 `useIncrementalCache=true`，并让 `cacheFile` 指向 CI 可持久化目录。
+
+Q: 有些问题没有被检测出来？
+A: 解析错误会导致部分分析跳过。请查看报告中的 parse problem 区域。
+
+## 报告解读
+
+默认输出目录：`target/spring-correctness-linter/`
+
+- `lint-report.json` / `lint-report.html`：问题详情、严重级别、模块聚合、运行指标。
+- `lint-report.sarif.json`：用于 code scanning 的 SARIF 输出。
+- `baseline-diff.json` / `baseline-diff.html`：新问题、baseline 匹配、过期条目。
+- `rules-reference.md`：规则说明与修复建议。
+
+关键运行指标：
+
+- `totalElapsedMillis`、`sourceFileCount`、`analyzedFileCount`、`cachedFileCount`
+- 缓存作用域与命中率
+- 多模块场景下的各模块分析耗时与缓存命中率
+
+## 规则治理模板
+
+可以用下面的轻量表格追踪规则治理决策：
+
+| 规则 ID | 规则域 | 严重级别 | 状态 | 理由 | 负责人 | 复审日期 |
+| --- | --- | --- | --- | --- | --- | --- |
+| SPRING_TX_SELF_INVOCATION | TRANSACTION | WARNING | 启用 | 高风险代理绕过 | 平台组 | 2026-06-30 |
+
+## CI 缓存策略
+
+GitHub Actions（带 restore keys）：
+
+```yaml
+- name: Cache linter analysis
+  uses: actions/cache@v4
+  with:
+    path: .cache/spring-correctness-linter
+    key: ${{ runner.os }}-linter-${{ hashFiles('**/pom.xml') }}
+    restore-keys: |
+      ${{ runner.os }}-linter-
+
+- name: Verify project
+  run: mvn -B -q verify "-Dspring.correctness.linter.cacheFile=.cache/spring-correctness-linter/analysis-cache.txt"
+```
+
+GitLab CI（按分支缓存）：
+
+```yaml
+lint:
+  stage: test
+  cache:
+    key: "linter-${CI_COMMIT_REF_SLUG}"
+    paths:
+      - .cache/spring-correctness-linter
+  script:
+    - mvn -B -q verify "-Dspring.correctness.linter.cacheFile=.cache/spring-correctness-linter/analysis-cache.txt"
+```
+
 ## Inline Suppression
 
 推荐写法：

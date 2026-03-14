@@ -446,6 +446,136 @@ lint:
 - Prefer inline suppressions with explicit reasons over broad domain disables.
 - Review rule-reference docs after upgrades to see newly added rules and adjust your governance plan.
 
+## Parameter Examples
+
+Only JSON output, custom report directory, no rule docs:
+
+```xml
+<configuration>
+  <reportDirectory>${project.build.directory}/lint</reportDirectory>
+  <formats>
+    <format>json</format>
+  </formats>
+  <writeRuleDocs>false</writeRuleDocs>
+</configuration>
+```
+
+Run a narrow rule set with overrides:
+
+```xml
+<configuration>
+  <enabledRules>SPRING_ASYNC_VOID,SPRING_TX_SELF_INVOCATION</enabledRules>
+  <severityOverrides>SPRING_ASYNC_VOID=ERROR</severityOverrides>
+  <failOnSeverity>WARNING</failOnSeverity>
+</configuration>
+```
+
+Enable domain bundles and disable one noisy rule:
+
+```xml
+<configuration>
+  <enabledRuleDomains>ASYNC,TRANSACTION,WEB</enabledRuleDomains>
+  <disabledRules>SPRING_ENDPOINT_SECURITY</disabledRules>
+</configuration>
+```
+
+Reactor scan with per-module baseline/cache:
+
+```xml
+<configuration>
+  <scanReactorModules>true</scanReactorModules>
+  <splitBaselineByModule>true</splitBaselineByModule>
+  <splitCacheByModule>true</splitCacheByModule>
+  <useIncrementalCache>true</useIncrementalCache>
+</configuration>
+```
+
+Allow default cache keys for selected caches:
+
+```xml
+<configuration>
+  <cacheDefaultKeyCacheNames>users,orders</cacheDefaultKeyCacheNames>
+</configuration>
+```
+
+Treat custom security annotations as explicit intent:
+
+```xml
+<configuration>
+  <securityAnnotations>InternalEndpoint,com.example.TeamSecure</securityAnnotations>
+</configuration>
+```
+
+## FAQ
+
+Q: Why do I see “Unknown rule id(s)” failures?
+A: Rule ids are validated and normalized to uppercase. Verify the ID exists in `rules-reference.md`.
+
+Q: I set `failOnError=true`, but the build still passes.
+A: If `failOnSeverity` is configured, it takes precedence. Remove it or set a lower threshold.
+
+Q: Baseline is not hiding issues.
+A: Ensure `applyBaseline=true` and the baseline file path matches where the baseline was generated.
+
+Q: Cache hit rate stays at 0%.
+A: Make sure `useIncrementalCache=true` and `cacheFile` points to a stable path that is persisted in CI.
+
+Q: Why are some findings missing?
+A: Parse problems can cause partial analysis. Check the report for parse problem sections.
+
+## Report Interpretation
+
+Generated outputs (by default under `target/spring-correctness-linter/`):
+
+- `lint-report.json` and `lint-report.html`: findings, severities, module grouping, and runtime metrics.
+- `lint-report.sarif.json`: SARIF output for code scanning.
+- `baseline-diff.json` / `baseline-diff.html`: new vs matched vs stale baseline entries.
+- `rules-reference.md`: rule metadata and guidance for each rule.
+
+Key runtime metrics to watch:
+
+- `totalElapsedMillis`, `sourceFileCount`, `analyzedFileCount`, `cachedFileCount`
+- cache scope and hit rate
+- per-module analyzed time and cache hit rate (for reactor scans)
+
+## Rule Governance Template
+
+Use this lightweight template to track rule decisions:
+
+| Rule ID | Domain | Severity | Status | Rationale | Owner | Review Date |
+| --- | --- | --- | --- | --- | --- | --- |
+| SPRING_TX_SELF_INVOCATION | TRANSACTION | WARNING | Enabled | High-risk proxy bypass | Platform | 2026-06-30 |
+
+## CI Cache Strategies
+
+GitHub Actions (cache with restore keys):
+
+```yaml
+- name: Cache linter analysis
+  uses: actions/cache@v4
+  with:
+    path: .cache/spring-correctness-linter
+    key: ${{ runner.os }}-linter-${{ hashFiles('**/pom.xml') }}
+    restore-keys: |
+      ${{ runner.os }}-linter-
+
+- name: Verify project
+  run: mvn -B -q verify "-Dspring.correctness.linter.cacheFile=.cache/spring-correctness-linter/analysis-cache.txt"
+```
+
+GitLab CI (cache per branch):
+
+```yaml
+lint:
+  stage: test
+  cache:
+    key: "linter-${CI_COMMIT_REF_SLUG}"
+    paths:
+      - .cache/spring-correctness-linter
+  script:
+    - mvn -B -q verify "-Dspring.correctness.linter.cacheFile=.cache/spring-correctness-linter/analysis-cache.txt"
+```
+
 ## Inline Suppression
 
 Preferred syntax:
