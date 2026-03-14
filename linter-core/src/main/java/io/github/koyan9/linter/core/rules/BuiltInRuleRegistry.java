@@ -20,6 +20,7 @@ final class BuiltInRuleRegistry {
     private static final List<RuleRegistration> DEFAULT_RULES = List.of(
             new RuleRegistration("SPRING_ASYNC_VOID", RuleDomain.ASYNC, AsyncVoidMethodRule::new),
             new RuleRegistration("SPRING_ASYNC_PRIVATE_METHOD", RuleDomain.ASYNC, AsyncPrivateMethodRule::new),
+            new RuleRegistration("SPRING_ASYNC_FINAL_METHOD", RuleDomain.ASYNC, AsyncFinalMethodRule::new),
             new RuleRegistration("SPRING_ASYNC_SELF_INVOCATION", RuleDomain.ASYNC, AsyncSelfInvocationRule::new),
             new RuleRegistration("SPRING_ASYNC_TRANSACTIONAL_BOUNDARY", RuleDomain.ASYNC, AsyncTransactionalBoundaryRule::new),
             new RuleRegistration("SPRING_LIFECYCLE_ASYNC_BOUNDARY", RuleDomain.LIFECYCLE, LifecycleAsyncBoundaryRule::new),
@@ -39,6 +40,7 @@ final class BuiltInRuleRegistry {
             new RuleRegistration("SPRING_TX_SELF_INVOCATION", RuleDomain.TRANSACTION, TransactionalSelfInvocationRule::new),
             new RuleRegistration("SPRING_TX_PRIVATE_METHOD", RuleDomain.TRANSACTION, TransactionalPrivateMethodRule::new),
             new RuleRegistration("SPRING_TX_FINAL_METHOD", RuleDomain.TRANSACTION, TransactionalFinalMethodRule::new),
+            new RuleRegistration("SPRING_TX_FINAL_CLASS", RuleDomain.TRANSACTION, TransactionalFinalClassRule::new),
             new RuleRegistration("SPRING_EVENT_LISTENER_TRANSACTIONAL", RuleDomain.EVENTS, EventListenerTransactionalRule::new),
             new RuleRegistration("SPRING_TRANSACTIONAL_EVENT_LISTENER", RuleDomain.EVENTS, TransactionalEventListenerRule::new),
             new RuleRegistration("SPRING_TX_HIGH_RISK_PROPAGATION", RuleDomain.TRANSACTION, TransactionalHighRiskPropagationRule::new),

@@ -25,7 +25,7 @@ This sample is the best fit when you want to validate domain bundles that focus 
 - `CI Starter`: good for a broad first pass across async, transaction, and web-facing issues in one module
 - `Scheduled Focus`: covers missing or conflicting `@Scheduled` trigger configuration, repeated schedules, non-positive intervals, scheduled method parameters, non-void scheduled return values, and `@Scheduled` + `@Async` / `@Transactional` boundary reviews
 - `Lifecycle Focus`: covers `@PostConstruct`, `afterPropertiesSet()`, `ApplicationRunner`, and `SmartInitializingSingleton` callbacks combined with `@Async` or `@Transactional`
-- `Transaction Focus`: covers self-invocation, private/final transactional methods, high-risk propagation, and event/transaction boundary combinations
+- `Transaction Focus`: covers self-invocation, private/final transactional methods, final transactional classes, high-risk propagation, and event/transaction boundary combinations
 - `Web/API Focus`: covers controller profile drift and public endpoint security intent
 
 It also includes a configuration conflict example in `ConditionalConfig.java`, so it is useful when you want to spot-check `CONFIGURATION` findings alongside the recommended bundles.

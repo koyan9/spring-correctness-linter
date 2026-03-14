@@ -6,6 +6,7 @@
 package io.github.koyan9.linter.core;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.IdentityHashMap;
@@ -21,6 +22,7 @@ public final class ProjectContext {
     private final Path sourceDirectory;
     private final List<SourceRoot> sourceRoots;
     private final List<SourceDocument> sourceDocuments;
+    private final Map<Path, JavaSourceInspector.ParseOutcome> parseOutcomes;
     private final AnnotationMetadataIndex annotationMetadataIndex;
     private final LintOptions options;
     private final Map<SourceUnit, SpringSemanticFacts> semanticFactsBySourceUnit = new IdentityHashMap<>();
@@ -31,6 +33,7 @@ public final class ProjectContext {
             Path sourceDirectory,
             List<SourceRoot> sourceRoots,
             List<SourceDocument> sourceDocuments,
+            Map<Path, JavaSourceInspector.ParseOutcome> parseOutcomes,
             AnnotationMetadataIndex annotationMetadataIndex,
             LintOptions options
     ) {
@@ -38,6 +41,7 @@ public final class ProjectContext {
         this.sourceDirectory = sourceDirectory;
         this.sourceRoots = List.copyOf(sourceRoots);
         this.sourceDocuments = List.copyOf(sourceDocuments);
+        this.parseOutcomes = Map.copyOf(parseOutcomes);
         this.annotationMetadataIndex = annotationMetadataIndex;
         this.options = options == null ? LintOptions.defaults() : options;
     }
@@ -63,10 +67,11 @@ public final class ProjectContext {
         Path primarySourceDirectory = normalizedSourceRoots.isEmpty() ? normalizedRoot : normalizedSourceRoots.get(0).path();
 
         if (normalizedSourceRoots.isEmpty()) {
-            return new ProjectContext(normalizedRoot, primarySourceDirectory, List.of(), List.of(), AnnotationMetadataIndex.empty(), options);
+            return new ProjectContext(normalizedRoot, primarySourceDirectory, List.of(), List.of(), Map.of(), AnnotationMetadataIndex.empty(), options);
         }
 
         Map<Path, SourceDocument> documentsByPath = new LinkedHashMap<>();
+        Map<Path, JavaSourceInspector.ParseOutcome> parseOutcomes = new LinkedHashMap<>();
         for (SourceRoot sourceRoot : normalizedSourceRoots) {
             Path normalizedSource = sourceRoot.path();
             if (!Files.exists(normalizedSource)) {
@@ -76,7 +81,7 @@ public final class ProjectContext {
             try (Stream<Path> stream = Files.walk(normalizedSource)) {
                 stream.filter(Files::isRegularFile)
                         .filter(path -> path.toString().endsWith(".java"))
-                        .map(path -> readDocument(path, sourceRoot.moduleId()))
+                        .map(path -> readDocument(path, sourceRoot.moduleId(), parseOutcomes))
                         .forEach(document -> documentsByPath.put(document.path(), document));
             }
         }
@@ -86,14 +91,21 @@ public final class ProjectContext {
                 primarySourceDirectory,
                 normalizedSourceRoots,
                 documentsByPath.values().stream().collect(Collectors.toList()),
-                AnnotationMetadataIndex.build(documentsByPath.values().stream().collect(Collectors.toList())),
+                parseOutcomes,
+                AnnotationMetadataIndex.build(documentsByPath.values().stream().collect(Collectors.toList()), parseOutcomes),
                 options
         );
     }
 
-    private static SourceDocument readDocument(Path path, String moduleId) {
+    private static SourceDocument readDocument(Path path, String moduleId, Map<Path, JavaSourceInspector.ParseOutcome> parseOutcomes) {
         try {
-            return new SourceDocument(path.toAbsolutePath().normalize(), Files.readString(path), null, moduleId);
+            Path normalizedPath = path.toAbsolutePath().normalize();
+            byte[] bytes = Files.readAllBytes(normalizedPath);
+            String content = new String(bytes, StandardCharsets.UTF_8);
+            if (content.contains("@interface")) {
+                parseOutcomes.put(normalizedPath, JavaSourceInspector.inspect(content));
+            }
+            return new SourceDocument(normalizedPath, content, SourceDocument.sha256(bytes), moduleId);
         } catch (IOException exception) {
             throw new IllegalStateException("Failed to read source file: " + path, exception);
         }
@@ -120,7 +132,9 @@ public final class ProjectContext {
     }
 
     public List<SourceUnit> sourceUnits() {
-        return sourceDocuments.stream().map(SourceDocument::toSourceUnit).toList();
+        return sourceDocuments.stream()
+                .map(document -> document.toSourceUnit(parseOutcomes.get(document.path())))
+                .toList();
     }
 
     public AnnotationMetadataIndex annotationMetadataIndex() {
@@ -129,6 +143,10 @@ public final class ProjectContext {
 
     public LintOptions options() {
         return options;
+    }
+
+    JavaSourceInspector.ParseOutcome parseOutcomeFor(SourceDocument sourceDocument) {
+        return parseOutcomes.get(sourceDocument.path());
     }
 
     public SpringSemanticFacts springFacts(SourceUnit sourceUnit) {

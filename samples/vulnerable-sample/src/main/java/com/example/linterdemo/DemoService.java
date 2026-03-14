@@ -29,6 +29,10 @@ class DemoService implements InitializingBean, ApplicationRunner, SmartInitializ
     private void asyncPrivateRefresh() {
     }
 
+    @Async
+    public final void asyncFinalRefresh() {
+    }
+
     public void outer() {
         this.inner();
     }

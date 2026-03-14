@@ -26,20 +26,31 @@ public record SourceDocument(Path path, String content, String contentHash, Stri
     }
 
     public SourceUnit toSourceUnit() {
-        return new SourceUnit(path, content);
+        return toSourceUnit(null);
     }
 
-    private static String sha256(String content) {
+    public SourceUnit toSourceUnit(JavaSourceInspector.ParseOutcome parseOutcome) {
+        if (parseOutcome == null) {
+            return new SourceUnit(path, content);
+        }
+        return new SourceUnit(path, content, parseOutcome);
+    }
+
+    static String sha256(byte[] bytes) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] bytes = digest.digest(content.getBytes(StandardCharsets.UTF_8));
+            byte[] hashed = digest.digest(bytes);
             StringBuilder builder = new StringBuilder();
-            for (byte current : bytes) {
+            for (byte current : hashed) {
                 builder.append(String.format("%02x", current));
             }
             return builder.toString();
         } catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException("SHA-256 is not available", exception);
         }
+    }
+
+    private static String sha256(String content) {
+        return sha256(content.getBytes(StandardCharsets.UTF_8));
     }
 }

@@ -17,7 +17,7 @@ public record SourceUnit(Path path, String content, Optional<CompilationUnit> co
         this(path, content, JavaSourceInspector.inspect(content));
     }
 
-    private SourceUnit(Path path, String content, JavaSourceInspector.ParseOutcome parseOutcome) {
+    SourceUnit(Path path, String content, JavaSourceInspector.ParseOutcome parseOutcome) {
         this(
                 path,
                 content,

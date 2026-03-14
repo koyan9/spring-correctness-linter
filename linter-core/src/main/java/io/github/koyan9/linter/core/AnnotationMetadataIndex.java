@@ -14,6 +14,7 @@ import com.github.javaparser.ast.expr.AnnotationExpr;
 import com.github.javaparser.ast.expr.Expression;
 import com.github.javaparser.ast.nodeTypes.NodeWithAnnotations;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -40,13 +41,20 @@ final class AnnotationMetadataIndex {
     }
 
     static AnnotationMetadataIndex build(List<SourceDocument> sourceDocuments) {
+        return build(sourceDocuments, Map.of());
+    }
+
+    static AnnotationMetadataIndex build(List<SourceDocument> sourceDocuments, Map<Path, JavaSourceInspector.ParseOutcome> parseOutcomes) {
         Map<String, List<AnnotationDefinition>> definitionsBySimpleName = new LinkedHashMap<>();
         Map<String, AnnotationDefinition> definitionsByQualifiedName = new LinkedHashMap<>();
         for (SourceDocument sourceDocument : sourceDocuments) {
             if (!sourceDocument.content().contains("@interface")) {
                 continue;
             }
-            JavaSourceInspector.ParseOutcome parseOutcome = JavaSourceInspector.inspect(sourceDocument.content());
+            JavaSourceInspector.ParseOutcome parseOutcome = parseOutcomes.get(sourceDocument.path());
+            if (parseOutcome == null) {
+                parseOutcome = JavaSourceInspector.inspect(sourceDocument.content());
+            }
             if (parseOutcome.compilationUnit().isEmpty()) {
                 continue;
             }

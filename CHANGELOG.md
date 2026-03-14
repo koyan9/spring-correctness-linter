@@ -19,6 +19,8 @@ All notable changes to `spring-correctness-linter` will be documented in this fi
 - Recommended Maven configuration templates and GitHub SARIF upload guidance in the documentation
 - Added async self-invocation detection for @Async proxy bypass scenarios
 - Added async transactional boundary detection for @Async + @Transactional combinations
+- Added async final-method detection for @Async proxy boundaries
+- Added final-class detection for @Transactional proxy boundaries
 
 ### Changed
 
@@ -49,6 +51,7 @@ All notable changes to `spring-correctness-linter` will be documented in this fi
 - Quality gate failures now report the affected module IDs
 - Incremental cache reuse is now documented with explicit fingerprint-based invalidation semantics
 - `README.zh-CN.md` is aligned with the English README for runtime metrics, cache guidance, and code scanning integration
+- Analysis now reuses annotation parse results and avoids redundant hashing to improve end-to-end scan performance
 
 ### Fixed
 

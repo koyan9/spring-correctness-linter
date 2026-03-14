@@ -66,10 +66,10 @@ At a high level, one lint run works like this:
 
 The default rule set currently focuses on:
 
-- `@Async` misuse
+- `@Async` misuse (private/final methods, self-invocation)
 - lifecycle and startup boundary reviews such as `@PostConstruct`, `afterPropertiesSet()`, `ApplicationRunner`, and `SmartInitializingSingleton` with proxy-oriented annotations
 - `@Scheduled` misuse and scheduling boundary reviews
-- `@Transactional` misuse
+- `@Transactional` misuse (private/final methods, final classes, self-invocation, high-risk propagation)
 - `@EventListener` / `@TransactionalEventListener` boundaries
 - cache key and cache annotation combination risks
 - controller security intent checks

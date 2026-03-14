@@ -91,7 +91,7 @@ public final class ProjectLinter {
             }
 
             module.analyzedFileCount++;
-            SourceUnit sourceUnit = sourceDocument.toSourceUnit();
+            SourceUnit sourceUnit = sourceDocument.toSourceUnit(context.parseOutcomeFor(sourceDocument));
             if (sourceUnit.hasParseProblems()) {
                 parseProblems.add(new SourceParseProblem(sourceUnit.path(), sourceUnit.parseProblems()));
                 module.parseProblemFileCount++;
