@@ -376,6 +376,76 @@ Generate the first baseline once with:
 </configuration>
 ```
 
+## Adoption Playbook
+
+### Typical rollout flow
+
+1. Start locally with a focused bundle such as `ASYNC,TRANSACTION,WEB` and keep `failOnSeverity` unset.
+2. Generate a baseline once and commit it to version control.
+3. Enable CI with `applyBaseline=true` and `useIncrementalCache=true` to focus on new issues only.
+4. Gradually expand rule domains or enable the full default set once noise is under control.
+5. Promote high-signal rules to `ERROR` via `severityOverrides` and tighten the CI gate over time.
+
+### CI/CD configuration
+
+Minimal Maven CLI example:
+
+```bash
+mvn -B -q verify \
+  "-Dspring.correctness.linter.applyBaseline=true" \
+  "-Dspring.correctness.linter.failOnSeverity=WARNING"
+```
+
+GitHub Actions example (with cache reuse):
+
+```yaml
+- name: Cache linter analysis
+  uses: actions/cache@v4
+  with:
+    path: .cache/spring-correctness-linter
+    key: ${{ runner.os }}-linter-${{ hashFiles('**/pom.xml') }}
+
+- name: Verify project
+  run: mvn -B -q verify "-Dspring.correctness.linter.cacheFile=.cache/spring-correctness-linter/analysis-cache.txt"
+```
+
+GitLab CI example:
+
+```yaml
+lint:
+  stage: test
+  cache:
+    key: "${CI_COMMIT_REF_SLUG}"
+    paths:
+      - .cache/spring-correctness-linter
+  script:
+    - mvn -B -q verify "-Dspring.correctness.linter.cacheFile=.cache/spring-correctness-linter/analysis-cache.txt"
+```
+
+### Baseline strategy
+
+1. Generate the first baseline:
+   `./mvnw spring-correctness-linter:lint "-Dspring.correctness.linter.writeBaseline=true"`
+2. Commit the baseline file (or per-module baseline files when splitting).
+3. Keep `applyBaseline=true` in CI to suppress known issues.
+4. Periodically refresh the baseline and review `baseline-diff.*` to ensure the set of known issues only shrinks.
+5. For reactors, prefer `splitBaselineByModule=true` so each module owns its own baseline file.
+
+### Incremental cache best practices
+
+- Keep `useIncrementalCache=true` for local and CI runs.
+- Place `cacheFile` under a stable cache directory and persist it in CI, rather than committing it to git.
+- Use `splitCacheByModule=true` for reactor scans to avoid cross-module churn.
+- Cache reuse is automatically invalidated when rule configuration or implementation changes, so it is safe to keep enabled.
+
+### Rule governance suggestions
+
+- Start with domain bundles and add new domains only after the current set stabilizes.
+- Use `severityOverrides` to raise high-risk rules to `ERROR` while keeping others at `WARNING`.
+- Track any `disabledRules` or `disabledRuleDomains` in a backlog and review them regularly.
+- Prefer inline suppressions with explicit reasons over broad domain disables.
+- Review rule-reference docs after upgrades to see newly added rules and adjust your governance plan.
+
 ## Inline Suppression
 
 Preferred syntax:

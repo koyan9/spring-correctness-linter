@@ -378,6 +378,76 @@ PowerShell 下，建议对带点号的 `-Dspring.correctness.linter.*` 参数加
 </configuration>
 ```
 
+## 落地指南
+
+### 典型落地流程
+
+1. 本地先从 `ASYNC,TRANSACTION,WEB` 等小范围开始，`failOnSeverity` 先不设置。
+2. 一次性生成 baseline 并提交到版本库。
+3. CI 中开启 `applyBaseline=true` 与 `useIncrementalCache=true`，只关注新增问题。
+4. 噪声可控后再逐步扩大规则域或启用全量默认规则。
+5. 对高风险规则用 `severityOverrides` 提升到 `ERROR`，逐步收紧门禁。
+
+### CI/CD 配置
+
+最小 Maven CLI 示例：
+
+```bash
+mvn -B -q verify \
+  "-Dspring.correctness.linter.applyBaseline=true" \
+  "-Dspring.correctness.linter.failOnSeverity=WARNING"
+```
+
+GitHub Actions 示例（复用缓存）：
+
+```yaml
+- name: Cache linter analysis
+  uses: actions/cache@v4
+  with:
+    path: .cache/spring-correctness-linter
+    key: ${{ runner.os }}-linter-${{ hashFiles('**/pom.xml') }}
+
+- name: Verify project
+  run: mvn -B -q verify "-Dspring.correctness.linter.cacheFile=.cache/spring-correctness-linter/analysis-cache.txt"
+```
+
+GitLab CI 示例：
+
+```yaml
+lint:
+  stage: test
+  cache:
+    key: "${CI_COMMIT_REF_SLUG}"
+    paths:
+      - .cache/spring-correctness-linter
+  script:
+    - mvn -B -q verify "-Dspring.correctness.linter.cacheFile=.cache/spring-correctness-linter/analysis-cache.txt"
+```
+
+### baseline 策略
+
+1. 首次生成 baseline：
+   `./mvnw spring-correctness-linter:lint "-Dspring.correctness.linter.writeBaseline=true"`
+2. 提交 baseline 文件（或按模块拆分后的 baseline）。
+3. CI 中保持 `applyBaseline=true`，只看新增问题。
+4. 定期刷新 baseline 并检查 `baseline-diff.*`，确保已知问题逐步减少。
+5. reactor 项目优先使用 `splitBaselineByModule=true`，让每个模块独立管理 baseline。
+
+### 增量缓存最佳实践
+
+- 保持 `useIncrementalCache=true`，本地与 CI 都能获得更快的增量扫描。
+- `cacheFile` 放到稳定缓存目录并在 CI 中持久化，不要提交到 git。
+- reactor 扫描建议使用 `splitCacheByModule=true`，减少跨模块抖动。
+- 规则配置或实现变化会自动失效缓存，可放心长期开启。
+
+### 规则治理建议
+
+- 先按规则域逐步启用，稳定后再扩大范围。
+- 对高风险规则用 `severityOverrides` 提升到 `ERROR`。
+- 把 `disabledRules` / `disabledRuleDomains` 视为待治理清单，定期回收。
+- 优先使用带理由的 inline suppression，而不是长期关闭规则域。
+- 版本升级后查看 `rules-reference.md`，评估新增规则并更新治理策略。
+
 ## Inline Suppression
 
 推荐写法：
