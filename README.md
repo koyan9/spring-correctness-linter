@@ -197,23 +197,38 @@ When reactor scanning is enabled:
 
 ## Key Configuration Properties
 
-- `spring.correctness.linter.sourceDirectory`: override the primary Java source root
-- `spring.correctness.linter.additionalSourceDirectories`: add extra source roots in the current module
-- `spring.correctness.linter.scanReactorModules=true`: scan all reactor modules from the execution root
-- `spring.correctness.linter.includeTestSourceRoots=true`: include test compile source roots
-- `spring.correctness.linter.reportDirectory`: change the report output directory
-- `spring.correctness.linter.baselineFile`: change the baseline file location
-- `spring.correctness.linter.writeBaseline=true`: regenerate baseline
-- `spring.correctness.linter.enabledRules=RULE_A,RULE_B`: run only selected rules
-- `spring.correctness.linter.disabledRules=RULE_A,RULE_B`: skip selected rules
-- `spring.correctness.linter.enabledRuleDomains=TRANSACTION,CACHE`: run rules from selected domains
-- `spring.correctness.linter.disabledRuleDomains=WEB`: skip rules from selected domains
-- `spring.correctness.linter.severityOverrides=RULE_A=ERROR,RULE_B=INFO`: override per-rule severities
-- `spring.correctness.linter.assumeCentralizedSecurity=true`: skip `SPRING_ENDPOINT_SECURITY` when security is enforced centrally
-- `spring.correctness.linter.securityAnnotations=CustomSecured,TeamSecure`: treat additional annotations as explicit security intent
-- `spring.correctness.linter.cacheDefaultKeyCacheNames=users,orders`: allow default cache keys for selected cache names (`*` to allow all)
-- `spring.correctness.linter.failOnSeverity=WARNING`: fail the build for matching severities
-- `spring.correctness.linter.failOnError=true`: fail the build when any visible issue remains
+List-valued properties accept comma or semicolon separators. Whitespace is trimmed.
+Rule ids are normalized to uppercase. Rule domains are case-insensitive and accept `-` or spaces (for example `transaction`, `Transaction`, `TRANSACTION`).
+
+| Property | Default | Values | Effect |
+| --- | --- | --- | --- |
+| `spring.correctness.linter.sourceDirectory` | `${project.basedir}/src/main/java` | Path (absolute or relative) | Overrides the primary source root. Relative paths are resolved against the project base directory. |
+| `spring.correctness.linter.additionalSourceDirectories` | _empty_ | Paths separated by `,` or `;` | Adds extra source roots for the current module. Relative paths are resolved against the project base directory. |
+| `spring.correctness.linter.scanReactorModules` | `false` | `true` / `false` | Scan the full Maven reactor from the execution root. Non-root modules are skipped when enabled. |
+| `spring.correctness.linter.includeTestSourceRoots` | `false` | `true` / `false` | Include test compile source roots when resolving source roots. |
+| `spring.correctness.linter.reportDirectory` | `${project.build.directory}/spring-correctness-linter` | Path | Report output directory. |
+| `spring.correctness.linter.formats` | `json,html,sarif` | `json`, `html`, `sarif` | Controls which core report formats to write. Baseline diff and rule docs are controlled separately. |
+| `spring.correctness.linter.baselineFile` | `${project.basedir}/spring-correctness-linter-baseline.txt` | Path | Baseline file path used for filtering and/or writing. |
+| `spring.correctness.linter.honorInlineSuppressions` | `true` | `true` / `false` | Enables inline suppression comments. |
+| `spring.correctness.linter.applyBaseline` | `true` | `true` / `false` | Applies baseline filtering to hide known issues. |
+| `spring.correctness.linter.writeBaseline` | `false` | `true` / `false` | Writes a new baseline file (or per-module baseline files when splitting). |
+| `spring.correctness.linter.writeBaselineDiff` | `true` | `true` / `false` | Writes `baseline-diff.json` and `baseline-diff.html` when a baseline path is configured. |
+| `spring.correctness.linter.writeRuleDocs` | `true` | `true` / `false` | Writes the generated rule reference markdown. |
+| `spring.correctness.linter.ruleDocsFileName` | `rules-reference.md` | File name or path | File name (or relative path) for the generated rules reference under the report directory. |
+| `spring.correctness.linter.failOnSeverity` | _unset_ | `INFO`, `WARNING`, `ERROR` | Fails the build when any visible issue meets or exceeds the threshold. Takes precedence over `failOnError`. |
+| `spring.correctness.linter.failOnError` | `false` | `true` / `false` | Fails the build when any visible issue remains, only when `failOnSeverity` is not set. |
+| `spring.correctness.linter.enabledRules` | _empty_ | Rule IDs | Enables only the specified rule IDs. Unknown IDs fail the build. |
+| `spring.correctness.linter.disabledRules` | _empty_ | Rule IDs | Disables the specified rule IDs. Unknown IDs fail the build. |
+| `spring.correctness.linter.enabledRuleDomains` | _empty_ | `ASYNC`, `LIFECYCLE`, `SCHEDULED`, `CACHE`, `WEB`, `TRANSACTION`, `EVENTS`, `CONFIGURATION`, `GENERAL` | Enables only selected rule domains. Unknown domains fail the build. |
+| `spring.correctness.linter.disabledRuleDomains` | _empty_ | Same as above | Disables selected rule domains. |
+| `spring.correctness.linter.severityOverrides` | _empty_ | `RULE_ID=INFO|WARNING|ERROR` | Overrides per-rule severities. Unknown rule IDs fail the build. |
+| `spring.correctness.linter.assumeCentralizedSecurity` | `false` | `true` / `false` | Skips `SPRING_ENDPOINT_SECURITY` when security is enforced centrally. |
+| `spring.correctness.linter.securityAnnotations` | _empty_ | Annotation names | Treats additional annotations as explicit security intent. Accepts simple or fully qualified names (leading `@` is allowed). |
+| `spring.correctness.linter.cacheDefaultKeyCacheNames` | _empty_ | Cache names or `*` | Allows default cache keys for specific cache names. `*` allows all caches. |
+| `spring.correctness.linter.cacheFile` | `${project.build.directory}/spring-correctness-linter/analysis-cache.txt` | Path | Incremental cache file path (ignored when cache is disabled or split by module). |
+| `spring.correctness.linter.useIncrementalCache` | `true` | `true` / `false` | Enables file-content-based incremental cache reuse. |
+| `spring.correctness.linter.splitBaselineByModule` | `false` | `true` / `false` | Writes module-scoped baseline files under `modules/<module>/` next to the baseline file parent directory. |
+| `spring.correctness.linter.splitCacheByModule` | `false` | `true` / `false` | Writes module-scoped cache files under `modules/<module>/` next to the cache file parent directory. |
 
 ### Centralized security intent
 
@@ -238,14 +253,10 @@ If some caches intentionally rely on Spring's default key generation, you can al
   <!-- Use '*' to allow default keys for all caches -->
 </configuration>
 ```
-- `spring.correctness.linter.useIncrementalCache=true`: enable file-content-based cache reuse
-- `spring.correctness.linter.cacheFile=target/spring-correctness-linter/analysis-cache.txt`: set cache file path
-- `spring.correctness.linter.splitBaselineByModule=true`: write module-scoped baseline files
-- `spring.correctness.linter.splitCacheByModule=true`: write module-scoped cache files
 
 PowerShell note: quote dotted `-Dspring.correctness.linter.*` properties or invoke Maven through `cmd /c`.
 
-Available built-in rule domains currently include `ASYNC`, `LIFECYCLE`, `SCHEDULED`, `CACHE`, `WEB`, `TRANSACTION`, `EVENTS`, and `CONFIGURATION`.
+Available built-in rule domains currently include `ASYNC`, `LIFECYCLE`, `SCHEDULED`, `CACHE`, `WEB`, `TRANSACTION`, `EVENTS`, `CONFIGURATION`, and `GENERAL`.
 
 Recommended starter bundles:
 

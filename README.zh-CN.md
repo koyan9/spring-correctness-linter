@@ -200,23 +200,38 @@ JSON 和 HTML 报告现在还会包含运行期指标，便于观察：
 
 ## 关键配置项
 
-- `spring.correctness.linter.sourceDirectory`：覆盖主源码目录
-- `spring.correctness.linter.additionalSourceDirectories`：补充当前模块额外源码根
-- `spring.correctness.linter.scanReactorModules=true`：从 reactor 执行根扫描全部模块
-- `spring.correctness.linter.includeTestSourceRoots=true`：把测试源码根也纳入扫描
-- `spring.correctness.linter.reportDirectory`：覆盖报告目录
-- `spring.correctness.linter.baselineFile`：覆盖 baseline 文件路径
-- `spring.correctness.linter.writeBaseline=true`：重新生成 baseline
-- `spring.correctness.linter.enabledRules=RULE_A,RULE_B`：只启用指定规则
-- `spring.correctness.linter.disabledRules=RULE_A,RULE_B`：禁用指定规则
-- `spring.correctness.linter.enabledRuleDomains=TRANSACTION,CACHE`：按规则域启用规则
-- `spring.correctness.linter.disabledRuleDomains=WEB`：按规则域禁用规则
-- `spring.correctness.linter.severityOverrides=RULE_A=ERROR,RULE_B=INFO`：覆盖规则默认严重级别
-- `spring.correctness.linter.assumeCentralizedSecurity=true`：安全策略集中配置时跳过 `SPRING_ENDPOINT_SECURITY`
-- `spring.correctness.linter.securityAnnotations=CustomSecured,TeamSecure`：额外安全注解视为显式安全意图
-- `spring.correctness.linter.cacheDefaultKeyCacheNames=users,orders`：指定 cache 名称允许默认 key（`*` 表示全部允许）
-- `spring.correctness.linter.failOnSeverity=WARNING`：按严重级别失败
-- `spring.correctness.linter.failOnError=true`：只要还有可见问题就失败
+列表型配置支持逗号或分号分隔，自动去掉空白。
+规则 ID 会统一转成大写；规则域大小写不敏感，允许连字符或空格（如 `transaction` / `Transaction` / `TRANSACTION`）。
+
+| 参数 | 默认值 | 取值范围 | 作用 |
+| --- | --- | --- | --- |
+| `spring.correctness.linter.sourceDirectory` | `${project.basedir}/src/main/java` | 路径（绝对或相对） | 覆盖主源码目录。相对路径以项目根目录为基准。 |
+| `spring.correctness.linter.additionalSourceDirectories` | 空 | 以 `,` 或 `;` 分隔的路径 | 补充当前模块的额外源码根目录。相对路径以项目根目录为基准。 |
+| `spring.correctness.linter.scanReactorModules` | `false` | `true` / `false` | 从执行根扫描整个 Maven reactor；开启后非执行根模块会跳过。 |
+| `spring.correctness.linter.includeTestSourceRoots` | `false` | `true` / `false` | 将测试源码根目录也纳入扫描。 |
+| `spring.correctness.linter.reportDirectory` | `${project.build.directory}/spring-correctness-linter` | 路径 | 报告输出目录。 |
+| `spring.correctness.linter.formats` | `json,html,sarif` | `json`、`html`、`sarif` | 控制核心报告格式。baseline diff 与规则文档由独立开关控制。 |
+| `spring.correctness.linter.baselineFile` | `${project.basedir}/spring-correctness-linter-baseline.txt` | 路径 | baseline 文件路径，用于过滤和/或写入。 |
+| `spring.correctness.linter.honorInlineSuppressions` | `true` | `true` / `false` | 是否启用 inline suppression 注释。 |
+| `spring.correctness.linter.applyBaseline` | `true` | `true` / `false` | 是否应用 baseline 过滤隐藏已知问题。 |
+| `spring.correctness.linter.writeBaseline` | `false` | `true` / `false` | 写入新的 baseline（或按模块拆分时写入模块 baseline）。 |
+| `spring.correctness.linter.writeBaselineDiff` | `true` | `true` / `false` | baseline 路径存在时写出 `baseline-diff.json` 与 `baseline-diff.html`。 |
+| `spring.correctness.linter.writeRuleDocs` | `true` | `true` / `false` | 写出规则参考文档。 |
+| `spring.correctness.linter.ruleDocsFileName` | `rules-reference.md` | 文件名或相对路径 | 规则文档文件名（或相对路径），写入到报告目录下。 |
+| `spring.correctness.linter.failOnSeverity` | 未设置 | `INFO` / `WARNING` / `ERROR` | 当可见问题达到或超过该阈值时失败。优先级高于 `failOnError`。 |
+| `spring.correctness.linter.failOnError` | `false` | `true` / `false` | 当存在可见问题时失败，仅在未设置 `failOnSeverity` 时生效。 |
+| `spring.correctness.linter.enabledRules` | 空 | 规则 ID | 仅启用指定规则。未知规则会导致构建失败。 |
+| `spring.correctness.linter.disabledRules` | 空 | 规则 ID | 禁用指定规则。未知规则会导致构建失败。 |
+| `spring.correctness.linter.enabledRuleDomains` | 空 | `ASYNC`、`LIFECYCLE`、`SCHEDULED`、`CACHE`、`WEB`、`TRANSACTION`、`EVENTS`、`CONFIGURATION`、`GENERAL` | 仅启用指定规则域。未知规则域会导致构建失败。 |
+| `spring.correctness.linter.disabledRuleDomains` | 空 | 同上 | 禁用指定规则域。 |
+| `spring.correctness.linter.severityOverrides` | 空 | `RULE_ID=INFO|WARNING|ERROR` | 覆盖规则默认严重级别。未知规则会导致构建失败。 |
+| `spring.correctness.linter.assumeCentralizedSecurity` | `false` | `true` / `false` | 安全策略集中配置时跳过 `SPRING_ENDPOINT_SECURITY`。 |
+| `spring.correctness.linter.securityAnnotations` | 空 | 注解名 | 额外安全注解视为显式安全意图，支持简单名或全限定名（允许前缀 `@`）。 |
+| `spring.correctness.linter.cacheDefaultKeyCacheNames` | 空 | cache 名称或 `*` | 指定 cache 名称允许默认 key；`*` 表示全部允许。 |
+| `spring.correctness.linter.cacheFile` | `${project.build.directory}/spring-correctness-linter/analysis-cache.txt` | 路径 | 增量缓存文件路径（缓存关闭或按模块拆分时忽略）。 |
+| `spring.correctness.linter.useIncrementalCache` | `true` | `true` / `false` | 是否启用增量缓存复用。 |
+| `spring.correctness.linter.splitBaselineByModule` | `false` | `true` / `false` | 按模块拆分 baseline，输出到 `modules/<module>/` 下。 |
+| `spring.correctness.linter.splitCacheByModule` | `false` | `true` / `false` | 按模块拆分缓存文件，输出到 `modules/<module>/` 下。 |
 
 ### 集中式安全意图
 
@@ -226,7 +241,7 @@ JSON 和 HTML 报告现在还会包含运行期指标，便于观察：
 <configuration>
   <assumeCentralizedSecurity>true</assumeCentralizedSecurity>
   <securityAnnotations>InternalEndpoint,TeamSecure</securityAnnotations>
-  <!-- ??? @InternalEndpoint ? com.example.InternalEndpoint -->
+  <!-- 也支持 @InternalEndpoint 或 com.example.InternalEndpoint -->
 </configuration>
 ```
 
@@ -237,17 +252,13 @@ JSON 和 HTML 报告现在还会包含运行期指标，便于观察：
 ```xml
 <configuration>
   <cacheDefaultKeyCacheNames>users,orders</cacheDefaultKeyCacheNames>
-  <!-- ?? '*' ???? cache ????? key -->
+  <!-- 使用 '*' 允许所有 cache 使用默认 key -->
 </configuration>
 ```
-- `spring.correctness.linter.useIncrementalCache=true`：启用增量缓存
-- `spring.correctness.linter.cacheFile=target/spring-correctness-linter/analysis-cache.txt`：设置 cache 文件路径
-- `spring.correctness.linter.splitBaselineByModule=true`：按模块拆分 baseline
-- `spring.correctness.linter.splitCacheByModule=true`：按模块拆分 cache
 
 PowerShell 下，建议对带点号的 `-Dspring.correctness.linter.*` 参数加引号，或者通过 `cmd /c` 调用 Maven。
 
-当前内建规则域包括 `ASYNC`、`LIFECYCLE`、`SCHEDULED`、`CACHE`、`WEB`、`TRANSACTION`、`EVENTS` 和 `CONFIGURATION`。
+当前内建规则域包括 `ASYNC`、`LIFECYCLE`、`SCHEDULED`、`CACHE`、`WEB`、`TRANSACTION`、`EVENTS`、`CONFIGURATION` 和 `GENERAL`。
 
 推荐的起步组合：
 
