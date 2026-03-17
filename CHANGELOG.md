@@ -50,6 +50,7 @@ All notable changes to `spring-correctness-linter` will be documented in this fi
 - Cacheable default-key allowlist now honors `@CacheConfig(cacheNames=...)`
 - Endpoint security rule now honors security annotations declared on interfaces or base classes
 - Transactional self-invocation now flags direct self method references such as `this::method`
+- Added auto-detection for centralized security when a `SecurityFilterChain` bean is present
 - Annotation meta-resolution now prefers same-package and import-based matches when simple names are ambiguous
 - Generated rule reference docs now include recommended domain-based rule bundles for common rollout scenarios
 - Added an initial `SCHEDULED` rule domain covering invalid trigger configuration, scheduled method parameters, and non-void return-value review

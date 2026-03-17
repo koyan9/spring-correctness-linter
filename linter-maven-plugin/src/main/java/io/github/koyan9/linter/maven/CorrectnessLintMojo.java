@@ -112,6 +112,9 @@ public class CorrectnessLintMojo extends AbstractMojo {
     @Parameter(property = "spring.correctness.linter.assumeCentralizedSecurity", defaultValue = "false")
     private boolean assumeCentralizedSecurity;
 
+    @Parameter(property = "spring.correctness.linter.autoDetectCentralizedSecurity", defaultValue = "false")
+    private boolean autoDetectCentralizedSecurity;
+
     @Parameter(property = "spring.correctness.linter.securityAnnotations")
     private String securityAnnotations;
 
@@ -167,6 +170,7 @@ public class CorrectnessLintMojo extends AbstractMojo {
                     disabledRuleDomains,
                     severityOverrides,
                     assumeCentralizedSecurity,
+                    autoDetectCentralizedSecurity,
                     securityAnnotations,
                     cacheDefaultKeyCacheNames
             );

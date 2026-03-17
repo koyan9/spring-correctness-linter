@@ -50,6 +50,7 @@ final class MojoExecutionPlanBuilder {
             String disabledRuleDomains,
             String severityOverrides,
             boolean assumeCentralizedSecurity,
+            boolean autoDetectCentralizedSecurity,
             String securityAnnotations,
             String cacheDefaultKeyCacheNames
     ) throws MojoExecutionException {
@@ -104,6 +105,7 @@ final class MojoExecutionPlanBuilder {
                 parsedEnabledRules,
                 parsedDisabledRules,
                 assumeCentralizedSecurity,
+                autoDetectCentralizedSecurity,
                 parsedSecurityAnnotations,
                 parsedCacheDefaultKeyCacheNames
         );

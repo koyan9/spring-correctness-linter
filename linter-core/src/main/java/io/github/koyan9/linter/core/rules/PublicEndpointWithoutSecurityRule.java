@@ -73,7 +73,8 @@ public final class PublicEndpointWithoutSecurityRule extends AbstractSpringRule 
 
     @Override
     public List<LintIssue> evaluate(SourceUnit sourceUnit, ProjectContext context) {
-        if (context.options().assumeCentralizedSecurity()) {
+        if (context.options().assumeCentralizedSecurity()
+                || (context.options().autoDetectCentralizedSecurity() && context.hasSecurityFilterChainBean())) {
             return List.of();
         }
         List<LintIssue> issues = new ArrayList<>();

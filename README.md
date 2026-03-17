@@ -225,6 +225,7 @@ Rule ids are normalized to uppercase. Rule domains are case-insensitive and acce
 | `spring.correctness.linter.disabledRuleDomains` | _empty_ | Same as above | Disables selected rule domains. |
 | `spring.correctness.linter.severityOverrides` | _empty_ | `RULE_ID=INFO|WARNING|ERROR` | Overrides per-rule severities. Unknown rule IDs fail the build. |
 | `spring.correctness.linter.assumeCentralizedSecurity` | `false` | `true` / `false` | Skips `SPRING_ENDPOINT_SECURITY` when security is enforced centrally. |
+| `spring.correctness.linter.autoDetectCentralizedSecurity` | `false` | `true` / `false` | Auto-skips `SPRING_ENDPOINT_SECURITY` when a `SecurityFilterChain` bean is detected in the source tree. |
 | `spring.correctness.linter.securityAnnotations` | _empty_ | Annotation names | Treats additional annotations as explicit security intent. Accepts simple or fully qualified names (leading `@` is allowed). |
 | `spring.correctness.linter.cacheDefaultKeyCacheNames` | _empty_ | Cache names or `*` | Allows default cache keys for specific cache names. `*` allows all caches. |
 | `spring.correctness.linter.cacheFile` | `${project.build.directory}/spring-correctness-linter/analysis-cache.txt` | Path | Incremental cache file path (ignored when cache is disabled or split by module). |
@@ -240,6 +241,8 @@ disabling the endpoint-security rule globally or by providing your internal secu
 ```xml
 <configuration>
   <assumeCentralizedSecurity>true</assumeCentralizedSecurity>
+  <!-- Or detect SecurityFilterChain automatically -->
+  <!-- <autoDetectCentralizedSecurity>true</autoDetectCentralizedSecurity> -->
   <securityAnnotations>InternalEndpoint,TeamSecure</securityAnnotations>
   <!-- Also supported: @InternalEndpoint or com.example.InternalEndpoint -->
 </configuration>

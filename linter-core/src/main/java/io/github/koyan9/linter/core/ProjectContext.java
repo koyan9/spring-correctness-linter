@@ -27,6 +27,7 @@ public final class ProjectContext {
     private final LintOptions options;
     private final Map<SourceUnit, SpringSemanticFacts> semanticFactsBySourceUnit = new ConcurrentHashMap<>();
     private volatile TypeResolutionIndex typeResolutionIndex;
+    private volatile Boolean securityFilterChainBeanPresent;
 
     private ProjectContext(
             Path projectRoot,
@@ -161,5 +162,50 @@ public final class ProjectContext {
         TypeResolutionIndex built = TypeResolutionIndex.build(this);
         typeResolutionIndex = built;
         return built;
+    }
+
+    public boolean hasSecurityFilterChainBean() {
+        Boolean cached = securityFilterChainBeanPresent;
+        if (cached != null) {
+            return cached;
+        }
+        synchronized (this) {
+            if (securityFilterChainBeanPresent != null) {
+                return securityFilterChainBeanPresent;
+            }
+            boolean found = false;
+            for (SourceDocument sourceDocument : sourceDocuments) {
+                SourceUnit sourceUnit = sourceDocument.toSourceUnit(parseOutcomeFor(sourceDocument));
+                SpringSemanticFacts facts = springFacts(sourceUnit);
+                for (com.github.javaparser.ast.body.MethodDeclaration method : sourceUnit.structure().methods()) {
+                    if (!facts.hasAnnotation(method, "Bean")) {
+                        continue;
+                    }
+                    if (isSecurityFilterChainType(method.getType().toString())) {
+                        found = true;
+                        break;
+                    }
+                }
+                if (found) {
+                    break;
+                }
+            }
+            securityFilterChainBeanPresent = found;
+            return found;
+        }
+    }
+
+    private boolean isSecurityFilterChainType(String rawType) {
+        if (rawType == null || rawType.isBlank()) {
+            return false;
+        }
+        String stripped = rawType.trim();
+        int genericStart = stripped.indexOf('<');
+        if (genericStart >= 0) {
+            stripped = stripped.substring(0, genericStart);
+        }
+        int lastDot = stripped.lastIndexOf('.');
+        String simpleName = lastDot >= 0 ? stripped.substring(lastDot + 1) : stripped;
+        return "SecurityFilterChain".equals(simpleName);
     }
 }

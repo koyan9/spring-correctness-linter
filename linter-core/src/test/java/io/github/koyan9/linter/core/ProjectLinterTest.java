@@ -1938,6 +1938,45 @@ class ProjectLinterTest {
     }
 
     @Test
+    void autoDetectsSecurityFilterChainForCentralizedSecurity() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("SecurityConfig.java"), """
+                package demo;
+
+                import org.springframework.context.annotation.Bean;
+                import org.springframework.security.web.SecurityFilterChain;
+                import org.springframework.web.bind.annotation.GetMapping;
+                import org.springframework.web.bind.annotation.RestController;
+
+                class SecurityConfig {
+
+                    @Bean
+                    SecurityFilterChain filterChain() {
+                        return null;
+                    }
+                }
+
+                @RestController
+                class PublicController {
+
+                    @GetMapping("/open")
+                    public String open() {
+                        return "ok";
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport defaultReport = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
+        assertTrue(defaultReport.issues().stream().anyMatch(issue -> issue.ruleId().equals("SPRING_ENDPOINT_SECURITY")));
+
+        LintOptions options = LintOptions.defaults().withAutoDetectCentralizedSecurity(true);
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"), options).report();
+        assertFalse(report.issues().stream().anyMatch(issue -> issue.ruleId().equals("SPRING_ENDPOINT_SECURITY")));
+    }
+
+    @Test
     void honorsInheritedSecurityAnnotations() throws Exception {
         Path sourceDirectory = tempDir.resolve("src/main/java/demo");
         Files.createDirectories(sourceDirectory);
