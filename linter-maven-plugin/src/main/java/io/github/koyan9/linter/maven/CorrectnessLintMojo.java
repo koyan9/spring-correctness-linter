@@ -21,6 +21,8 @@ import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.project.MavenProject;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -210,6 +212,8 @@ public class CorrectnessLintMojo extends AbstractMojo {
             if (report.cachedFileCount() > 0) {
                 getLog().info("spring-correctness-linter reused incremental cache for "
                         + report.cachedFileCount() + " source file(s)");
+            } else {
+                logCacheHints(plan.options(), report);
             }
 
             LintSeverity threshold = executionPlanBuilder.optionParser().parseSeverity(failOnSeverity);
@@ -249,5 +253,38 @@ public class CorrectnessLintMojo extends AbstractMojo {
             return "rules-reference.md";
         }
         return value;
+    }
+
+    private void logCacheHints(LintOptions options, LintReport report) {
+        if (!options.useIncrementalCache()) {
+            return;
+        }
+        if (report.cachedFileCount() > 0) {
+            return;
+        }
+
+        if (!options.moduleAnalysisCacheFiles().isEmpty()) {
+            int total = options.moduleAnalysisCacheFiles().size();
+            long existing = options.moduleAnalysisCacheFiles().values().stream().filter(Files::exists).count();
+            if (existing == 0) {
+                getLog().info("spring-correctness-linter cache: no module cache files found (" + total + " expected). First run or cache directory not persisted.");
+            } else {
+                getLog().info("spring-correctness-linter cache: " + existing + "/" + total
+                        + " module cache files found, but no entries reused. Likely a fingerprint change or all files modified.");
+            }
+            return;
+        }
+
+        Path cacheFile = options.analysisCacheFile();
+        if (cacheFile == null) {
+            getLog().info("spring-correctness-linter cache: incremental cache enabled but no cache file configured.");
+            return;
+        }
+        if (!Files.exists(cacheFile)) {
+            getLog().info("spring-correctness-linter cache: no cache file found at " + cacheFile + ". First run or cache directory not persisted.");
+            return;
+        }
+        getLog().info("spring-correctness-linter cache: cache file found at " + cacheFile
+                + ", but no entries reused. Likely a fingerprint change or all files modified.");
     }
 }
