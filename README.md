@@ -204,6 +204,7 @@ Rule ids are normalized to uppercase. Rule domains are case-insensitive and acce
 | --- | --- | --- | --- |
 | `spring.correctness.linter.sourceDirectory` | `${project.basedir}/src/main/java` | Path (absolute or relative) | Overrides the primary source root. Relative paths are resolved against the project base directory. |
 | `spring.correctness.linter.additionalSourceDirectories` | _empty_ | Paths separated by `,` or `;` | Adds extra source roots for the current module. Relative paths are resolved against the project base directory. |
+| `spring.correctness.linter.moduleSourceDirectories` | _empty_ | `moduleId=path1,path2;moduleId2=path3` | Adds per-module extra source roots. Paths are resolved against each module’s base directory. Unknown module ids fail the build. |
 | `spring.correctness.linter.scanReactorModules` | `false` | `true` / `false` | Scan the full Maven reactor from the execution root. Non-root modules are skipped when enabled. |
 | `spring.correctness.linter.includeTestSourceRoots` | `false` | `true` / `false` | Include test compile source roots when resolving source roots. |
 | `spring.correctness.linter.reportDirectory` | `${project.build.directory}/spring-correctness-linter` | Path | Report output directory. |
@@ -487,6 +488,14 @@ Reactor scan with per-module baseline/cache:
   <splitBaselineByModule>true</splitBaselineByModule>
   <splitCacheByModule>true</splitCacheByModule>
   <useIncrementalCache>true</useIncrementalCache>
+</configuration>
+```
+
+Add per-module extra source roots:
+
+```xml
+<configuration>
+  <moduleSourceDirectories>root-app=src/it/java;module-a=src/generated/java</moduleSourceDirectories>
 </configuration>
 ```
 

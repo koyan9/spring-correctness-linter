@@ -55,6 +55,9 @@ public class CorrectnessLintMojo extends AbstractMojo {
     @Parameter(property = "spring.correctness.linter.additionalSourceDirectories")
     private String additionalSourceDirectories;
 
+    @Parameter(property = "spring.correctness.linter.moduleSourceDirectories")
+    private String moduleSourceDirectories;
+
     @Parameter(property = "spring.correctness.linter.reportDirectory", defaultValue = "${project.build.directory}/spring-correctness-linter")
     private java.io.File reportDirectory;
 
@@ -144,6 +147,7 @@ public class CorrectnessLintMojo extends AbstractMojo {
                     reactorProjects,
                     sourceDirectory,
                     additionalSourceDirectories,
+                    moduleSourceDirectories,
                     reportDirectory,
                     baselineFile,
                     cacheFile,

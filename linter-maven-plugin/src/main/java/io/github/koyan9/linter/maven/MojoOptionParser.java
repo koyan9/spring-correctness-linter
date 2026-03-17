@@ -11,6 +11,7 @@ import org.apache.maven.plugin.MojoExecutionException;
 
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -33,6 +34,39 @@ final class MojoOptionParser {
             }
         }
         return items;
+    }
+
+    Map<String, List<String>> parseModuleSourceDirectories(String value) throws MojoExecutionException {
+        Map<String, List<String>> modules = new LinkedHashMap<>();
+        if (value == null || value.isBlank()) {
+            return modules;
+        }
+
+        for (String entry : value.split("[;]")) {
+            if (entry.isBlank()) {
+                continue;
+            }
+            String[] parts = entry.split("=", 2);
+            if (parts.length != 2 || parts[0].isBlank() || parts[1].isBlank()) {
+                throw new MojoExecutionException(
+                        "Invalid moduleSourceDirectories entry: " + entry + ". Expected moduleId=path1,path2."
+                );
+            }
+            String moduleId = parts[0].trim();
+            Set<String> paths = new LinkedHashSet<>();
+            for (String token : parts[1].split("[,]")) {
+                if (!token.isBlank()) {
+                    paths.add(token.trim());
+                }
+            }
+            if (paths.isEmpty()) {
+                throw new MojoExecutionException(
+                        "Invalid moduleSourceDirectories entry: " + entry + ". Expected at least one path."
+                );
+            }
+            modules.computeIfAbsent(moduleId, ignored -> new java.util.ArrayList<>()).addAll(paths);
+        }
+        return modules;
     }
 
     Set<RuleDomain> parseRuleDomains(String value) throws MojoExecutionException {

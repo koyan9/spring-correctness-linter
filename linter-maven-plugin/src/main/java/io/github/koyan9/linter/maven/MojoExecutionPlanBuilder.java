@@ -15,6 +15,7 @@ import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.project.MavenProject;
 
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +33,7 @@ final class MojoExecutionPlanBuilder {
             List<MavenProject> reactorProjects,
             java.io.File sourceDirectory,
             String additionalSourceDirectories,
+            String moduleSourceDirectories,
             java.io.File reportDirectory,
             java.io.File baselineFile,
             java.io.File cacheFile,
@@ -61,6 +63,8 @@ final class MojoExecutionPlanBuilder {
         java.util.Set<RuleDomain> parsedDisabledRuleDomains = optionParser.parseRuleDomains(disabledRuleDomains);
         Set<String> parsedSecurityAnnotations = normalizeAnnotationNames(optionParser.parseStringSet(securityAnnotations));
         Set<String> parsedCacheDefaultKeyCacheNames = optionParser.parseStringSet(cacheDefaultKeyCacheNames);
+        Map<String, List<String>> parsedModuleSourceDirectories = optionParser.parseModuleSourceDirectories(moduleSourceDirectories);
+        validateModuleSourceDirectories(parsedModuleSourceDirectories, project, reactorProjects, scanReactorModules);
 
         List<LintRule> rules = RuleSelection.configure(
                 SpringBootRuleSet.defaultRules(),
@@ -76,6 +80,7 @@ final class MojoExecutionPlanBuilder {
                 reactorProjects,
                 sourceDirectory,
                 additionalSourceDirectories,
+                parsedModuleSourceDirectories,
                 scanReactorModules,
                 includeTestSourceRoots
         );
@@ -124,5 +129,46 @@ final class MojoExecutionPlanBuilder {
             normalized.add(dotIndex >= 0 ? trimmed.substring(dotIndex + 1) : trimmed);
         }
         return normalized;
+    }
+
+    private void validateModuleSourceDirectories(
+            Map<String, List<String>> moduleSourceDirectories,
+            MavenProject project,
+            List<MavenProject> reactorProjects,
+            boolean scanReactorModules
+    ) throws MojoExecutionException {
+        if (moduleSourceDirectories == null || moduleSourceDirectories.isEmpty()) {
+            return;
+        }
+        Map<String, MavenProject> projectsByModuleId = new LinkedHashMap<>();
+        List<MavenProject> projectsToScan = scanReactorModules
+                ? (reactorProjects == null || reactorProjects.isEmpty() ? List.of(project) : reactorProjects)
+                : List.of(project);
+        for (MavenProject current : projectsToScan) {
+            if (current == null) {
+                continue;
+            }
+            projectsByModuleId.putIfAbsent(moduleId(current), current);
+        }
+        Set<String> unknown = new LinkedHashSet<>(moduleSourceDirectories.keySet());
+        unknown.removeAll(projectsByModuleId.keySet());
+        if (!unknown.isEmpty()) {
+            String available = projectsByModuleId.keySet().stream().sorted().collect(java.util.stream.Collectors.joining(", "));
+            throw new MojoExecutionException("Unknown module id(s) in moduleSourceDirectories: "
+                    + String.join(", ", unknown) + ". Available modules: " + available + ".");
+        }
+    }
+
+    private String moduleId(MavenProject currentProject) {
+        if (currentProject == null) {
+            return ".";
+        }
+        if (currentProject.getArtifactId() != null && !currentProject.getArtifactId().isBlank()) {
+            return currentProject.getArtifactId();
+        }
+        if (currentProject.getFile() != null && currentProject.getFile().getParentFile() != null) {
+            return currentProject.getFile().getParentFile().getName();
+        }
+        return ".";
     }
 }

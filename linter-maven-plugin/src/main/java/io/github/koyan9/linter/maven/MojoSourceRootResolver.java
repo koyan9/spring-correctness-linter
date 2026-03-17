@@ -21,6 +21,7 @@ final class MojoSourceRootResolver {
             List<MavenProject> reactorProjects,
             java.io.File sourceDirectory,
             String additionalSourceDirectories,
+            Map<String, List<String>> moduleSourceDirectories,
             boolean scanReactorModules,
             boolean includeTestSourceRoots
     ) {
@@ -32,9 +33,11 @@ final class MojoSourceRootResolver {
                     : reactorProjects;
             for (MavenProject reactorProject : projectsToScan) {
                 addProjectSourceRoots(reactorProject, sourceRoots, includeTestSourceRoots);
+                addModuleSourceRoots(reactorProject, moduleSourceDirectories, sourceRoots, projectRoot);
             }
         } else if (project != null) {
             addProjectSourceRoots(project, sourceRoots, includeTestSourceRoots);
+            addModuleSourceRoots(project, moduleSourceDirectories, sourceRoots, projectRoot);
         }
 
         if (sourceDirectory != null) {
@@ -62,6 +65,34 @@ final class MojoSourceRootResolver {
         addStringRoots(currentProject.getCompileSourceRoots(), sourceRoots, moduleId(currentProject));
         if (includeTestSourceRoots) {
             addStringRoots(currentProject.getTestCompileSourceRoots(), sourceRoots, moduleId(currentProject));
+        }
+    }
+
+    private void addModuleSourceRoots(
+            MavenProject currentProject,
+            Map<String, List<String>> moduleSourceDirectories,
+            Map<Path, SourceRoot> sourceRoots,
+            Path projectRoot
+    ) {
+        if (currentProject == null || moduleSourceDirectories == null || moduleSourceDirectories.isEmpty()) {
+            return;
+        }
+        String moduleId = moduleId(currentProject);
+        List<String> moduleRoots = moduleSourceDirectories.get(moduleId);
+        if (moduleRoots == null || moduleRoots.isEmpty()) {
+            return;
+        }
+        Path baseDir = currentProject.getBasedir() != null
+                ? currentProject.getBasedir().toPath().toAbsolutePath().normalize()
+                : projectRoot.toAbsolutePath().normalize();
+        for (String root : moduleRoots) {
+            if (root == null || root.isBlank()) {
+                continue;
+            }
+            Path sourceRoot = Path.of(root.trim());
+            Path resolvedPath = (sourceRoot.isAbsolute() ? sourceRoot : baseDir.resolve(sourceRoot)).toAbsolutePath().normalize();
+            SourceRoot currentSourceRoot = new SourceRoot(resolvedPath, moduleId);
+            sourceRoots.put(currentSourceRoot.path(), currentSourceRoot);
         }
     }
 

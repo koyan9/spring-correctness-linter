@@ -207,6 +207,7 @@ JSON 和 HTML 报告现在还会包含运行期指标，便于观察：
 | --- | --- | --- | --- |
 | `spring.correctness.linter.sourceDirectory` | `${project.basedir}/src/main/java` | 路径（绝对或相对） | 覆盖主源码目录。相对路径以项目根目录为基准。 |
 | `spring.correctness.linter.additionalSourceDirectories` | 空 | 以 `,` 或 `;` 分隔的路径 | 补充当前模块的额外源码根目录。相对路径以项目根目录为基准。 |
+| `spring.correctness.linter.moduleSourceDirectories` | 空 | `moduleId=path1,path2;moduleId2=path3` | 为指定模块补充额外源码根目录，路径相对模块根目录解析。未知模块会导致构建失败。 |
 | `spring.correctness.linter.scanReactorModules` | `false` | `true` / `false` | 从执行根扫描整个 Maven reactor；开启后非执行根模块会跳过。 |
 | `spring.correctness.linter.includeTestSourceRoots` | `false` | `true` / `false` | 将测试源码根目录也纳入扫描。 |
 | `spring.correctness.linter.reportDirectory` | `${project.build.directory}/spring-correctness-linter` | 路径 | 报告输出目录。 |
@@ -489,6 +490,14 @@ Reactor 扫描并按模块拆分 baseline/cache：
   <splitBaselineByModule>true</splitBaselineByModule>
   <splitCacheByModule>true</splitCacheByModule>
   <useIncrementalCache>true</useIncrementalCache>
+</configuration>
+```
+
+为指定模块补充额外源码根目录：
+
+```xml
+<configuration>
+  <moduleSourceDirectories>root-app=src/it/java;module-a=src/generated/java</moduleSourceDirectories>
 </configuration>
 ```
 

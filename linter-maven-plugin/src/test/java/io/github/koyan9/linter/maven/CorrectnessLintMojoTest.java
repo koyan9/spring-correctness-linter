@@ -629,6 +629,46 @@ class CorrectnessLintMojoTest {
         assertFalse(json.contains("\"ruleId\": \"SPRING_CACHEABLE_KEY\""));
     }
 
+    @Test
+    void includesModuleSpecificSourceDirectories() throws Exception {
+        Path sourceDirectory = writeSource("""
+                package demo;
+
+                class BaseService {
+                }
+                """);
+        Path extraRoot = tempDir.resolve("custom-src/demo");
+        Files.createDirectories(extraRoot);
+        Files.writeString(extraRoot.resolve("ExtraService.java"), """
+                package demo;
+
+                import org.springframework.scheduling.annotation.Async;
+
+                class ExtraService {
+
+                    @Async
+                    public void runAsync() {
+                    }
+                }
+                """);
+        Path reportsDirectory = tempDir.resolve("target/reports-module-extra");
+
+        CorrectnessLintMojo mojo = configuredMojo(
+                sourceDirectory,
+                reportsDirectory,
+                tempDir.resolve("spring-correctness-linter-baseline.txt")
+        );
+        setField(mojo, "applyBaseline", false);
+        setField(mojo, "moduleSourceDirectories", tempDir.getFileName().toString() + "=custom-src");
+        setField(mojo, "formats", new LinkedHashSet<>(Set.of("json")));
+
+        mojo.execute();
+
+        String json = Files.readString(reportsDirectory.resolve("lint-report.json"));
+        assertTrue(json.contains("\"issueCount\": 1"));
+        assertTrue(json.contains("\"ruleId\": \"SPRING_ASYNC_VOID\""));
+    }
+
     private Path writeSource(String content) throws Exception {
         Path sourceDirectory = tempDir.resolve("src/main/java/demo");
         Files.createDirectories(sourceDirectory);
