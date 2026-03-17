@@ -119,6 +119,12 @@ public final class JavaSourceInspector {
         return false;
     }
 
+    public static boolean annotationMemberIsEmpty(AnnotationExpr annotationExpr, String memberName) {
+        return annotationMemberValue(annotationExpr, memberName)
+                .map(JavaSourceInspector::isBlankLiteral)
+                .orElse(false);
+    }
+
     public static boolean annotationMemberContains(NodeWithAnnotations<?> node, String annotationName, String memberName, String token) {
         return findAnnotation(node, annotationName)
                 .flatMap(annotation -> annotationMemberValue(annotation, memberName))
@@ -301,6 +307,28 @@ public final class JavaSourceInspector {
 
     private static String expressionText(Expression expression) {
         return expression.toString();
+    }
+
+    static boolean isBlankLiteral(String value) {
+        if (value == null) {
+            return true;
+        }
+        String trimmed = value.trim();
+        if (trimmed.isEmpty()) {
+            return true;
+        }
+        if (trimmed.equals("\"\"") || trimmed.equals("''")) {
+            return true;
+        }
+        if (trimmed.startsWith("\"") && trimmed.endsWith("\"")) {
+            String inner = trimmed.substring(1, trimmed.length() - 1).trim();
+            return inner.isEmpty();
+        }
+        if (trimmed.startsWith("'") && trimmed.endsWith("'")) {
+            String inner = trimmed.substring(1, trimmed.length() - 1).trim();
+            return inner.isEmpty();
+        }
+        return false;
     }
 
     public record ParseOutcome(Optional<CompilationUnit> compilationUnit, List<String> problems) {

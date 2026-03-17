@@ -495,6 +495,64 @@ class ProjectLinterTest {
     }
 
     @Test
+    void flagsBlankCacheableKeyGenerator() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("BlankKeyGenerator.java"), """
+                package demo;
+
+                import org.springframework.cache.annotation.Cacheable;
+
+                class BlankKeyGenerator {
+
+                    @Cacheable(cacheNames = "demo", keyGenerator = "")
+                    public String load(String id) {
+                        return id;
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
+        List<LintIssue> cacheIssues = report.issues().stream()
+                .filter(issue -> issue.ruleId().equals("SPRING_CACHEABLE_KEY"))
+                .toList();
+
+        assertEquals(1, cacheIssues.size());
+        assertTrue(cacheIssues.get(0).message().contains("load"));
+    }
+
+    @Test
+    void flagsBlankCacheConfigKeyGenerator() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("BlankCacheConfig.java"), """
+                package demo;
+
+                import org.springframework.cache.annotation.CacheConfig;
+                import org.springframework.cache.annotation.Cacheable;
+
+                @CacheConfig(keyGenerator = "")
+                class BlankCacheConfig {
+
+                    @Cacheable(cacheNames = "demo")
+                    public String load(String id) {
+                        return id;
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
+        List<LintIssue> cacheIssues = report.issues().stream()
+                .filter(issue -> issue.ruleId().equals("SPRING_CACHEABLE_KEY"))
+                .toList();
+
+        assertEquals(1, cacheIssues.size());
+        assertTrue(cacheIssues.get(0).message().contains("load"));
+    }
+
+    @Test
     void recognizesPostAuthorizeEndpointsAndZeroArgCacheDefaults() throws Exception {
         Path sourceDirectory = tempDir.resolve("src/main/java/demo");
         Files.createDirectories(sourceDirectory);

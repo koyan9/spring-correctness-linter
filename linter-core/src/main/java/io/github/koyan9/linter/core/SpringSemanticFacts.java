@@ -47,6 +47,19 @@ public final class SpringSemanticFacts {
         return JavaSourceInspector.annotationDeclaresMember(node, context, annotationName, memberName);
     }
 
+    public boolean annotationMemberIsEmpty(NodeWithAnnotations<?> node, String annotationName, String memberName) {
+        for (com.github.javaparser.ast.expr.AnnotationExpr annotationExpr : node.getAnnotations()) {
+            if (JavaSourceInspector.annotationSimpleName(annotationExpr).equals(annotationName)
+                    && JavaSourceInspector.annotationMemberIsEmpty(annotationExpr, memberName)) {
+                return true;
+            }
+        }
+        return context.annotationMetadataIndex()
+                .annotationMemberValue(node, annotationName, memberName)
+                .map(JavaSourceInspector::isBlankLiteral)
+                .orElse(false);
+    }
+
     public boolean annotationMemberContains(NodeWithAnnotations<?> node, String annotationName, String memberName, String token) {
         return JavaSourceInspector.annotationMemberContains(node, context, annotationName, memberName, token);
     }
@@ -75,7 +88,8 @@ public final class SpringSemanticFacts {
 
     public MethodSemanticFacts methodFacts(TypeDeclaration<?> typeDeclaration, MethodDeclaration methodDeclaration) {
         boolean cacheConfigKeyGenerator = typeDeclaration != null
-                && annotationDeclaresMember(typeDeclaration, "CacheConfig", "keyGenerator");
+                && annotationDeclaresMember(typeDeclaration, "CacheConfig", "keyGenerator")
+                && !annotationMemberIsEmpty(typeDeclaration, "CacheConfig", "keyGenerator");
         return methodFactsCache
                 .computeIfAbsent(methodDeclaration, ignored -> new IdentityHashMap<>())
                 .computeIfAbsent(typeDeclaration, ignored -> new MethodSemanticFacts(
@@ -90,8 +104,10 @@ public final class SpringSemanticFacts {
                         isInitializationCallback(typeDeclaration, methodDeclaration),
                         isStartupLifecycleMethod(typeDeclaration, methodDeclaration),
                         hasAnnotation(methodDeclaration, "Cacheable")
-                                && (annotationDeclaresMember(methodDeclaration, "Cacheable", "key")
-                                || annotationDeclaresMember(methodDeclaration, "Cacheable", "keyGenerator")
+                                && ((annotationDeclaresMember(methodDeclaration, "Cacheable", "key")
+                                && !annotationMemberIsEmpty(methodDeclaration, "Cacheable", "key"))
+                                || (annotationDeclaresMember(methodDeclaration, "Cacheable", "keyGenerator")
+                                && !annotationMemberIsEmpty(methodDeclaration, "Cacheable", "keyGenerator"))
                                 || cacheConfigKeyGenerator),
                         annotationMemberContains(methodDeclaration, "Transactional", "propagation", "REQUIRES_NEW"),
                         annotationMemberContains(methodDeclaration, "Transactional", "propagation", "NESTED")
