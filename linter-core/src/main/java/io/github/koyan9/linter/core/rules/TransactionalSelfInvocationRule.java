@@ -8,6 +8,7 @@ package io.github.koyan9.linter.core.rules;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.TypeDeclaration;
 import com.github.javaparser.ast.expr.MethodCallExpr;
+import com.github.javaparser.ast.expr.MethodReferenceExpr;
 import com.github.javaparser.ast.expr.ThisExpr;
 import io.github.koyan9.linter.core.JavaSourceInspector;
 import io.github.koyan9.linter.core.LintIssue;
@@ -60,7 +61,7 @@ public final class TransactionalSelfInvocationRule extends AbstractSpringRule {
                 "The rule matches same-type calls by method name and argument count and supports varargs, but does not fully resolve imported-static edge cases.",
                 "Class-level `@Transactional` is treated as applying to public methods, and type resolution is best-effort without a full symbol solver; custom proxy settings or weaving can change that boundary.",
                 "Proxy-injection patterns such as self-injection or ApplicationContext lookups are treated as external calls unless there is an explicit self-call.",
-                "Method references (for example, `this::inner`) are not analyzed for self-invocation today."
+                "Method references are only checked for direct `this::method` or `ClassName::method` usage inside the same type."
         );
     }
 
@@ -90,6 +91,8 @@ public final class TransactionalSelfInvocationRule extends AbstractSpringRule {
             Set<VarArgsSignature> varArgsTransactionalMethods = new LinkedHashSet<>();
             Set<MethodSignature> exactFinalTransactionalMethods = new LinkedHashSet<>();
             Set<VarArgsSignature> varArgsFinalTransactionalMethods = new LinkedHashSet<>();
+            Set<String> transactionalMethodNames = new LinkedHashSet<>();
+            Set<String> nonTransactionalMethodNames = new LinkedHashSet<>();
 
             for (TypeResolutionIndex.TypeDescriptor relatedType : typeIndex.relatedTypes(rootType)) {
                 boolean classTransactional = facts.typeFacts(relatedType.declaration()).hasTransactionalBoundary();
@@ -109,11 +112,13 @@ public final class TransactionalSelfInvocationRule extends AbstractSpringRule {
                     MethodSignature signature = new MethodSignature(method.getNameAsString(), method.getParameters().size());
                     if (transactional) {
                         exactTransactionalMethods.add(signature);
+                        transactionalMethodNames.add(method.getNameAsString());
                         if (method.isFinal()) {
                             exactFinalTransactionalMethods.add(signature);
                         }
                     } else {
                         exactNonTransactionalMethods.add(signature);
+                        nonTransactionalMethodNames.add(method.getNameAsString());
                     }
                 }
             }
@@ -135,6 +140,11 @@ public final class TransactionalSelfInvocationRule extends AbstractSpringRule {
                             varArgsFinalTransactionalMethods
                     )) {
                         issues.add(issue(sourceUnit, JavaSourceInspector.lineOf(methodCall), "Method '" + methodCall.getNameAsString() + "' is @Transactional and invoked via self-call; proxy advice will not run."));
+                    }
+                }
+                for (MethodReferenceExpr methodReference : method.findAll(MethodReferenceExpr.class)) {
+                    if (isTransactionalSelfReference(typeDeclaration, methodReference, transactionalMethodNames, nonTransactionalMethodNames)) {
+                        issues.add(issue(sourceUnit, JavaSourceInspector.lineOf(methodReference), "Method reference '" + methodReference.getIdentifier() + "' targets a @Transactional method via self-reference; proxy advice will not run."));
                     }
                 }
             }
@@ -176,9 +186,44 @@ public final class TransactionalSelfInvocationRule extends AbstractSpringRule {
                 .orElse(false);
     }
 
+    private boolean belongsToCurrentType(TypeDeclaration<?> typeDeclaration, MethodReferenceExpr methodReference) {
+        return methodReference.findAncestor(TypeDeclaration.class)
+                .map(typeDeclaration::equals)
+                .orElse(false);
+    }
+
     private boolean isDirectSameTypeCall(MethodCallExpr methodCall) {
         return methodCall.getScope().isEmpty()
                 || methodCall.getScope().filter(ThisExpr.class::isInstance).isPresent();
+    }
+
+    private boolean isTransactionalSelfReference(
+            TypeDeclaration<?> typeDeclaration,
+            MethodReferenceExpr methodReference,
+            Set<String> transactionalMethodNames,
+            Set<String> nonTransactionalMethodNames
+    ) {
+        if (!belongsToCurrentType(typeDeclaration, methodReference)) {
+            return false;
+        }
+        String identifier = methodReference.getIdentifier();
+        if ("new".equals(identifier)) {
+            return false;
+        }
+        if (!isDirectSelfReference(typeDeclaration, methodReference)) {
+            return false;
+        }
+        if (nonTransactionalMethodNames.contains(identifier)) {
+            return false;
+        }
+        return transactionalMethodNames.contains(identifier);
+    }
+
+    private boolean isDirectSelfReference(TypeDeclaration<?> typeDeclaration, MethodReferenceExpr methodReference) {
+        if (methodReference.getScope() instanceof ThisExpr) {
+            return true;
+        }
+        return methodReference.getScope().toString().equals(typeDeclaration.getNameAsString());
     }
 
     private boolean isDirectRecursiveCall(MethodDeclaration enclosingMethod, MethodCallExpr methodCall) {

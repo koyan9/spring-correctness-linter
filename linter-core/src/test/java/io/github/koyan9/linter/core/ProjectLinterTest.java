@@ -1226,7 +1226,7 @@ class ProjectLinterTest {
     }
 
     @Test
-    void doesNotFlagMethodReferencesForTransactionalSelfInvocation() throws Exception {
+    void flagsMethodReferencesForTransactionalSelfInvocation() throws Exception {
         Path sourceDirectory = tempDir.resolve("src/main/java/demo");
         Files.createDirectories(sourceDirectory);
         Files.writeString(sourceDirectory.resolve("TransactionalSelfInvocationMethodRef.java"), """
@@ -1253,7 +1253,8 @@ class ProjectLinterTest {
                 .filter(issue -> issue.ruleId().equals("SPRING_TX_SELF_INVOCATION"))
                 .toList();
 
-        assertEquals(0, selfInvocationIssues.size());
+        assertEquals(1, selfInvocationIssues.size());
+        assertTrue(selfInvocationIssues.get(0).message().contains("inner"));
     }
 
     @Test
