@@ -75,7 +75,7 @@ public final class CacheableWithoutKeyRule extends AbstractSpringRule {
             for (MethodDeclaration method : sourceUnit.structure().methodsOf(typeDeclaration)) {
                 MethodSemanticFacts methodFacts = facts.methodFacts(typeDeclaration, method);
                 if (methodFacts.shouldDeclareExplicitCacheKey()) {
-                    if (isDefaultCacheKeyAllowed(method, facts, context.options().cacheDefaultKeyCacheNames())) {
+                    if (isDefaultCacheKeyAllowed(typeDeclaration, method, facts, context.options().cacheDefaultKeyCacheNames())) {
                         continue;
                     }
                     issues.add(issue(sourceUnit, JavaSourceInspector.lineOf(method), "@Cacheable method '" + method.getNameAsString() + "' does not declare an explicit cache key strategy."));
@@ -85,7 +85,7 @@ public final class CacheableWithoutKeyRule extends AbstractSpringRule {
         return issues;
     }
 
-    private boolean isDefaultCacheKeyAllowed(MethodDeclaration method, SpringSemanticFacts facts, java.util.Set<String> cacheNames) {
+    private boolean isDefaultCacheKeyAllowed(TypeDeclaration<?> typeDeclaration, MethodDeclaration method, SpringSemanticFacts facts, java.util.Set<String> cacheNames) {
         if (cacheNames.isEmpty()) {
             return false;
         }
@@ -98,6 +98,11 @@ public final class CacheableWithoutKeyRule extends AbstractSpringRule {
             }
             if (facts.annotationMemberContains(method, "Cacheable", "cacheNames", cacheName)
                     || facts.annotationMemberContains(method, "Cacheable", "value", cacheName)) {
+                return true;
+            }
+            if (typeDeclaration != null
+                    && (facts.annotationMemberContains(typeDeclaration, "CacheConfig", "cacheNames", cacheName)
+                    || facts.annotationMemberContains(typeDeclaration, "CacheConfig", "value", cacheName))) {
                 return true;
             }
         }

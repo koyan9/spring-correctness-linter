@@ -47,6 +47,7 @@ All notable changes to `spring-correctness-linter` will be documented in this fi
 - Analysis now processes source files in parallel when multiple files are present to improve throughput
 - Added `lightweightReports` to generate smaller JSON outputs for large repositories
 - Cacheable key strategy now ignores blank `key`/`keyGenerator` values to reduce false negatives
+- Cacheable default-key allowlist now honors `@CacheConfig(cacheNames=...)`
 - Annotation meta-resolution now prefers same-package and import-based matches when simple names are ambiguous
 - Generated rule reference docs now include recommended domain-based rule bundles for common rollout scenarios
 - Added an initial `SCHEDULED` rule domain covering invalid trigger configuration, scheduled method parameters, and non-void return-value review

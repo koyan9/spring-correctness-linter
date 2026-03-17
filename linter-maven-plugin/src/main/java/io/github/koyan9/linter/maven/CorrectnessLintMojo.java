@@ -188,7 +188,7 @@ public class CorrectnessLintMojo extends AbstractMojo {
                     plan.reportsRoot(),
                     normalizedFormats,
                     writeBaselineDiff && plan.baselinePath() != null,
-                    writeRuleDocs && !lightweightReports,
+                    writeRuleDocs,
                     resolveRuleDocsFileName(ruleDocsFileName),
                     lightweightReports
             );

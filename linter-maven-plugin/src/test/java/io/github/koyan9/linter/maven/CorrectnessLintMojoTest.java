@@ -630,6 +630,73 @@ class CorrectnessLintMojoTest {
     }
 
     @Test
+    void writesRuleGovernanceSnapshot() throws Exception {
+        Path sourceDirectory = writeSource("""
+                package demo;
+
+                import org.springframework.scheduling.annotation.Async;
+
+                class AsyncOnly {
+
+                    @Async
+                    public void runAsync() {
+                    }
+                }
+                """);
+        Path reportsDirectory = tempDir.resolve("target/reports-governance");
+
+        CorrectnessLintMojo mojo = configuredMojo(
+                sourceDirectory,
+                reportsDirectory,
+                tempDir.resolve("spring-correctness-linter-baseline.txt")
+        );
+        setField(mojo, "applyBaseline", false);
+        setField(mojo, "formats", new LinkedHashSet<>(Set.of("json")));
+
+        mojo.execute();
+
+        Path governanceFile = reportsDirectory.resolve("rules-governance.json");
+        assertTrue(Files.exists(governanceFile));
+        String json = Files.readString(governanceFile);
+        assertTrue(json.contains("\"ruleCount\""));
+        assertTrue(json.contains("\"rules\""));
+    }
+
+    @Test
+    void writesLightweightJsonReportWhenEnabled() throws Exception {
+        Path sourceDirectory = writeSource("""
+                package demo;
+
+                import org.springframework.scheduling.annotation.Async;
+
+                class AsyncOnly {
+
+                    @Async
+                    public void runAsync() {
+                    }
+                }
+                """);
+        Path reportsDirectory = tempDir.resolve("target/reports-light");
+
+        CorrectnessLintMojo mojo = configuredMojo(
+                sourceDirectory,
+                reportsDirectory,
+                tempDir.resolve("spring-correctness-linter-baseline.txt")
+        );
+        setField(mojo, "applyBaseline", false);
+        setField(mojo, "lightweightReports", true);
+        setField(mojo, "formats", new LinkedHashSet<>(Set.of("json")));
+
+        mojo.execute();
+
+        String json = Files.readString(reportsDirectory.resolve("lint-report.json"));
+        assertTrue(json.contains("\"summary\""));
+        assertTrue(json.contains("\"ruleDomainSelection\""));
+        assertFalse(json.contains("\"issues\""));
+        assertFalse(json.contains("\"runtimeMetrics\""));
+    }
+
+    @Test
     void includesModuleSpecificSourceDirectories() throws Exception {
         Path sourceDirectory = writeSource("""
                 package demo;

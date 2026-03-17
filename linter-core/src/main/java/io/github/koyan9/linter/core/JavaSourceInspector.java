@@ -30,7 +30,7 @@ import java.util.Set;
 
 public final class JavaSourceInspector {
 
-    private static final JavaParser PARSER = new JavaParser();
+    private static final ThreadLocal<JavaParser> PARSER = ThreadLocal.withInitial(JavaParser::new);
 
     private JavaSourceInspector() {
     }
@@ -40,7 +40,7 @@ public final class JavaSourceInspector {
     }
 
     public static ParseOutcome inspect(String content) {
-        ParseResult<CompilationUnit> result = PARSER.parse(content);
+        ParseResult<CompilationUnit> result = PARSER.get().parse(content);
         return new ParseOutcome(
                 result.getResult(),
                 result.getProblems().stream().map(problem -> problem.getMessage()).toList()

@@ -553,6 +553,34 @@ class ProjectLinterTest {
     }
 
     @Test
+    void allowsCacheConfigNamesInDefaultKeyAllowlist() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("CacheConfigAllowlist.java"), """
+                package demo;
+
+                import org.springframework.cache.annotation.CacheConfig;
+                import org.springframework.cache.annotation.Cacheable;
+
+                @CacheConfig(cacheNames = "safe")
+                class CacheConfigAllowlist {
+
+                    @Cacheable
+                    public String load(String id) {
+                        return id;
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintOptions options = LintOptions.defaults().withCacheDefaultKeyCacheNames(Set.of("safe"));
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"), options).report();
+        Set<String> issueIds = report.issues().stream().map(LintIssue::ruleId).collect(Collectors.toSet());
+
+        assertFalse(issueIds.contains("SPRING_CACHEABLE_KEY"));
+    }
+
+    @Test
     void recognizesPostAuthorizeEndpointsAndZeroArgCacheDefaults() throws Exception {
         Path sourceDirectory = tempDir.resolve("src/main/java/demo");
         Files.createDirectories(sourceDirectory);
