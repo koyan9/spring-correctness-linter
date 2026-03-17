@@ -17,6 +17,7 @@ public final class ReportWriter {
     private final BaselineDiffJsonWriter baselineDiffJsonWriter = new BaselineDiffJsonWriter();
     private final BaselineDiffHtmlWriter baselineDiffHtmlWriter = new BaselineDiffHtmlWriter();
     private final RulesMarkdownWriter rulesMarkdownWriter = new RulesMarkdownWriter();
+    private final RuleGovernanceJsonWriter ruleGovernanceJsonWriter = new RuleGovernanceJsonWriter();
 
     public void writeJson(LintReport report, Path outputFile) throws IOException {
         ReportWriterSupport.ensureParentDirectory(outputFile);
@@ -46,5 +47,10 @@ public final class ReportWriter {
     public void writeRulesMarkdown(Iterable<RuleDescriptor> rules, Path outputFile) throws IOException {
         ReportWriterSupport.ensureParentDirectory(outputFile);
         Files.writeString(outputFile, rulesMarkdownWriter.write(rules));
+    }
+
+    public void writeRuleGovernance(LintReport report, Path outputFile) throws IOException {
+        ReportWriterSupport.ensureParentDirectory(outputFile);
+        Files.writeString(outputFile, ruleGovernanceJsonWriter.write(report));
     }
 }

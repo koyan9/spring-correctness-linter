@@ -531,6 +531,7 @@ Generated outputs (by default under `target/spring-correctness-linter/`):
 - `lint-report.sarif.json`: SARIF output for code scanning.
 - `baseline-diff.json` / `baseline-diff.html`: new vs matched vs stale baseline entries.
 - `rules-reference.md`: rule metadata and guidance for each rule.
+- `rules-governance.json`: snapshot of enabled rules, domains, and severities for audit/governance workflows.
 
 Key runtime metrics to watch:
 

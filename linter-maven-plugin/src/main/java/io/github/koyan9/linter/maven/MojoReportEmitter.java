@@ -41,6 +41,7 @@ final class MojoReportEmitter {
         }
         if (writeRuleDocs) {
             reportWriter.writeRulesMarkdown(report.rules(), reportsRoot.resolve(ruleDocsFileName));
+            reportWriter.writeRuleGovernance(report, reportsRoot.resolve("rules-governance.json"));
         }
     }
 }

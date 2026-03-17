@@ -41,6 +41,7 @@ All notable changes to `spring-correctness-linter` will be documented in this fi
 - Scheduled trigger configuration checks now treat placeholder values as configured to reduce false positives
 - Baseline and incremental cache loaders now stream files to reduce memory usage on large repositories
 - Maven plugin logs now include cache-miss hints when incremental cache is enabled but no entries were reused
+- Rule-doc generation now also outputs `rules-governance.json` for governance/audit workflows
 - SARIF output now includes module identifiers for multi-module repositories
 - Annotation meta-resolution now prefers same-package and import-based matches when simple names are ambiguous
 - Generated rule reference docs now include recommended domain-based rule bundles for common rollout scenarios

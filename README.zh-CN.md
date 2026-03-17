@@ -533,6 +533,7 @@ A: 解析错误会导致部分分析跳过。请查看报告中的 parse problem
 - `lint-report.sarif.json`：用于 code scanning 的 SARIF 输出。
 - `baseline-diff.json` / `baseline-diff.html`：新问题、baseline 匹配、过期条目。
 - `rules-reference.md`：规则说明与修复建议。
+- `rules-governance.json`：规则启用情况、规则域与严重级别的治理快照。
 
 关键运行指标：
 
