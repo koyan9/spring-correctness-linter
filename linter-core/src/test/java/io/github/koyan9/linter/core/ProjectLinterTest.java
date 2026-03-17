@@ -2228,6 +2228,46 @@ class ProjectLinterTest {
     }
 
     @Test
+    void honorsComposedCacheKeyGeneratorAlias() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("ComposedCacheKeyGenerator.java"), """
+                package demo;
+
+                import org.springframework.cache.annotation.Cacheable;
+                import org.springframework.core.annotation.AliasFor;
+
+                import java.lang.annotation.ElementType;
+                import java.lang.annotation.Retention;
+                import java.lang.annotation.RetentionPolicy;
+                import java.lang.annotation.Target;
+
+                @Target(ElementType.METHOD)
+                @Retention(RetentionPolicy.RUNTIME)
+                @Cacheable
+                @interface KeyedCacheable {
+
+                    @AliasFor(annotation = Cacheable.class, attribute = "keyGenerator")
+                    String keyGenerator() default "";
+                }
+
+                class CacheService {
+
+                    @KeyedCacheable(keyGenerator = "demoKeyGenerator")
+                    public String load(String id) {
+                        return id;
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
+        Set<String> issueIds = report.issues().stream().map(LintIssue::ruleId).collect(Collectors.toSet());
+
+        assertFalse(issueIds.contains("SPRING_CACHEABLE_KEY"));
+    }
+
+    @Test
     void detectsScheduledAsyncAndTransactionalBoundaries() throws Exception {
         Path sourceDirectory = tempDir.resolve("src/main/java/demo");
         Files.createDirectories(sourceDirectory);
