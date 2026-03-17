@@ -9,10 +9,10 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -25,7 +25,7 @@ public final class ProjectContext {
     private final Map<Path, JavaSourceInspector.ParseOutcome> parseOutcomes;
     private final AnnotationMetadataIndex annotationMetadataIndex;
     private final LintOptions options;
-    private final Map<SourceUnit, SpringSemanticFacts> semanticFactsBySourceUnit = new IdentityHashMap<>();
+    private final Map<SourceUnit, SpringSemanticFacts> semanticFactsBySourceUnit = new ConcurrentHashMap<>();
     private volatile TypeResolutionIndex typeResolutionIndex;
 
     private ProjectContext(

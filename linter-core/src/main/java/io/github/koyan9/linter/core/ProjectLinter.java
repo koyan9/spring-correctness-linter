@@ -65,67 +65,29 @@ public final class ProjectLinter {
         Map<String, String> fileModules = new HashMap<>();
         Map<String, ModuleAccumulator> modules = initializeModules(context);
 
+        context.typeResolutionIndex();
+
         long fileAnalysisStartNanos = System.nanoTime();
-        for (SourceDocument sourceDocument : context.sourceDocuments()) {
-            String relativePath = sourceDocument.relativePath(context.projectRoot());
-            fileModules.put(sourceDocument.path().toAbsolutePath().normalize().toString(), sourceDocument.moduleId());
-            ModuleAccumulator module = modules.computeIfAbsent(sourceDocument.moduleId(), ModuleAccumulator::new);
-            module.sourceFileCount++;
-
-            long fileAnalysisStartedAt = System.nanoTime();
-            CachedFileAnalysis cachedAnalysis = cachedAnalyses.get(relativePath);
-            if (cachedAnalysis != null && cachedAnalysis.contentHash().equals(sourceDocument.contentHash())) {
-                cachedFileCount++;
-                module.cachedFileCount++;
-                suppressedIssueCount += cachedAnalysis.suppressedIssueCount();
-                baselineCandidates.addAll(cachedAnalysis.restoreIssues(context.projectRoot()));
-                if (!cachedAnalysis.parseProblemMessages().isEmpty()) {
-                    parseProblems.add(cachedAnalysis.toParseProblem(context.projectRoot()));
-                    module.parseProblemFileCount++;
-                }
-                cacheEntries.add(cachedAnalysis);
-                long elapsed = System.nanoTime() - fileAnalysisStartedAt;
-                module.analysisNanos += elapsed;
-                module.cachedNanos += elapsed;
-                continue;
-            }
-
-            module.analyzedFileCount++;
-            SourceUnit sourceUnit = sourceDocument.toSourceUnit(context.parseOutcomeFor(sourceDocument));
-            if (sourceUnit.hasParseProblems()) {
-                parseProblems.add(new SourceParseProblem(sourceUnit.path(), sourceUnit.parseProblems()));
-                module.parseProblemFileCount++;
-            }
-
-            InlineSuppressions inlineSuppressions = options.honorInlineSuppressions()
-                    ? InlineSuppressions.parse(sourceUnit)
-                    : InlineSuppressions.none();
-            List<LintIssue> fileBaselineCandidates = new ArrayList<>();
-            long fileSuppressedIssueCount = 0;
-            for (LintRule rule : rules) {
-                for (LintIssue issue : rule.evaluate(sourceUnit, context)) {
-                    if (inlineSuppressions.suppresses(issue)) {
-                        fileSuppressedIssueCount++;
-                        continue;
-                    }
-                    fileBaselineCandidates.add(issue);
-                }
-            }
-
-            suppressedIssueCount += fileSuppressedIssueCount;
-            baselineCandidates.addAll(fileBaselineCandidates);
-            cacheEntries.add(CachedFileAnalysis.from(
-                    context.projectRoot(),
-                    sourceDocument,
-                    fileBaselineCandidates,
-                    fileSuppressedIssueCount,
-                    sourceUnit.parseProblems()
-            ));
-            long elapsed = System.nanoTime() - fileAnalysisStartedAt;
-            module.analysisNanos += elapsed;
-            module.analyzedNanos += elapsed;
-        }
+        List<FileAnalysisResult> fileResults = analyzeDocuments(context, options, cachedAnalyses);
         long fileAnalysisNanos = System.nanoTime() - fileAnalysisStartNanos;
+
+        for (FileAnalysisResult result : fileResults) {
+            fileModules.put(result.absolutePathKey(), result.moduleId());
+            ModuleAccumulator module = modules.computeIfAbsent(result.moduleId(), ModuleAccumulator::new);
+            module.sourceFileCount += result.sourceFileCount();
+            module.analyzedFileCount += result.analyzedFileCount();
+            module.cachedFileCount += result.cachedFileCount();
+            module.parseProblemFileCount += result.parseProblemFileCount();
+            module.analysisNanos += result.analysisNanos();
+            module.analyzedNanos += result.analyzedNanos();
+            module.cachedNanos += result.cachedNanos();
+
+            cachedFileCount += result.cachedFileCount();
+            suppressedIssueCount += result.suppressedIssueCount();
+            baselineCandidates.addAll(result.baselineCandidates());
+            parseProblems.addAll(result.parseProblems());
+            cacheEntries.add(result.cacheEntry());
+        }
 
         long cacheWriteStartNanos = System.nanoTime();
         writeCachedAnalyses(options, loadedCachedAnalyses.analysisFingerprint(), cacheEntries);
@@ -346,6 +308,102 @@ public final class ProjectLinter {
         return modules;
     }
 
+    private List<FileAnalysisResult> analyzeDocuments(
+            ProjectContext context,
+            LintOptions options,
+            Map<String, CachedFileAnalysis> cachedAnalyses
+    ) {
+        List<SourceDocument> documents = context.sourceDocuments();
+        if (documents.size() <= 1) {
+            return documents.stream()
+                    .map(document -> analyzeDocument(document, context, options, cachedAnalyses))
+                    .toList();
+        }
+        return documents.parallelStream()
+                .map(document -> analyzeDocument(document, context, options, cachedAnalyses))
+                .toList();
+    }
+
+    private FileAnalysisResult analyzeDocument(
+            SourceDocument sourceDocument,
+            ProjectContext context,
+            LintOptions options,
+            Map<String, CachedFileAnalysis> cachedAnalyses
+    ) {
+        String relativePath = sourceDocument.relativePath(context.projectRoot());
+        String moduleId = sourceDocument.moduleId();
+        String absolutePathKey = sourceDocument.path().toAbsolutePath().normalize().toString();
+
+        long fileAnalysisStartedAt = System.nanoTime();
+        CachedFileAnalysis cachedAnalysis = cachedAnalyses.get(relativePath);
+        if (cachedAnalysis != null && cachedAnalysis.contentHash().equals(sourceDocument.contentHash())) {
+            List<LintIssue> baselineCandidates = cachedAnalysis.restoreIssues(context.projectRoot());
+            List<SourceParseProblem> parseProblems = cachedAnalysis.parseProblemMessages().isEmpty()
+                    ? List.of()
+                    : List.of(cachedAnalysis.toParseProblem(context.projectRoot()));
+            long elapsed = System.nanoTime() - fileAnalysisStartedAt;
+            return new FileAnalysisResult(
+                    moduleId,
+                    relativePath,
+                    absolutePathKey,
+                    baselineCandidates,
+                    parseProblems,
+                    cachedAnalysis.suppressedIssueCount(),
+                    1,
+                    0,
+                    parseProblems.isEmpty() ? 0 : 1,
+                    elapsed,
+                    0,
+                    elapsed,
+                    cachedAnalysis
+            );
+        }
+
+        SourceUnit sourceUnit = sourceDocument.toSourceUnit(context.parseOutcomeFor(sourceDocument));
+        List<SourceParseProblem> parseProblems = sourceUnit.hasParseProblems()
+                ? List.of(new SourceParseProblem(sourceUnit.path(), sourceUnit.parseProblems()))
+                : List.of();
+
+        InlineSuppressions inlineSuppressions = options.honorInlineSuppressions()
+                ? InlineSuppressions.parse(sourceUnit)
+                : InlineSuppressions.none();
+        List<LintIssue> fileBaselineCandidates = new ArrayList<>();
+        long fileSuppressedIssueCount = 0;
+        for (LintRule rule : rules) {
+            for (LintIssue issue : rule.evaluate(sourceUnit, context)) {
+                if (inlineSuppressions.suppresses(issue)) {
+                    fileSuppressedIssueCount++;
+                    continue;
+                }
+                fileBaselineCandidates.add(issue);
+            }
+        }
+
+        CachedFileAnalysis cacheEntry = CachedFileAnalysis.from(
+                context.projectRoot(),
+                sourceDocument,
+                fileBaselineCandidates,
+                fileSuppressedIssueCount,
+                sourceUnit.parseProblems()
+        );
+        long elapsed = System.nanoTime() - fileAnalysisStartedAt;
+        return new FileAnalysisResult(
+                moduleId,
+                relativePath,
+                absolutePathKey,
+                fileBaselineCandidates,
+                parseProblems,
+                fileSuppressedIssueCount,
+                0,
+                1,
+                parseProblems.isEmpty() ? 0 : 1,
+                elapsed,
+                elapsed,
+                0,
+                cacheEntry
+        );
+    }
+
     private String moduleIdForRelativePath(String relativePath, List<SourceRoot> sourceRoots) {
         for (SourceRoot sourceRoot : sourceRoots) {
             String normalizedRoot = sourceRoot.path().toString().replace('\\', '/');
@@ -419,6 +477,32 @@ public final class ProjectLinter {
         private LoadedCachedAnalyses {
             analyses = Map.copyOf(analyses);
             analysisFingerprint = analysisFingerprint == null ? "" : analysisFingerprint;
+        }
+    }
+
+    private record FileAnalysisResult(
+            String moduleId,
+            String relativePath,
+            String absolutePathKey,
+            List<LintIssue> baselineCandidates,
+            List<SourceParseProblem> parseProblems,
+            long suppressedIssueCount,
+            long cachedFileCount,
+            long analyzedFileCount,
+            long parseProblemFileCount,
+            long analysisNanos,
+            long analyzedNanos,
+            long cachedNanos,
+            CachedFileAnalysis cacheEntry
+    ) {
+
+        private FileAnalysisResult {
+            baselineCandidates = List.copyOf(baselineCandidates);
+            parseProblems = List.copyOf(parseProblems);
+        }
+
+        private long sourceFileCount() {
+            return 1;
         }
     }
 }
