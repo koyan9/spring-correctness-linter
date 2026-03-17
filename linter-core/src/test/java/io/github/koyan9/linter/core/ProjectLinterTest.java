@@ -2284,6 +2284,45 @@ class ProjectLinterTest {
     }
 
     @Test
+    void honorsComposedScheduledDelayPlaceholder() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("ComposedDelayScheduled.java"), """
+                package demo;
+
+                import org.springframework.core.annotation.AliasFor;
+                import org.springframework.scheduling.annotation.Scheduled;
+
+                import java.lang.annotation.ElementType;
+                import java.lang.annotation.Retention;
+                import java.lang.annotation.RetentionPolicy;
+                import java.lang.annotation.Target;
+
+                @Target(ElementType.METHOD)
+                @Retention(RetentionPolicy.RUNTIME)
+                @Scheduled
+                @interface DelayScheduled {
+
+                    @AliasFor(annotation = Scheduled.class, attribute = "fixedDelayString")
+                    String delay() default "";
+                }
+
+                class DelayService {
+
+                    @DelayScheduled(delay = "${demo.delay}")
+                    public void delayed() {
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
+        Set<String> issueIds = report.issues().stream().map(LintIssue::ruleId).collect(Collectors.toSet());
+
+        assertFalse(issueIds.contains("SPRING_SCHEDULED_TRIGGER_CONFIGURATION"));
+    }
+
+    @Test
     void flagsRepeatedScheduledTriggersWithComposedConfiguration() throws Exception {
         Path sourceDirectory = tempDir.resolve("src/main/java/demo");
         Files.createDirectories(sourceDirectory);

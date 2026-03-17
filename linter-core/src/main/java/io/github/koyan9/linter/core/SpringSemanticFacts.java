@@ -114,6 +114,23 @@ public final class SpringSemanticFacts {
                 ));
     }
 
+    public ScheduledTriggerSummary scheduledTriggerSummary(MethodDeclaration methodDeclaration) {
+        TriggerValue cron = stringTriggerValue(methodDeclaration, "cron");
+        TriggerValue fixedDelay = merge(
+                numericTriggerValue(methodDeclaration, "fixedDelay"),
+                stringTriggerValue(methodDeclaration, "fixedDelayString")
+        );
+        TriggerValue fixedRate = merge(
+                numericTriggerValue(methodDeclaration, "fixedRate"),
+                stringTriggerValue(methodDeclaration, "fixedRateString")
+        );
+        TriggerValue initialDelay = merge(
+                numericTriggerValue(methodDeclaration, "initialDelay"),
+                stringTriggerValue(methodDeclaration, "initialDelayString")
+        );
+        return new ScheduledTriggerSummary(cron, fixedDelay, fixedRate, initialDelay);
+    }
+
     public boolean isInitializationCallback(TypeDeclaration<?> typeDeclaration, MethodDeclaration methodDeclaration) {
         return JavaSourceInspector.isInitializationCallback(typeDeclaration, methodDeclaration, context);
     }
@@ -124,5 +141,112 @@ public final class SpringSemanticFacts {
 
     public long annotationMatchCount(NodeWithAnnotations<?> node, String simpleName) {
         return JavaSourceInspector.annotationMatchCount(node, context, simpleName);
+    }
+
+    private TriggerValue stringTriggerValue(MethodDeclaration methodDeclaration, String memberName) {
+        return annotationMemberValue(methodDeclaration, "Scheduled", memberName)
+                .map(this::parseStringTriggerValue)
+                .orElse(TriggerValue.missing());
+    }
+
+    private TriggerValue numericTriggerValue(MethodDeclaration methodDeclaration, String memberName) {
+        return annotationMemberValue(methodDeclaration, "Scheduled", memberName)
+                .map(this::parseNumericTriggerValue)
+                .orElse(TriggerValue.missing());
+    }
+
+    private TriggerValue parseStringTriggerValue(String rawValue) {
+        String trimmed = rawValue.trim();
+        if (trimmed.isBlank()) {
+            return TriggerValue.missing();
+        }
+        boolean quoted = trimmed.length() >= 2 && trimmed.startsWith("\"") && trimmed.endsWith("\"");
+        String normalized = quoted ? trimmed.substring(1, trimmed.length() - 1).trim() : trimmed;
+        if (normalized.isBlank()) {
+            return TriggerValue.missing();
+        }
+        if (!quoted || isPlaceholderValue(normalized)) {
+            return TriggerValue.placeholder();
+        }
+        return TriggerValue.literal();
+    }
+
+    private TriggerValue parseNumericTriggerValue(String rawValue) {
+        String normalized = normalizeNumericLiteral(rawValue);
+        if (normalized.isBlank()) {
+            return TriggerValue.missing();
+        }
+        if (isPlaceholderValue(normalized)) {
+            return TriggerValue.placeholder();
+        }
+        try {
+            long parsed = Long.parseLong(normalized);
+            if (parsed == -1) {
+                return TriggerValue.missing();
+            }
+        } catch (NumberFormatException exception) {
+            return TriggerValue.placeholder();
+        }
+        return TriggerValue.literal();
+    }
+
+    private boolean isPlaceholderValue(String value) {
+        return value.contains("${") || value.contains("#{");
+    }
+
+    private String normalizeNumericLiteral(String value) {
+        String normalized = value.trim().replace("_", "");
+        if (normalized.endsWith("L") || normalized.endsWith("l")) {
+            normalized = normalized.substring(0, normalized.length() - 1);
+        }
+        return normalized;
+    }
+
+    private TriggerValue merge(TriggerValue left, TriggerValue right) {
+        if (left.configured || right.configured) {
+            if (left.placeholder || right.placeholder) {
+                return TriggerValue.placeholder();
+            }
+            return TriggerValue.literal();
+        }
+        return TriggerValue.missing();
+    }
+
+    public record ScheduledTriggerSummary(
+            TriggerValue cron,
+            TriggerValue fixedDelay,
+            TriggerValue fixedRate,
+            TriggerValue initialDelay
+    ) {
+
+        public int periodicConfiguredCount() {
+            return (cron.configured ? 1 : 0) + (fixedDelay.configured ? 1 : 0) + (fixedRate.configured ? 1 : 0);
+        }
+
+        public int periodicLiteralCount() {
+            return (cron.literal ? 1 : 0) + (fixedDelay.literal ? 1 : 0) + (fixedRate.literal ? 1 : 0);
+        }
+
+        public boolean periodicHasPlaceholder() {
+            return cron.placeholder || fixedDelay.placeholder || fixedRate.placeholder;
+        }
+
+        public boolean initialDelayConfigured() {
+            return initialDelay.configured;
+        }
+    }
+
+    public record TriggerValue(boolean configured, boolean literal, boolean placeholder) {
+        public static TriggerValue missing() {
+            return new TriggerValue(false, false, false);
+        }
+
+        public static TriggerValue literal() {
+            return new TriggerValue(true, true, false);
+        }
+
+        public static TriggerValue placeholder() {
+            return new TriggerValue(true, false, true);
+        }
     }
 }

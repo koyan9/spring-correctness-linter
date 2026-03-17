@@ -71,126 +71,16 @@ public final class ScheduledTriggerConfigurationRule extends AbstractSpringRule 
                 continue;
             }
 
-            TriggerValue cron = stringTriggerValue(method, facts, "Scheduled", "cron");
-            TriggerValue fixedDelay = merge(
-                    numericTriggerValue(method, facts, "Scheduled", "fixedDelay"),
-                    stringTriggerValue(method, facts, "Scheduled", "fixedDelayString")
-            );
-            TriggerValue fixedRate = merge(
-                    numericTriggerValue(method, facts, "Scheduled", "fixedRate"),
-                    stringTriggerValue(method, facts, "Scheduled", "fixedRateString")
-            );
-            TriggerValue initialDelay = merge(
-                    numericTriggerValue(method, facts, "Scheduled", "initialDelay"),
-                    stringTriggerValue(method, facts, "Scheduled", "initialDelayString")
-            );
+            SpringSemanticFacts.ScheduledTriggerSummary summary = facts.scheduledTriggerSummary(method);
 
-            int periodicConfigured = (cron.configured ? 1 : 0) + (fixedDelay.configured ? 1 : 0) + (fixedRate.configured ? 1 : 0);
-            int periodicLiteral = (cron.literal ? 1 : 0) + (fixedDelay.literal ? 1 : 0) + (fixedRate.literal ? 1 : 0);
-            boolean periodicHasPlaceholder = cron.placeholder || fixedDelay.placeholder || fixedRate.placeholder;
-
-            if (periodicConfigured == 0 && !initialDelay.configured) {
+            if (summary.periodicConfiguredCount() == 0 && !summary.initialDelayConfigured()) {
                 issues.add(issue(sourceUnit, JavaSourceInspector.lineOf(method), "@Scheduled method '" + method.getNameAsString() + "' does not declare an effective trigger configuration."));
                 continue;
             }
-            if (periodicLiteral > 1 && !periodicHasPlaceholder) {
+            if (summary.periodicLiteralCount() > 1 && !summary.periodicHasPlaceholder()) {
                 issues.add(issue(sourceUnit, JavaSourceInspector.lineOf(method), "@Scheduled method '" + method.getNameAsString() + "' combines multiple trigger modes; keep a single periodic schedule configuration."));
             }
         }
         return issues;
-    }
-
-    private TriggerValue stringTriggerValue(MethodDeclaration method, SpringSemanticFacts facts, String annotationName, String memberName) {
-        return facts.annotationMemberValue(method, annotationName, memberName)
-                .map(this::parseStringTriggerValue)
-                .orElse(TriggerValue.missing());
-    }
-
-    private TriggerValue numericTriggerValue(MethodDeclaration method, SpringSemanticFacts facts, String annotationName, String memberName) {
-        return facts.annotationMemberValue(method, annotationName, memberName)
-                .map(this::parseNumericTriggerValue)
-                .orElse(TriggerValue.missing());
-    }
-
-    private TriggerValue parseStringTriggerValue(String rawValue) {
-        String trimmed = rawValue.trim();
-        if (trimmed.isBlank()) {
-            return TriggerValue.missing();
-        }
-        boolean quoted = trimmed.length() >= 2 && trimmed.startsWith("\"") && trimmed.endsWith("\"");
-        String normalized = quoted ? trimmed.substring(1, trimmed.length() - 1).trim() : trimmed;
-        if (normalized.isBlank()) {
-            return TriggerValue.missing();
-        }
-        if (!quoted || isPlaceholderValue(normalized)) {
-            return TriggerValue.placeholder();
-        }
-        return TriggerValue.literal();
-    }
-
-    private TriggerValue parseNumericTriggerValue(String rawValue) {
-        String normalized = normalizeNumericLiteral(rawValue);
-        if (normalized.isBlank()) {
-            return TriggerValue.missing();
-        }
-        if (isPlaceholderValue(normalized)) {
-            return TriggerValue.placeholder();
-        }
-        try {
-            long parsed = Long.parseLong(normalized);
-            if (parsed == -1) {
-                return TriggerValue.missing();
-            }
-        } catch (NumberFormatException exception) {
-            return TriggerValue.placeholder();
-        }
-        return TriggerValue.literal();
-    }
-
-    private boolean isPlaceholderValue(String value) {
-        return value.contains("${") || value.contains("#{");
-    }
-
-    private String normalizeNumericLiteral(String value) {
-        String normalized = value.trim().replace("_", "");
-        if (normalized.endsWith("L") || normalized.endsWith("l")) {
-            normalized = normalized.substring(0, normalized.length() - 1);
-        }
-        return normalized;
-    }
-
-    private TriggerValue merge(TriggerValue left, TriggerValue right) {
-        if (left.configured || right.configured) {
-            if (left.placeholder || right.placeholder) {
-                return TriggerValue.placeholder();
-            }
-            return TriggerValue.literal();
-        }
-        return TriggerValue.missing();
-    }
-
-    private static final class TriggerValue {
-
-        private final boolean configured;
-        private final boolean literal;
-        private final boolean placeholder;
-
-        private TriggerValue(boolean configured, boolean literal, boolean placeholder) {
-            this.configured = configured;
-            this.literal = literal;
-            this.placeholder = placeholder;
-        }
-
-        private static TriggerValue missing() {
-            return new TriggerValue(false, false, false);
-        }
-
-        private static TriggerValue literal() {
-            return new TriggerValue(true, true, false);
-        }
-
-        private static TriggerValue placeholder() {
-            return new TriggerValue(true, false, true);
-        }
     }
 }
