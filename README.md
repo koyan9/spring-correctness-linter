@@ -207,7 +207,7 @@ Rule ids are normalized to uppercase. Rule domains are case-insensitive and acce
 | `spring.correctness.linter.scanReactorModules` | `false` | `true` / `false` | Scan the full Maven reactor from the execution root. Non-root modules are skipped when enabled. |
 | `spring.correctness.linter.includeTestSourceRoots` | `false` | `true` / `false` | Include test compile source roots when resolving source roots. |
 | `spring.correctness.linter.reportDirectory` | `${project.build.directory}/spring-correctness-linter` | Path | Report output directory. |
-| `spring.correctness.linter.formats` | `json,html,sarif` | `json`, `html`, `sarif` | Controls which core report formats to write. Baseline diff and rule docs are controlled separately. |
+| `spring.correctness.linter.formats` | `json,html,sarif` | `json`, `html`, `sarif` | Controls which core report formats to write. Values are case-insensitive; unknown values are ignored with a warning. Baseline diff and rule docs are controlled separately. |
 | `spring.correctness.linter.baselineFile` | `${project.basedir}/spring-correctness-linter-baseline.txt` | Path | Baseline file path used for filtering and/or writing. |
 | `spring.correctness.linter.honorInlineSuppressions` | `true` | `true` / `false` | Enables inline suppression comments. |
 | `spring.correctness.linter.applyBaseline` | `true` | `true` / `false` | Applies baseline filtering to hide known issues. |

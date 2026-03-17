@@ -45,6 +45,17 @@ Track rule-accuracy follow-ups and regression-test priorities in `docs/ACCURACY_
 - Add small, high-confidence correctness checks only if they fit the current reporting and testing model cleanly
 - Gather real-user feedback from sample-driven adoption before committing to broader rule expansion
 
+## Planned improvements (priority order)
+
+1. Validate configuration inputs and warn on unknown report formats or empty outputs
+2. Stream baseline and cache loading to reduce memory pressure on large repositories
+3. Surface cache invalidation hints in logs to explain cache-miss causes
+4. Export a governance snapshot (rule status/severity) for audit workflows
+5. Tackle the top items from `docs/ACCURACY_BACKLOG.md` with focused regression tests
+6. Add module-level extra source root configuration for reactor scans
+7. Evaluate safe per-file parallel analysis for performance gains
+8. Add optional report-field toggles for lightweight outputs
+
 ## Later candidates
 
 - Lightweight rule registration or extension mechanisms beyond the built-in rule list

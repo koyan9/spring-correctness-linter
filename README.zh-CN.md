@@ -210,7 +210,7 @@ JSON 和 HTML 报告现在还会包含运行期指标，便于观察：
 | `spring.correctness.linter.scanReactorModules` | `false` | `true` / `false` | 从执行根扫描整个 Maven reactor；开启后非执行根模块会跳过。 |
 | `spring.correctness.linter.includeTestSourceRoots` | `false` | `true` / `false` | 将测试源码根目录也纳入扫描。 |
 | `spring.correctness.linter.reportDirectory` | `${project.build.directory}/spring-correctness-linter` | 路径 | 报告输出目录。 |
-| `spring.correctness.linter.formats` | `json,html,sarif` | `json`、`html`、`sarif` | 控制核心报告格式。baseline diff 与规则文档由独立开关控制。 |
+| `spring.correctness.linter.formats` | `json,html,sarif` | `json`、`html`、`sarif` | 控制核心报告格式，大小写不敏感，未知值会给出警告并忽略。baseline diff 与规则文档由独立开关控制。 |
 | `spring.correctness.linter.baselineFile` | `${project.basedir}/spring-correctness-linter-baseline.txt` | 路径 | baseline 文件路径，用于过滤和/或写入。 |
 | `spring.correctness.linter.honorInlineSuppressions` | `true` | `true` / `false` | 是否启用 inline suppression 注释。 |
 | `spring.correctness.linter.applyBaseline` | `true` | `true` / `false` | 是否应用 baseline 过滤隐藏已知问题。 |

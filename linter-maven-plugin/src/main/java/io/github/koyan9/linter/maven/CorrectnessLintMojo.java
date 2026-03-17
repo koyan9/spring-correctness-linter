@@ -23,11 +23,14 @@ import org.apache.maven.project.MavenProject;
 import java.io.IOException;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 @Mojo(name = "lint", defaultPhase = LifecyclePhase.VERIFY, threadSafe = true)
 public class CorrectnessLintMojo extends AbstractMojo {
+
+    private static final Set<String> ALLOWED_FORMATS = Set.of("json", "html", "sarif");
 
     private final BaselineFileWriter baselineFileWriter = new BaselineFileWriter();
     private final MojoExecutionPlanBuilder executionPlanBuilder = new MojoExecutionPlanBuilder();
@@ -166,7 +169,19 @@ public class CorrectnessLintMojo extends AbstractMojo {
                 baselineFileWriter.write(plan.projectRoot(), result, report, plan.baselinePath(), plan.moduleBaselineFiles(), getLog());
             }
 
-            reportEmitter.write(result, report, plan.reportsRoot(), formats, writeBaselineDiff && plan.baselinePath() != null, writeRuleDocs, ruleDocsFileName);
+            Set<String> normalizedFormats = normalizeFormats(formats);
+            if (normalizedFormats.isEmpty()) {
+                getLog().warn("spring-correctness-linter: no valid report formats configured; skipping core report outputs.");
+            }
+            reportEmitter.write(
+                    result,
+                    report,
+                    plan.reportsRoot(),
+                    normalizedFormats,
+                    writeBaselineDiff && plan.baselinePath() != null,
+                    writeRuleDocs,
+                    resolveRuleDocsFileName(ruleDocsFileName)
+            );
 
             getLog().info("spring-correctness-linter finished with " + report.issueCount()
                     + " visible issue(s), " + report.suppressedIssueCount() + " inline suppression(s), "
@@ -207,5 +222,32 @@ public class CorrectnessLintMojo extends AbstractMojo {
         } catch (IOException | IllegalArgumentException exception) {
             throw new MojoExecutionException("Failed to execute spring-correctness-linter", exception);
         }
+    }
+
+    private Set<String> normalizeFormats(Set<String> requestedFormats) {
+        Set<String> normalized = new LinkedHashSet<>();
+        if (requestedFormats == null || requestedFormats.isEmpty()) {
+            return normalized;
+        }
+        for (String format : requestedFormats) {
+            if (format == null || format.isBlank()) {
+                continue;
+            }
+            String normalizedFormat = format.trim().toLowerCase(Locale.ROOT);
+            if (!ALLOWED_FORMATS.contains(normalizedFormat)) {
+                getLog().warn("spring-correctness-linter: unknown report format '" + format + "'. Supported formats: " + ALLOWED_FORMATS + ".");
+                continue;
+            }
+            normalized.add(normalizedFormat);
+        }
+        return normalized;
+    }
+
+    private String resolveRuleDocsFileName(String value) {
+        if (value == null || value.isBlank()) {
+            getLog().warn("spring-correctness-linter: ruleDocsFileName is blank; using rules-reference.md");
+            return "rules-reference.md";
+        }
+        return value;
     }
 }
