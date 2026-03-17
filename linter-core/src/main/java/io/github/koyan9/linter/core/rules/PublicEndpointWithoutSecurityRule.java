@@ -5,7 +5,6 @@
 
 package io.github.koyan9.linter.core.rules;
 
-import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.TypeDeclaration;
 import io.github.koyan9.linter.core.JavaSourceInspector;
@@ -16,9 +15,12 @@ import io.github.koyan9.linter.core.ProjectContext;
 import io.github.koyan9.linter.core.SourceUnit;
 import io.github.koyan9.linter.core.SpringSemanticFacts;
 import io.github.koyan9.linter.core.TypeSemanticFacts;
+import io.github.koyan9.linter.core.TypeResolutionIndex;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 public final class PublicEndpointWithoutSecurityRule extends AbstractSpringRule {
 
@@ -81,19 +83,27 @@ public final class PublicEndpointWithoutSecurityRule extends AbstractSpringRule 
 
     private void collectIssues(SourceUnit sourceUnit, ProjectContext context, List<LintIssue> issues) {
         SpringSemanticFacts facts = context.springFacts(sourceUnit);
+        TypeResolutionIndex typeIndex = context.typeResolutionIndex();
         for (TypeDeclaration<?> typeDeclaration : sourceUnit.structure().typeDeclarations()) {
             TypeSemanticFacts typeFacts = facts.typeFacts(typeDeclaration);
             if (!typeFacts.isWebController()) {
                 continue;
             }
 
+            TypeResolutionIndex.TypeDescriptor rootType = typeIndex.descriptorFor(typeDeclaration, sourceUnit);
+            SecurityInheritance securityInheritance = resolveSecurityInheritance(rootType, typeIndex, facts, context.options().customSecurityAnnotations());
+
             boolean classSecured = typeFacts.hasExplicitSecurityIntent()
-                    || hasCustomSecurityIntent(typeFacts.annotationNames(), context.options().customSecurityAnnotations());
+                    || hasCustomSecurityIntent(typeFacts.annotationNames(), context.options().customSecurityAnnotations())
+                    || securityInheritance.classSecured();
             for (MethodDeclaration method : sourceUnit.structure().methodsOf(typeDeclaration)) {
                 MethodSemanticFacts methodFacts = facts.methodFacts(typeDeclaration, method);
                 boolean methodSecured = methodFacts.hasExplicitSecurityIntent()
                         || hasCustomSecurityIntent(methodFacts.annotationNames(), context.options().customSecurityAnnotations());
-                if (methodFacts.isPublicRequestMapping() && !classSecured && !methodSecured) {
+                if (methodFacts.isPublicRequestMapping()
+                        && !classSecured
+                        && !methodSecured
+                        && !securityInheritance.securedMethodSignatures().contains(signatureOf(method))) {
                     issues.add(issue(sourceUnit, JavaSourceInspector.lineOf(method), "Endpoint method '" + method.getNameAsString() + "' is public and mapped but has no explicit security annotation."));
                 }
             }
@@ -110,5 +120,43 @@ public final class PublicEndpointWithoutSecurityRule extends AbstractSpringRule 
             }
         }
         return false;
+    }
+
+    private SecurityInheritance resolveSecurityInheritance(
+            TypeResolutionIndex.TypeDescriptor rootType,
+            TypeResolutionIndex typeIndex,
+            SpringSemanticFacts facts,
+            java.util.Set<String> customSecurityAnnotations
+    ) {
+        boolean inheritedClassSecured = false;
+        Set<MethodSignature> securedMethods = new LinkedHashSet<>();
+        for (TypeResolutionIndex.TypeDescriptor relatedType : typeIndex.relatedTypes(rootType)) {
+            TypeSemanticFacts typeFacts = facts.typeFacts(relatedType.declaration());
+            if (typeFacts.hasExplicitSecurityIntent()
+                    || hasCustomSecurityIntent(typeFacts.annotationNames(), customSecurityAnnotations)) {
+                inheritedClassSecured = true;
+            }
+            for (MethodDeclaration method : relatedType.structure().methodsOf(relatedType.declaration())) {
+                MethodSemanticFacts methodFacts = facts.methodFacts(relatedType.declaration(), method);
+                if (methodFacts.hasExplicitSecurityIntent()
+                        || hasCustomSecurityIntent(methodFacts.annotationNames(), customSecurityAnnotations)) {
+                    securedMethods.add(signatureOf(method));
+                }
+            }
+        }
+        return new SecurityInheritance(inheritedClassSecured, securedMethods);
+    }
+
+    private MethodSignature signatureOf(MethodDeclaration method) {
+        return new MethodSignature(method.getNameAsString(), method.getParameters().size());
+    }
+
+    private record MethodSignature(String name, int arity) {
+    }
+
+    private record SecurityInheritance(boolean classSecured, Set<MethodSignature> securedMethodSignatures) {
+        private SecurityInheritance {
+            securedMethodSignatures = Set.copyOf(securedMethodSignatures);
+        }
     }
 }

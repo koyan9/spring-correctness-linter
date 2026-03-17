@@ -1937,6 +1937,56 @@ class ProjectLinterTest {
     }
 
     @Test
+    void honorsInheritedSecurityAnnotations() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("InheritedSecurity.java"), """
+                package demo;
+
+                import org.springframework.security.access.prepost.PreAuthorize;
+                import org.springframework.web.bind.annotation.GetMapping;
+                import org.springframework.web.bind.annotation.RestController;
+
+                interface SecuredApi {
+
+                    @PreAuthorize("hasRole('ADMIN')")
+                    String secured();
+                }
+
+                @RestController
+                class InterfaceBackedController implements SecuredApi {
+
+                    @Override
+                    @GetMapping("/secured")
+                    public String secured() {
+                        return "ok";
+                    }
+                }
+
+                @PreAuthorize("hasRole('ADMIN')")
+                abstract class SecuredBaseController {
+                }
+
+                @RestController
+                class BaseClassController extends SecuredBaseController {
+
+                    @GetMapping("/base")
+                    public String base() {
+                        return "ok";
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
+        List<LintIssue> issues = report.issues().stream()
+                .filter(issue -> issue.ruleId().equals("SPRING_ENDPOINT_SECURITY"))
+                .toList();
+
+        assertTrue(issues.isEmpty());
+    }
+
+    @Test
     void resolvesAmbiguousSecurityAnnotationsByImports() throws Exception {
         Path sourceDirectory = tempDir.resolve("src/main/java");
         Files.createDirectories(sourceDirectory.resolve("a"));
