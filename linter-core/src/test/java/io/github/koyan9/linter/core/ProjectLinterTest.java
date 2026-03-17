@@ -581,6 +581,90 @@ class ProjectLinterTest {
     }
 
     @Test
+    void allowsComposedCacheNamesInDefaultKeyAllowlist() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("ComposedCacheAllowlist.java"), """
+                package demo;
+
+                import org.springframework.cache.annotation.Cacheable;
+                import org.springframework.core.annotation.AliasFor;
+
+                import java.lang.annotation.ElementType;
+                import java.lang.annotation.Retention;
+                import java.lang.annotation.RetentionPolicy;
+                import java.lang.annotation.Target;
+
+                @Target(ElementType.METHOD)
+                @Retention(RetentionPolicy.RUNTIME)
+                @Cacheable
+                @interface AllowedCacheable {
+
+                    @AliasFor(annotation = Cacheable.class, attribute = "cacheNames")
+                    String[] cacheNames() default {};
+                }
+
+                class CacheService {
+
+                    @AllowedCacheable(cacheNames = "safe")
+                    public String load(String id) {
+                        return id;
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintOptions options = LintOptions.defaults().withCacheDefaultKeyCacheNames(Set.of("safe"));
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"), options).report();
+        Set<String> issueIds = report.issues().stream().map(LintIssue::ruleId).collect(Collectors.toSet());
+
+        assertFalse(issueIds.contains("SPRING_CACHEABLE_KEY"));
+    }
+
+    @Test
+    void allowsComposedCacheConfigNamesInDefaultKeyAllowlist() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("ComposedCacheConfigAllowlist.java"), """
+                package demo;
+
+                import org.springframework.cache.annotation.CacheConfig;
+                import org.springframework.cache.annotation.Cacheable;
+                import org.springframework.core.annotation.AliasFor;
+
+                import java.lang.annotation.ElementType;
+                import java.lang.annotation.Retention;
+                import java.lang.annotation.RetentionPolicy;
+                import java.lang.annotation.Target;
+
+                @Target(ElementType.TYPE)
+                @Retention(RetentionPolicy.RUNTIME)
+                @CacheConfig
+                @interface CacheConfigNames {
+
+                    @AliasFor(annotation = CacheConfig.class, attribute = "cacheNames")
+                    String[] cacheNames() default {};
+                }
+
+                @CacheConfigNames(cacheNames = "safe")
+                class CacheService {
+
+                    @Cacheable
+                    public String load(String id) {
+                        return id;
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintOptions options = LintOptions.defaults().withCacheDefaultKeyCacheNames(Set.of("safe"));
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"), options).report();
+        Set<String> issueIds = report.issues().stream().map(LintIssue::ruleId).collect(Collectors.toSet());
+
+        assertFalse(issueIds.contains("SPRING_CACHEABLE_KEY"));
+    }
+
+    @Test
     void recognizesPostAuthorizeEndpointsAndZeroArgCacheDefaults() throws Exception {
         Path sourceDirectory = tempDir.resolve("src/main/java/demo");
         Files.createDirectories(sourceDirectory);
