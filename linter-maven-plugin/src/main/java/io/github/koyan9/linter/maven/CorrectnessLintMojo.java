@@ -85,6 +85,9 @@ public class CorrectnessLintMojo extends AbstractMojo {
     @Parameter(property = "spring.correctness.linter.ruleDocsFileName", defaultValue = "rules-reference.md")
     private String ruleDocsFileName;
 
+    @Parameter(property = "spring.correctness.linter.lightweightReports", defaultValue = "false")
+    private boolean lightweightReports;
+
     @Parameter(property = "spring.correctness.linter.failOnError", defaultValue = "false")
     private boolean failOnError;
 
@@ -185,8 +188,9 @@ public class CorrectnessLintMojo extends AbstractMojo {
                     plan.reportsRoot(),
                     normalizedFormats,
                     writeBaselineDiff && plan.baselinePath() != null,
-                    writeRuleDocs,
-                    resolveRuleDocsFileName(ruleDocsFileName)
+                    writeRuleDocs && !lightweightReports,
+                    resolveRuleDocsFileName(ruleDocsFileName),
+                    lightweightReports
             );
 
             getLog().info("spring-correctness-linter finished with " + report.issueCount()

@@ -45,6 +45,7 @@ All notable changes to `spring-correctness-linter` will be documented in this fi
 - Rule-doc generation now also outputs `rules-governance.json` for governance/audit workflows
 - SARIF output now includes module identifiers for multi-module repositories
 - Analysis now processes source files in parallel when multiple files are present to improve throughput
+- Added `lightweightReports` to generate smaller JSON outputs for large repositories
 - Annotation meta-resolution now prefers same-package and import-based matches when simple names are ambiguous
 - Generated rule reference docs now include recommended domain-based rule bundles for common rollout scenarios
 - Added an initial `SCHEDULED` rule domain covering invalid trigger configuration, scheduled method parameters, and non-void return-value review

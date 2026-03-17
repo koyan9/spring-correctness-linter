@@ -24,6 +24,11 @@ public final class ReportWriter {
         Files.writeString(outputFile, lintReportJsonWriter.write(report));
     }
 
+    public void writeJson(LintReport report, Path outputFile, ReportDetail detail) throws IOException {
+        ReportWriterSupport.ensureParentDirectory(outputFile);
+        Files.writeString(outputFile, lintReportJsonWriter.write(report, detail));
+    }
+
     public void writeHtml(LintReport report, Path outputFile) throws IOException {
         ReportWriterSupport.ensureParentDirectory(outputFile);
         Files.writeString(outputFile, lintReportHtmlWriter.write(report));
@@ -52,5 +57,10 @@ public final class ReportWriter {
     public void writeRuleGovernance(LintReport report, Path outputFile) throws IOException {
         ReportWriterSupport.ensureParentDirectory(outputFile);
         Files.writeString(outputFile, ruleGovernanceJsonWriter.write(report));
+    }
+
+    public enum ReportDetail {
+        FULL,
+        LIGHT
     }
 }

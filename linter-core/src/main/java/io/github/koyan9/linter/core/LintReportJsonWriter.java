@@ -13,6 +13,10 @@ final class LintReportJsonWriter {
     private final RuleGuidanceJsonSupport ruleGuidanceJsonSupport = new RuleGuidanceJsonSupport();
 
     String write(LintReport report) {
+        return write(report, ReportWriter.ReportDetail.FULL);
+    }
+
+    String write(LintReport report, ReportWriter.ReportDetail detail) {
         StringBuilder builder = new StringBuilder();
         builder.append("{\n");
         builder.append("  \"generatedAt\": \"").append(report.generatedAt()).append("\",\n");
@@ -52,6 +56,11 @@ final class LintReportJsonWriter {
         builder.append("}\n");
         builder.append("  },\n");
         appendRuleDomainSelection(builder, report.ruleDomainSelection());
+        if (detail == ReportWriter.ReportDetail.LIGHT) {
+            builder.append("\n");
+            builder.append("}\n");
+            return builder.toString();
+        }
         builder.append(",\n");
         builder.append("  \"runtimeMetrics\": {\n");
         builder.append("    \"incrementalCacheEnabled\": ").append(report.runtimeMetrics().incrementalCacheEnabled()).append(",\n");

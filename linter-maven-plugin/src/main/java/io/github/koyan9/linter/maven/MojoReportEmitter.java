@@ -24,10 +24,15 @@ final class MojoReportEmitter {
             Set<String> formats,
             boolean writeBaselineDiff,
             boolean writeRuleDocs,
-            String ruleDocsFileName
+            String ruleDocsFileName,
+            boolean lightweightReports
     ) throws IOException {
         if (formats.contains("json")) {
-            reportWriter.writeJson(report, reportsRoot.resolve("lint-report.json"));
+            if (lightweightReports) {
+                reportWriter.writeJson(report, reportsRoot.resolve("lint-report.json"), ReportWriter.ReportDetail.LIGHT);
+            } else {
+                reportWriter.writeJson(report, reportsRoot.resolve("lint-report.json"));
+            }
         }
         if (formats.contains("html")) {
             reportWriter.writeHtml(report, reportsRoot.resolve("lint-report.html"));

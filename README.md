@@ -216,6 +216,7 @@ Rule ids are normalized to uppercase. Rule domains are case-insensitive and acce
 | `spring.correctness.linter.writeBaselineDiff` | `true` | `true` / `false` | Writes `baseline-diff.json` and `baseline-diff.html` when a baseline path is configured. |
 | `spring.correctness.linter.writeRuleDocs` | `true` | `true` / `false` | Writes the generated rule reference markdown. |
 | `spring.correctness.linter.ruleDocsFileName` | `rules-reference.md` | File name or path | File name (or relative path) for the generated rules reference under the report directory. |
+| `spring.correctness.linter.lightweightReports` | `false` | `true` / `false` | Writes a lightweight `lint-report.json` (summary + selection only) to reduce report size. HTML/SARIF outputs are unchanged. |
 | `spring.correctness.linter.failOnSeverity` | _unset_ | `INFO`, `WARNING`, `ERROR` | Fails the build when any visible issue meets or exceeds the threshold. Takes precedence over `failOnError`. |
 | `spring.correctness.linter.failOnError` | `false` | `true` / `false` | Fails the build when any visible issue remains, only when `failOnSeverity` is not set. |
 | `spring.correctness.linter.enabledRules` | _empty_ | Rule IDs | Enables only the specified rule IDs. Unknown IDs fail the build. |
@@ -457,6 +458,7 @@ Only JSON output, custom report directory, no rule docs:
   <formats>
     <format>json</format>
   </formats>
+  <lightweightReports>true</lightweightReports>
   <writeRuleDocs>false</writeRuleDocs>
 </configuration>
 ```
