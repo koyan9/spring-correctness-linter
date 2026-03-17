@@ -39,6 +39,7 @@ All notable changes to `spring-correctness-linter` will be documented in this fi
 - Maven plugin logs now include cache hit rate and slow-module summaries for multi-module scans
 - Slow-module summaries now focus on analyzed time to avoid cache-only skew
 - Scheduled trigger configuration checks now treat placeholder values as configured to reduce false positives
+- Baseline and incremental cache loaders now stream files to reduce memory usage on large repositories
 - SARIF output now includes module identifiers for multi-module repositories
 - Annotation meta-resolution now prefers same-package and import-based matches when simple names are ambiguous
 - Generated rule reference docs now include recommended domain-based rule bundles for common rollout scenarios

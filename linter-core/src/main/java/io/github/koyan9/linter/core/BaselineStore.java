@@ -25,14 +25,17 @@ public final class BaselineStore {
         }
 
         Set<BaselineEntry> entries = new LinkedHashSet<>();
-        for (String line : Files.readAllLines(baselineFile)) {
-            if (line.isBlank() || line.startsWith("#")) {
-                continue;
-            }
+        try (java.io.BufferedReader reader = Files.newBufferedReader(baselineFile)) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (line.isBlank() || line.startsWith("#")) {
+                    continue;
+                }
 
-            BaselineEntry entry = parseEntry(line);
-            if (entry != null) {
-                entries.add(entry);
+                BaselineEntry entry = parseEntry(line);
+                if (entry != null) {
+                    entries.add(entry);
+                }
             }
         }
         return entries;

@@ -28,52 +28,54 @@ public final class AnalysisCacheStore {
             return CacheState.empty();
         }
 
-        List<String> lines = Files.readAllLines(cacheFile);
         Map<String, MutableAnalysis> analyses = new LinkedHashMap<>();
         String cachedFingerprint = null;
 
-        for (String line : lines) {
-            if (line.isBlank() || line.startsWith("#")) {
-                continue;
-            }
-            String[] parts = line.split("\t");
-            if (parts.length == 0) {
-                continue;
-            }
+        try (java.io.BufferedReader reader = Files.newBufferedReader(cacheFile)) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (line.isBlank() || line.startsWith("#")) {
+                    continue;
+                }
+                String[] parts = line.split("\t");
+                if (parts.length == 0) {
+                    continue;
+                }
 
-            switch (parts[0]) {
-                case "fingerprint" -> {
-                    if (parts.length >= 2) {
-                        cachedFingerprint = parts[1];
+                switch (parts[0]) {
+                    case "fingerprint" -> {
+                        if (parts.length >= 2) {
+                            cachedFingerprint = parts[1];
+                        }
                     }
-                }
-                case "file" -> {
-                    if (parts.length >= 4) {
-                        String relativePath = decode(parts[1]);
-                        String moduleId = parts.length >= 5 ? decode(parts[4]) : ".";
-                        analyses.put(relativePath, new MutableAnalysis(relativePath, parts[2], Long.parseLong(parts[3]), moduleId));
+                    case "file" -> {
+                        if (parts.length >= 4) {
+                            String relativePath = decode(parts[1]);
+                            String moduleId = parts.length >= 5 ? decode(parts[4]) : ".";
+                            analyses.put(relativePath, new MutableAnalysis(relativePath, parts[2], Long.parseLong(parts[3]), moduleId));
+                        }
                     }
-                }
-                case "parse" -> {
-                    if (parts.length >= 3) {
-                        String relativePath = decode(parts[1]);
-                        analyses.computeIfAbsent(relativePath, key -> new MutableAnalysis(relativePath, "", 0L, "."))
-                                .parseProblemMessages.add(decode(parts[2]));
+                    case "parse" -> {
+                        if (parts.length >= 3) {
+                            String relativePath = decode(parts[1]);
+                            analyses.computeIfAbsent(relativePath, key -> new MutableAnalysis(relativePath, "", 0L, "."))
+                                    .parseProblemMessages.add(decode(parts[2]));
+                        }
                     }
-                }
-                case "issue" -> {
-                    if (parts.length >= 6) {
-                        String relativePath = decode(parts[1]);
-                        analyses.computeIfAbsent(relativePath, key -> new MutableAnalysis(relativePath, "", 0L, "."))
-                                .issues.add(new CachedFileAnalysis.CachedIssue(
-                                        parts[2],
-                                        LintSeverity.valueOf(parts[3]),
-                                        Integer.parseInt(parts[4]),
-                                        decode(parts[5])
-                                ));
+                    case "issue" -> {
+                        if (parts.length >= 6) {
+                            String relativePath = decode(parts[1]);
+                            analyses.computeIfAbsent(relativePath, key -> new MutableAnalysis(relativePath, "", 0L, "."))
+                                    .issues.add(new CachedFileAnalysis.CachedIssue(
+                                            parts[2],
+                                            LintSeverity.valueOf(parts[3]),
+                                            Integer.parseInt(parts[4]),
+                                            decode(parts[5])
+                                    ));
+                        }
                     }
-                }
-                default -> {
+                    default -> {
+                    }
                 }
             }
         }
