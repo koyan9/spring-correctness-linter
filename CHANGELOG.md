@@ -4,6 +4,8 @@ All notable changes to `spring-correctness-linter` will be documented in this fi
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-03-18
+
 ### Added
 
 - Multi-source-root and Maven reactor module scanning support
