@@ -146,48 +146,48 @@ public final class SpringSemanticFacts {
     private TriggerValue stringTriggerValue(MethodDeclaration methodDeclaration, String memberName) {
         return annotationMemberValue(methodDeclaration, "Scheduled", memberName)
                 .map(this::parseStringTriggerValue)
-                .orElse(TriggerValue.missing());
+                .orElse(TriggerValue.missingValue());
     }
 
     private TriggerValue numericTriggerValue(MethodDeclaration methodDeclaration, String memberName) {
         return annotationMemberValue(methodDeclaration, "Scheduled", memberName)
                 .map(this::parseNumericTriggerValue)
-                .orElse(TriggerValue.missing());
+                .orElse(TriggerValue.missingValue());
     }
 
     private TriggerValue parseStringTriggerValue(String rawValue) {
         String trimmed = rawValue.trim();
         if (trimmed.isBlank()) {
-            return TriggerValue.missing();
+            return TriggerValue.missingValue();
         }
         boolean quoted = trimmed.length() >= 2 && trimmed.startsWith("\"") && trimmed.endsWith("\"");
         String normalized = quoted ? trimmed.substring(1, trimmed.length() - 1).trim() : trimmed;
         if (normalized.isBlank()) {
-            return TriggerValue.missing();
+            return TriggerValue.missingValue();
         }
         if (!quoted || isPlaceholderValue(normalized)) {
-            return TriggerValue.placeholder();
+            return TriggerValue.placeholderValue();
         }
-        return TriggerValue.literal();
+        return TriggerValue.literalValue();
     }
 
     private TriggerValue parseNumericTriggerValue(String rawValue) {
         String normalized = normalizeNumericLiteral(rawValue);
         if (normalized.isBlank()) {
-            return TriggerValue.missing();
+            return TriggerValue.missingValue();
         }
         if (isPlaceholderValue(normalized)) {
-            return TriggerValue.placeholder();
+            return TriggerValue.placeholderValue();
         }
         try {
             long parsed = Long.parseLong(normalized);
             if (parsed == -1) {
-                return TriggerValue.missing();
+                return TriggerValue.missingValue();
             }
         } catch (NumberFormatException exception) {
-            return TriggerValue.placeholder();
+            return TriggerValue.placeholderValue();
         }
-        return TriggerValue.literal();
+        return TriggerValue.literalValue();
     }
 
     private boolean isPlaceholderValue(String value) {
@@ -205,11 +205,11 @@ public final class SpringSemanticFacts {
     private TriggerValue merge(TriggerValue left, TriggerValue right) {
         if (left.configured || right.configured) {
             if (left.placeholder || right.placeholder) {
-                return TriggerValue.placeholder();
+                return TriggerValue.placeholderValue();
             }
-            return TriggerValue.literal();
+            return TriggerValue.literalValue();
         }
-        return TriggerValue.missing();
+        return TriggerValue.missingValue();
     }
 
     public record ScheduledTriggerSummary(
@@ -237,15 +237,15 @@ public final class SpringSemanticFacts {
     }
 
     public record TriggerValue(boolean configured, boolean literal, boolean placeholder) {
-        public static TriggerValue missing() {
+        public static TriggerValue missingValue() {
             return new TriggerValue(false, false, false);
         }
 
-        public static TriggerValue literal() {
+        public static TriggerValue literalValue() {
             return new TriggerValue(true, true, false);
         }
 
-        public static TriggerValue placeholder() {
+        public static TriggerValue placeholderValue() {
             return new TriggerValue(true, false, true);
         }
     }

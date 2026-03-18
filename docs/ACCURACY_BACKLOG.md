@@ -52,7 +52,7 @@ Current strengths:
 - Includes multi-level inheritance across source roots when type names can be resolved
 - Resolves explicit and wildcard imports for inherited targets, including nested types
 - Treats proxy-injection patterns (self-injection or ApplicationContext lookups) as out of scope when no explicit self-call is present
-- Ignores method references (`this::method`) for self-invocation detection
+- Flags direct self method references such as `this::method`
 - Keeps the rule simple and low-noise for the common proxy-bypass pattern
 
 Remaining accuracy gaps:

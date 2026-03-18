@@ -8,6 +8,7 @@ package io.github.koyan9.linter.core.rules;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.TypeDeclaration;
 import com.github.javaparser.ast.expr.MethodCallExpr;
+import com.github.javaparser.ast.expr.MethodReferenceExpr;
 import com.github.javaparser.ast.expr.ThisExpr;
 import io.github.koyan9.linter.core.JavaSourceInspector;
 import io.github.koyan9.linter.core.LintIssue;
@@ -59,7 +60,8 @@ public final class AsyncSelfInvocationRule extends AbstractSpringRule {
                 "Projects using AspectJ weaving or explicit executor submission may intentionally allow this pattern.",
                 "The rule matches same-type calls by method name and argument count and supports varargs, but does not fully resolve imported-static edge cases.",
                 "Class-level @Async is treated as applying to public methods, and type resolution is best-effort without a full symbol solver.",
-                "Proxy-injection patterns such as self-injection or ApplicationContext lookups are treated as external calls unless there is an explicit self-call."
+                "Proxy-injection patterns such as self-injection or ApplicationContext lookups are treated as external calls unless there is an explicit self-call.",
+                "Method references are only checked for direct `this::method` or `ClassName::method` usage inside the same type."
         );
     }
 
@@ -86,6 +88,8 @@ public final class AsyncSelfInvocationRule extends AbstractSpringRule {
             Set<MethodSignature> exactAsyncMethods = new LinkedHashSet<>();
             Set<MethodSignature> exactNonAsyncMethods = new LinkedHashSet<>();
             Set<VarArgsSignature> varArgsAsyncMethods = new LinkedHashSet<>();
+            Set<String> asyncMethodNames = new LinkedHashSet<>();
+            Set<String> nonAsyncMethodNames = new LinkedHashSet<>();
 
             for (TypeResolutionIndex.TypeDescriptor relatedType : typeIndex.relatedTypes(rootType)) {
                 boolean classAsync = facts.typeFacts(relatedType.declaration()).hasAsyncBoundary();
@@ -102,8 +106,10 @@ public final class AsyncSelfInvocationRule extends AbstractSpringRule {
                     MethodSignature signature = new MethodSignature(method.getNameAsString(), method.getParameters().size());
                     if (async) {
                         exactAsyncMethods.add(signature);
+                        asyncMethodNames.add(method.getNameAsString());
                     } else {
                         exactNonAsyncMethods.add(signature);
+                        nonAsyncMethodNames.add(method.getNameAsString());
                     }
                 }
             }
@@ -123,6 +129,11 @@ public final class AsyncSelfInvocationRule extends AbstractSpringRule {
                             varArgsAsyncMethods
                     )) {
                         issues.add(issue(sourceUnit, JavaSourceInspector.lineOf(methodCall), "Method '" + methodCall.getNameAsString() + "' is @Async and invoked via self-call; async advice will not run."));
+                    }
+                }
+                for (MethodReferenceExpr methodReference : method.findAll(MethodReferenceExpr.class)) {
+                    if (isAsyncSelfReference(typeDeclaration, methodReference, asyncMethodNames, nonAsyncMethodNames)) {
+                        issues.add(issue(sourceUnit, JavaSourceInspector.lineOf(methodReference), "Method reference '" + methodReference.getIdentifier() + "' targets an @Async method via self-reference; async advice will not run."));
                     }
                 }
             }
@@ -155,9 +166,44 @@ public final class AsyncSelfInvocationRule extends AbstractSpringRule {
                 .orElse(false);
     }
 
+    private boolean belongsToCurrentType(TypeDeclaration<?> typeDeclaration, MethodReferenceExpr methodReference) {
+        return methodReference.findAncestor(TypeDeclaration.class)
+                .map(typeDeclaration::equals)
+                .orElse(false);
+    }
+
     private boolean isDirectSameTypeCall(MethodCallExpr methodCall) {
         return methodCall.getScope().isEmpty()
                 || methodCall.getScope().filter(ThisExpr.class::isInstance).isPresent();
+    }
+
+    private boolean isAsyncSelfReference(
+            TypeDeclaration<?> typeDeclaration,
+            MethodReferenceExpr methodReference,
+            Set<String> asyncMethodNames,
+            Set<String> nonAsyncMethodNames
+    ) {
+        if (!belongsToCurrentType(typeDeclaration, methodReference)) {
+            return false;
+        }
+        String identifier = methodReference.getIdentifier();
+        if ("new".equals(identifier)) {
+            return false;
+        }
+        if (!isDirectSelfReference(typeDeclaration, methodReference)) {
+            return false;
+        }
+        if (nonAsyncMethodNames.contains(identifier)) {
+            return false;
+        }
+        return asyncMethodNames.contains(identifier);
+    }
+
+    private boolean isDirectSelfReference(TypeDeclaration<?> typeDeclaration, MethodReferenceExpr methodReference) {
+        if (methodReference.getScope() instanceof ThisExpr) {
+            return true;
+        }
+        return methodReference.getScope().toString().equals(typeDeclaration.getNameAsString());
     }
 
     private boolean isDirectRecursiveCall(MethodDeclaration enclosingMethod, MethodCallExpr methodCall) {

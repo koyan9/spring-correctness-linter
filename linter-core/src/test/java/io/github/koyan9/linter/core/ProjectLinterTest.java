@@ -176,6 +176,38 @@ class ProjectLinterTest {
         assertTrue(issues.get(0).message().contains("asyncWork"));
     }
 
+    @Test
+    void flagsMethodReferencesForAsyncSelfInvocation() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("AsyncSelfInvocationMethodRef.java"), """
+                package demo;
+
+                import org.springframework.scheduling.annotation.Async;
+
+                class AsyncSelfInvocationMethodRef {
+
+                    public void outer() {
+                        Runnable task = this::asyncWork;
+                        task.run();
+                    }
+
+                    @Async
+                    public void asyncWork() {
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
+        List<LintIssue> issues = report.issues().stream()
+                .filter(issue -> issue.ruleId().equals("SPRING_ASYNC_SELF_INVOCATION"))
+                .toList();
+
+        assertEquals(1, issues.size());
+        assertTrue(issues.get(0).message().contains("asyncWork"));
+    }
+
 
     @Test
     void detectsAsyncTransactionalBoundary() throws Exception {
