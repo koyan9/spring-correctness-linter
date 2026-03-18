@@ -57,6 +57,7 @@ All notable changes to `spring-correctness-linter` will be documented in this fi
 - Cache default-key allowlist matching is now exact, avoiding substring-based false negatives
 - Centralized security auto-detection now also recognizes reactive `SecurityWebFilterChain` beans
 - Added opt-in auto-detection for project-wide `KeyGenerator` beans to reduce cache-key noise
+- Project-wide cache key auto-detection now also recognizes `CachingConfigurer` / `CachingConfigurerSupport`
 - Annotation meta-resolution now prefers same-package and import-based matches when simple names are ambiguous
 - Generated rule reference docs now include recommended domain-based rule bundles for common rollout scenarios
 - Added an initial `SCHEDULED` rule domain covering invalid trigger configuration, scheduled method parameters, and non-void return-value review

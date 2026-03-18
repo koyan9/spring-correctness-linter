@@ -833,6 +833,49 @@ class CorrectnessLintMojoTest {
         assertFalse(json.contains("\"ruleId\": \"SPRING_CACHEABLE_KEY\""));
     }
 
+    @Test
+    void autoDetectsCachingConfigurerKeyGenerator() throws Exception {
+        Path sourceDirectory = writeSource("""
+                package demo;
+
+                import org.springframework.cache.annotation.Cacheable;
+                import org.springframework.cache.annotation.CachingConfigurerSupport;
+                import org.springframework.cache.interceptor.KeyGenerator;
+
+                class ProjectKeyGeneratorConfig extends CachingConfigurerSupport {
+
+                    @Override
+                    public KeyGenerator keyGenerator() {
+                        return (target, method, params) -> params.length;
+                    }
+                }
+
+                class CacheService {
+
+                    @Cacheable(cacheNames = "demo")
+                    public String load(String id) {
+                        return id;
+                    }
+                }
+                """);
+        Path reportsDirectory = tempDir.resolve("target/reports-caching-configurer");
+
+        CorrectnessLintMojo mojo = configuredMojo(
+                sourceDirectory,
+                reportsDirectory,
+                tempDir.resolve("spring-correctness-linter-baseline.txt")
+        );
+        setField(mojo, "applyBaseline", false);
+        setField(mojo, "autoDetectProjectWideKeyGenerator", true);
+        setField(mojo, "formats", new LinkedHashSet<>(Set.of("json")));
+
+        mojo.execute();
+
+        String json = Files.readString(reportsDirectory.resolve("lint-report.json"));
+        assertTrue(json.contains("\"issueCount\": 0"));
+        assertFalse(json.contains("\"ruleId\": \"SPRING_CACHEABLE_KEY\""));
+    }
+
     private Path writeSource(String content) throws Exception {
         Path sourceDirectory = tempDir.resolve("src/main/java/demo");
         Files.createDirectories(sourceDirectory);

@@ -231,7 +231,7 @@ JSON 和 HTML 报告现在还会包含运行期指标，便于观察：
 | `spring.correctness.linter.autoDetectCentralizedSecurity` | `false` | `true` / `false` | 当检测到 `SecurityFilterChain` 或 `SecurityWebFilterChain` Bean 时自动跳过 `SPRING_ENDPOINT_SECURITY`。 |
 | `spring.correctness.linter.securityAnnotations` | 空 | 注解名 | 额外安全注解视为显式安全意图，支持简单名或全限定名（允许前缀 `@`）。 |
 | `spring.correctness.linter.cacheDefaultKeyCacheNames` | 空 | cache 名称或 `*` | 指定 cache 名称允许默认 key；`*` 表示全部允许。 |
-| `spring.correctness.linter.autoDetectProjectWideKeyGenerator` | `false` | `true` / `false` | 当检测到项目级 `@Bean KeyGenerator` 时自动跳过 `SPRING_CACHEABLE_KEY`。 |
+| `spring.correctness.linter.autoDetectProjectWideKeyGenerator` | `false` | `true` / `false` | 当检测到项目级 `@Bean KeyGenerator`，或 `CachingConfigurer` / `CachingConfigurerSupport` 提供的 key generator 时自动跳过 `SPRING_CACHEABLE_KEY`。 |
 | `spring.correctness.linter.cacheFile` | `${project.build.directory}/spring-correctness-linter/analysis-cache.txt` | 路径 | 增量缓存文件路径（缓存关闭或按模块拆分时忽略）。 |
 | `spring.correctness.linter.useIncrementalCache` | `true` | `true` / `false` | 是否启用增量缓存复用。 |
 | `spring.correctness.linter.parallelFileAnalysis` | `true` | `true` / `false` | 当存在多个源码文件时，是否启用按文件并行分析。 |
@@ -264,7 +264,7 @@ JSON 和 HTML 报告现在还会包含运行期指标，便于观察：
 </configuration>
 ```
 
-如果项目统一约定了全局 `KeyGenerator` Bean，也可以显式开启自动检测：
+如果项目统一约定了全局 `KeyGenerator` Bean，或通过 `CachingConfigurer` / `CachingConfigurerSupport` 暴露统一 key generator，也可以显式开启自动检测：
 
 ```xml
 <configuration>

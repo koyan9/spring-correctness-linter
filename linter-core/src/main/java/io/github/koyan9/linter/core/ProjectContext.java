@@ -233,6 +233,9 @@ public final class ProjectContext {
                         break;
                     }
                 }
+                if (!found && declaresProjectWideKeyGenerator(sourceUnit)) {
+                    found = true;
+                }
                 if (found) {
                     break;
                 }
@@ -240,6 +243,26 @@ public final class ProjectContext {
             keyGeneratorBeanPresent = found;
             return found;
         }
+    }
+
+    private boolean declaresProjectWideKeyGenerator(SourceUnit sourceUnit) {
+        for (com.github.javaparser.ast.body.TypeDeclaration<?> typeDeclaration : sourceUnit.structure().typeDeclarations()) {
+            if (!isCachingConfigurerType(typeDeclaration)) {
+                continue;
+            }
+            for (com.github.javaparser.ast.body.MethodDeclaration method : sourceUnit.structure().methodsOf(typeDeclaration)) {
+                if (!"keyGenerator".equals(method.getNameAsString())) {
+                    continue;
+                }
+                if (!method.getParameters().isEmpty()) {
+                    continue;
+                }
+                if (isKeyGeneratorType(method.getType().toString())) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private boolean isSecurityFilterChainType(String rawType) {
@@ -268,5 +291,24 @@ public final class ProjectContext {
         int lastDot = stripped.lastIndexOf('.');
         String simpleName = lastDot >= 0 ? stripped.substring(lastDot + 1) : stripped;
         return "KeyGenerator".equals(simpleName);
+    }
+
+    private boolean isCachingConfigurerType(com.github.javaparser.ast.body.TypeDeclaration<?> typeDeclaration) {
+        if (!(typeDeclaration instanceof com.github.javaparser.ast.body.ClassOrInterfaceDeclaration classOrInterfaceDeclaration)) {
+            return false;
+        }
+        for (com.github.javaparser.ast.type.ClassOrInterfaceType implementedType : classOrInterfaceDeclaration.getImplementedTypes()) {
+            String simpleName = implementedType.getName().getIdentifier();
+            if ("CachingConfigurer".equals(simpleName)) {
+                return true;
+            }
+        }
+        for (com.github.javaparser.ast.type.ClassOrInterfaceType extendedType : classOrInterfaceDeclaration.getExtendedTypes()) {
+            String simpleName = extendedType.getName().getIdentifier();
+            if ("CachingConfigurerSupport".equals(simpleName)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

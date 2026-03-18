@@ -790,6 +790,43 @@ class ProjectLinterTest {
     }
 
     @Test
+    void autoDetectsCachingConfigurerKeyGeneratorWhenEnabled() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("CachingConfigurerSupportConfig.java"), """
+                package demo;
+
+                import org.springframework.cache.annotation.Cacheable;
+                import org.springframework.cache.annotation.CachingConfigurer;
+                import org.springframework.cache.interceptor.KeyGenerator;
+
+                class CachingConfigurerSupportConfig implements CachingConfigurer {
+
+                    @Override
+                    public KeyGenerator keyGenerator() {
+                        return (target, method, params) -> params.length;
+                    }
+                }
+
+                class CacheService {
+
+                    @Cacheable(cacheNames = "demo")
+                    public String load(String id) {
+                        return id;
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport defaultReport = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
+        assertTrue(defaultReport.issues().stream().anyMatch(issue -> issue.ruleId().equals("SPRING_CACHEABLE_KEY")));
+
+        LintOptions options = LintOptions.defaults().withAutoDetectProjectWideKeyGenerator(true);
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"), options).report();
+        assertFalse(report.issues().stream().anyMatch(issue -> issue.ruleId().equals("SPRING_CACHEABLE_KEY")));
+    }
+
+    @Test
     void recognizesPostAuthorizeEndpointsAndZeroArgCacheDefaults() throws Exception {
         Path sourceDirectory = tempDir.resolve("src/main/java/demo");
         Files.createDirectories(sourceDirectory);
