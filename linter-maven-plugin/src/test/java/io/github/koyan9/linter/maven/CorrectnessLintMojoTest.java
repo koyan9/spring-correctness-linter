@@ -730,6 +730,27 @@ class CorrectnessLintMojoTest {
     }
 
     @Test
+    void rejectsNegativeFileAnalysisParallelism() throws Exception {
+        Path sourceDirectory = writeSource("""
+                package demo;
+
+                class AsyncOnly {
+                }
+                """);
+
+        CorrectnessLintMojo mojo = configuredMojo(
+                sourceDirectory,
+                tempDir.resolve("target/reports-invalid-parallelism"),
+                tempDir.resolve("spring-correctness-linter-baseline.txt")
+        );
+        setField(mojo, "applyBaseline", false);
+        setField(mojo, "fileAnalysisParallelism", -1);
+
+        Exception exception = assertThrows(Exception.class, mojo::execute);
+        assertTrue(containsMessage(exception, "fileAnalysisParallelism"));
+    }
+
+    @Test
     void includesModuleSpecificSourceDirectories() throws Exception {
         Path sourceDirectory = writeSource("""
                 package demo;
@@ -788,9 +809,14 @@ class CorrectnessLintMojoTest {
         setField(mojo, "writeBaselineDiff", true);
         setField(mojo, "writeRuleDocs", true);
         setField(mojo, "ruleDocsFileName", "rules-reference.md");
+        setField(mojo, "lightweightReports", false);
         setField(mojo, "failOnError", false);
         setField(mojo, "useIncrementalCache", false);
+        setField(mojo, "parallelFileAnalysis", true);
+        setField(mojo, "fileAnalysisParallelism", 0);
         setField(mojo, "cacheFile", tempDir.resolve("analysis-cache.txt").toFile());
+        setField(mojo, "assumeCentralizedSecurity", false);
+        setField(mojo, "autoDetectCentralizedSecurity", false);
         MavenProject project = new MavenProject();
         project.setFile(tempDir.resolve("pom.xml").toFile());
         project.setExecutionRoot(true);
@@ -804,5 +830,16 @@ class CorrectnessLintMojoTest {
         Field field = CorrectnessLintMojo.class.getDeclaredField(fieldName);
         field.setAccessible(true);
         field.set(target, value);
+    }
+
+    private boolean containsMessage(Throwable throwable, String fragment) {
+        Throwable current = throwable;
+        while (current != null) {
+            if (current.getMessage() != null && current.getMessage().contains(fragment)) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 }
