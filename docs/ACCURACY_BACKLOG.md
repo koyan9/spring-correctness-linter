@@ -14,6 +14,8 @@ boundaries for a few high-impact checks.
 Current strengths:
 - Recognizes common method-security annotations and composed/meta-annotations
 - Reuses controller and request-mapping semantics through shared semantic facts
+- Honors inherited security intent from interfaces and base classes
+- Supports opt-in centralized-security auto-detection for `SecurityFilterChain` and `SecurityWebFilterChain`
 
 Remaining accuracy gaps:
 - Does not model centralized `SecurityFilterChain`, gateway policy, or path-based authorization rules
@@ -23,6 +25,7 @@ Remaining accuracy gaps:
 Recommended next tests:
 - [done] Method-level composed security annotations, including `@AliasFor` forwarding and `@PreFilter` usage
 - [done] Suppression guidance for teams with centralized security policy
+- [done] Auto-detection for servlet and reactive centralized-security beans
 
 ### `SPRING_CACHEABLE_KEY`
 
@@ -31,16 +34,22 @@ Current strengths:
 - Excludes zero-argument `@Cacheable` methods because Spring's default key is already stable there
 - Honors class-level `@CacheConfig(keyGenerator = ...)` as an explicit cache key strategy
 - Recognizes composed annotations that forward `keyGenerator` via `@AliasFor`
+- Treats blank `key` / `keyGenerator` values as missing
+- Supports exact allowlist matching for direct and composed cache names, including `@CacheConfig`
+- Supports opt-in auto-detection of project-wide `@Bean KeyGenerator` usage
 
 Remaining accuracy gaps:
 - Still warns on parameterized methods that intentionally rely on Spring's default key generation
 - Does not distinguish teams that standardize on cache conventions outside the method declaration site
-- Could benefit from better coverage for overloaded signatures and additional composed cache annotations
+- Could benefit from broader project-level key-convention modeling beyond direct `KeyGenerator` bean detection
 
 Recommended next tests:
 - [done] Parameterized methods that intentionally rely on default key generation
 - [done] Overloaded `@Cacheable` methods with shared cache names
 - [done] Additional `@AliasFor` forwarding for cache-name conventions
+- [done] Composed `@CacheConfig` and single-member `@Cacheable` allowlist matching
+- [done] Exact allowlist matching without substring false negatives
+- [done] Project-wide `KeyGenerator` bean detection
 
 ### `SPRING_TX_SELF_INVOCATION`
 
