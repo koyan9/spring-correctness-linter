@@ -13,6 +13,7 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ReportWriterTest {
@@ -176,6 +177,109 @@ class ReportWriterTest {
         assertTrue(html.contains("root-app"));
         assertTrue(html.contains("Files with parse problems"));
         assertTrue(html.contains("Broken.java"));
+    }
+
+    @Test
+    void writesLightweightJsonWithoutFindingsAndRuntimeSections() throws Exception {
+        Path jsonOutput = tempDir.resolve("reports/lint-report-light.json");
+        LintReport report = new LintReport(
+                tempDir,
+                tempDir.resolve("src/main/java"),
+                List.of(tempDir.resolve("src/main/java")),
+                Instant.now(),
+                List.of(new RuleDescriptor("RULE_A", "Rule A", "Description A", RuleDomain.WEB, LintSeverity.WARNING)),
+                List.of(new LintIssue("RULE_A", LintSeverity.WARNING, "Message", tempDir.resolve("src/main/java/demo/Demo.java"), 1)),
+                1,
+                2,
+                3,
+                4,
+                List.of(new ModuleSummary("root-app", 1, 1, 1, 0, 0)),
+                java.util.Map.of(tempDir.resolve("src/main/java/demo/Demo.java").toAbsolutePath().normalize().toString(), "root-app"),
+                List.of(new SourceParseProblem(tempDir.resolve("src/main/java/demo/Broken.java"), List.of("Parse error"))),
+                new AnalysisRuntimeMetrics(
+                        true,
+                        "shared-file",
+                        "fingerprint-123",
+                        42,
+                        2,
+                        1,
+                        1,
+                        1,
+                        new AnalysisPhaseMetrics(1, 2, 3, 4, 5, 6, 7),
+                        List.of(new ModuleRuntimeMetrics("root-app", 1, 1, 0, 0, 11, 11, 0))
+                ),
+                new RuleDomainSelectionSummary(
+                        List.of(RuleDomain.WEB),
+                        List.of(RuleDomain.CACHE),
+                        List.of(RuleDomain.WEB),
+                        List.of("RULE_A"),
+                        List.of("RULE_IGNORED"),
+                        List.of("RULE_A"),
+                        List.of(new RuleDomainRuleSummary(RuleDomain.WEB, List.of("RULE_A")))
+                )
+        );
+
+        new ReportWriter().writeJson(report, jsonOutput, ReportWriter.ReportDetail.LIGHT);
+        String json = Files.readString(jsonOutput);
+
+        assertTrue(json.contains("\"summary\""));
+        assertTrue(json.contains("\"ruleDomainSelection\""));
+        assertTrue(json.contains("\"issueCount\": 1"));
+        assertTrue(json.contains("\"cachedFileCount\": 4"));
+        assertTrue(json.contains("\"RULE_IGNORED\""));
+        assertFalse(json.contains("\"runtimeMetrics\""));
+        assertFalse(json.contains("\"issues\""));
+        assertFalse(json.contains("\"parseProblems\""));
+        assertFalse(json.contains("\"moduleSummaries\""));
+        assertFalse(json.contains("\"ruleGuidance\""));
+    }
+
+    @Test
+    void writesRuleGovernanceSnapshot() throws Exception {
+        Path output = tempDir.resolve("reports/rules-governance.json");
+        LintReport report = new LintReport(
+                tempDir,
+                tempDir.resolve("src/main/java"),
+                List.of(tempDir.resolve("src/main/java")),
+                Instant.now(),
+                List.of(
+                        new RuleDescriptor("RULE_A", "Rule A", "Description A", RuleDomain.WEB, LintSeverity.WARNING),
+                        new RuleDescriptor("RULE_B", "Rule B", "Description B", RuleDomain.TRANSACTION, LintSeverity.ERROR)
+                ),
+                List.of(),
+                0,
+                0,
+                0,
+                0,
+                List.of(),
+                java.util.Map.of(),
+                List.of(),
+                AnalysisRuntimeMetrics.empty(),
+                new RuleDomainSelectionSummary(
+                        List.of(RuleDomain.WEB),
+                        List.of(RuleDomain.CACHE),
+                        List.of(RuleDomain.WEB, RuleDomain.TRANSACTION),
+                        List.of("RULE_A"),
+                        List.of("RULE_C"),
+                        List.of("RULE_A", "RULE_B"),
+                        List.of(
+                                new RuleDomainRuleSummary(RuleDomain.WEB, List.of("RULE_A")),
+                                new RuleDomainRuleSummary(RuleDomain.TRANSACTION, List.of("RULE_B"))
+                        )
+                )
+        );
+
+        new ReportWriter().writeRuleGovernance(report, output);
+        String json = Files.readString(output);
+
+        assertTrue(json.contains("\"selection\""));
+        assertTrue(json.contains("\"enabledDomains\": [\"WEB\"]"));
+        assertTrue(json.contains("\"disabledDomains\": [\"CACHE\"]"));
+        assertTrue(json.contains("\"effectiveRuleIds\": [\"RULE_A\", \"RULE_B\"]"));
+        assertTrue(json.contains("\"ruleCount\": 2"));
+        assertTrue(json.contains("\"ruleId\": \"RULE_A\""));
+        assertTrue(json.contains("\"domain\": \"TRANSACTION\""));
+        assertTrue(json.contains("\"severity\": \"ERROR\""));
     }
 
     @Test
