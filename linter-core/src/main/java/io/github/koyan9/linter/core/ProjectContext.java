@@ -221,6 +221,6 @@ public final class ProjectContext {
         }
         int lastDot = stripped.lastIndexOf('.');
         String simpleName = lastDot >= 0 ? stripped.substring(lastDot + 1) : stripped;
-        return "SecurityFilterChain".equals(simpleName);
+        return "SecurityFilterChain".equals(simpleName) || "SecurityWebFilterChain".equals(simpleName);
     }
 }

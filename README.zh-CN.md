@@ -228,7 +228,7 @@ JSON 和 HTML 报告现在还会包含运行期指标，便于观察：
 | `spring.correctness.linter.disabledRuleDomains` | 空 | 同上 | 禁用指定规则域。 |
 | `spring.correctness.linter.severityOverrides` | 空 | `RULE_ID=INFO|WARNING|ERROR` | 覆盖规则默认严重级别。未知规则会导致构建失败。 |
 | `spring.correctness.linter.assumeCentralizedSecurity` | `false` | `true` / `false` | 安全策略集中配置时跳过 `SPRING_ENDPOINT_SECURITY`。 |
-| `spring.correctness.linter.autoDetectCentralizedSecurity` | `false` | `true` / `false` | 当检测到 `SecurityFilterChain` Bean 时自动跳过 `SPRING_ENDPOINT_SECURITY`。 |
+| `spring.correctness.linter.autoDetectCentralizedSecurity` | `false` | `true` / `false` | 当检测到 `SecurityFilterChain` 或 `SecurityWebFilterChain` Bean 时自动跳过 `SPRING_ENDPOINT_SECURITY`。 |
 | `spring.correctness.linter.securityAnnotations` | 空 | 注解名 | 额外安全注解视为显式安全意图，支持简单名或全限定名（允许前缀 `@`）。 |
 | `spring.correctness.linter.cacheDefaultKeyCacheNames` | 空 | cache 名称或 `*` | 指定 cache 名称允许默认 key；`*` 表示全部允许。 |
 | `spring.correctness.linter.cacheFile` | `${project.build.directory}/spring-correctness-linter/analysis-cache.txt` | 路径 | 增量缓存文件路径（缓存关闭或按模块拆分时忽略）。 |
@@ -240,12 +240,12 @@ JSON 和 HTML 报告现在还会包含运行期指标，便于观察：
 
 ### 集中式安全意图
 
-如果安全策略主要在 `SecurityFilterChain`、网关或其他基础设施中统一控制，可以通过配置减少噪声，或补充项目内的安全注解：
+如果安全策略主要在 `SecurityFilterChain`、`SecurityWebFilterChain`、网关或其他基础设施中统一控制，可以通过配置减少噪声，或补充项目内的安全注解：
 
 ```xml
 <configuration>
   <assumeCentralizedSecurity>true</assumeCentralizedSecurity>
-  <!-- 也可以自动检测 SecurityFilterChain -->
+  <!-- 也可以自动检测 SecurityFilterChain / SecurityWebFilterChain -->
   <!-- <autoDetectCentralizedSecurity>true</autoDetectCentralizedSecurity> -->
   <securityAnnotations>InternalEndpoint,TeamSecure</securityAnnotations>
   <!-- 也支持 @InternalEndpoint 或 com.example.InternalEndpoint -->
