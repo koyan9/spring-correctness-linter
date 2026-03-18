@@ -64,6 +64,10 @@ public final class SpringSemanticFacts {
         return JavaSourceInspector.annotationMemberContains(node, context, annotationName, memberName, token);
     }
 
+    public boolean annotationMemberContainsExactStringLiteral(NodeWithAnnotations<?> node, String annotationName, String memberName, String token) {
+        return JavaSourceInspector.annotationMemberContainsExactStringLiteral(node, context, annotationName, memberName, token);
+    }
+
     public Optional<String> annotationMemberValue(NodeWithAnnotations<?> node, String annotationName, String memberName) {
         return JavaSourceInspector.annotationMemberValue(node, context, annotationName, memberName);
     }

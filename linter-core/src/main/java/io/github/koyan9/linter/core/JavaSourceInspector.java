@@ -27,10 +27,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public final class JavaSourceInspector {
 
     private static final ThreadLocal<JavaParser> PARSER = ThreadLocal.withInitial(JavaParser::new);
+    private static final Pattern STRING_LITERAL_PATTERN = Pattern.compile("\"((?:\\\\.|[^\"\\\\])*)\"");
 
     private JavaSourceInspector() {
     }
@@ -138,6 +141,22 @@ public final class JavaSourceInspector {
         }
         return context.annotationMetadataIndex().annotationMemberValue(node, annotationName, memberName)
                 .map(value -> value.contains(token))
+                .orElse(false);
+    }
+
+    public static boolean annotationMemberContainsExactStringLiteral(NodeWithAnnotations<?> node, String annotationName, String memberName, String token) {
+        return findAnnotation(node, annotationName)
+                .flatMap(annotation -> annotationMemberValue(annotation, memberName))
+                .map(value -> stringLiteralValues(value).contains(token))
+                .orElse(false);
+    }
+
+    public static boolean annotationMemberContainsExactStringLiteral(NodeWithAnnotations<?> node, ProjectContext context, String annotationName, String memberName, String token) {
+        if (annotationMemberContainsExactStringLiteral(node, annotationName, memberName, token)) {
+            return true;
+        }
+        return context.annotationMetadataIndex().annotationMemberValue(node, annotationName, memberName)
+                .map(value -> stringLiteralValues(value).contains(token))
                 .orElse(false);
     }
 
@@ -329,6 +348,22 @@ public final class JavaSourceInspector {
             return inner.isEmpty();
         }
         return false;
+    }
+
+    private static List<String> stringLiteralValues(String rawValue) {
+        if (rawValue == null || rawValue.isBlank()) {
+            return List.of();
+        }
+        String trimmed = rawValue.trim();
+        if (trimmed.startsWith("\"") && trimmed.endsWith("\"") && trimmed.length() >= 2) {
+            return List.of(trimmed.substring(1, trimmed.length() - 1));
+        }
+        Matcher matcher = STRING_LITERAL_PATTERN.matcher(trimmed);
+        List<String> values = new ArrayList<>();
+        while (matcher.find()) {
+            values.add(matcher.group(1));
+        }
+        return values;
     }
 
     public record ParseOutcome(Optional<CompilationUnit> compilationUnit, List<String> problems) {

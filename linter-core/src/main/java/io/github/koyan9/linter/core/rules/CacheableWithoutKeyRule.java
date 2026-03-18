@@ -96,13 +96,13 @@ public final class CacheableWithoutKeyRule extends AbstractSpringRule {
             if (cacheName.isBlank()) {
                 continue;
             }
-            if (facts.annotationMemberContains(method, "Cacheable", "cacheNames", cacheName)
-                    || facts.annotationMemberContains(method, "Cacheable", "value", cacheName)) {
+            if (facts.annotationMemberContainsExactStringLiteral(method, "Cacheable", "cacheNames", cacheName)
+                    || facts.annotationMemberContainsExactStringLiteral(method, "Cacheable", "value", cacheName)) {
                 return true;
             }
             if (typeDeclaration != null
-                    && (facts.annotationMemberContains(typeDeclaration, "CacheConfig", "cacheNames", cacheName)
-                    || facts.annotationMemberContains(typeDeclaration, "CacheConfig", "value", cacheName))) {
+                    && (facts.annotationMemberContainsExactStringLiteral(typeDeclaration, "CacheConfig", "cacheNames", cacheName)
+                    || facts.annotationMemberContainsExactStringLiteral(typeDeclaration, "CacheConfig", "value", cacheName))) {
                 return true;
             }
         }
