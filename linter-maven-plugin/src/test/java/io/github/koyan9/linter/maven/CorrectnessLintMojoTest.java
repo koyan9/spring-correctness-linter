@@ -790,6 +790,49 @@ class CorrectnessLintMojoTest {
         assertTrue(json.contains("\"ruleId\": \"SPRING_ASYNC_VOID\""));
     }
 
+    @Test
+    void autoDetectsProjectWideKeyGenerator() throws Exception {
+        Path sourceDirectory = writeSource("""
+                package demo;
+
+                import org.springframework.cache.annotation.Cacheable;
+                import org.springframework.cache.interceptor.KeyGenerator;
+                import org.springframework.context.annotation.Bean;
+
+                class ProjectKeyGeneratorConfig {
+
+                    @Bean
+                    KeyGenerator keyGenerator() {
+                        return (target, method, params) -> params.length;
+                    }
+                }
+
+                class CacheService {
+
+                    @Cacheable(cacheNames = "demo")
+                    public String load(String id) {
+                        return id;
+                    }
+                }
+                """);
+        Path reportsDirectory = tempDir.resolve("target/reports-project-key-generator");
+
+        CorrectnessLintMojo mojo = configuredMojo(
+                sourceDirectory,
+                reportsDirectory,
+                tempDir.resolve("spring-correctness-linter-baseline.txt")
+        );
+        setField(mojo, "applyBaseline", false);
+        setField(mojo, "autoDetectProjectWideKeyGenerator", true);
+        setField(mojo, "formats", new LinkedHashSet<>(Set.of("json")));
+
+        mojo.execute();
+
+        String json = Files.readString(reportsDirectory.resolve("lint-report.json"));
+        assertTrue(json.contains("\"issueCount\": 0"));
+        assertFalse(json.contains("\"ruleId\": \"SPRING_CACHEABLE_KEY\""));
+    }
+
     private Path writeSource(String content) throws Exception {
         Path sourceDirectory = tempDir.resolve("src/main/java/demo");
         Files.createDirectories(sourceDirectory);
@@ -817,6 +860,7 @@ class CorrectnessLintMojoTest {
         setField(mojo, "cacheFile", tempDir.resolve("analysis-cache.txt").toFile());
         setField(mojo, "assumeCentralizedSecurity", false);
         setField(mojo, "autoDetectCentralizedSecurity", false);
+        setField(mojo, "autoDetectProjectWideKeyGenerator", false);
         MavenProject project = new MavenProject();
         project.setFile(tempDir.resolve("pom.xml").toFile());
         project.setExecutionRoot(true);

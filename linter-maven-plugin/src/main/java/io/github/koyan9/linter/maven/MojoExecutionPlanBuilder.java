@@ -54,6 +54,7 @@ final class MojoExecutionPlanBuilder {
             boolean assumeCentralizedSecurity,
             boolean autoDetectCentralizedSecurity,
             String securityAnnotations,
+            boolean autoDetectProjectWideKeyGenerator,
             String cacheDefaultKeyCacheNames
     ) throws MojoExecutionException {
         Path projectRoot = projectBaseDir.toPath();
@@ -110,6 +111,7 @@ final class MojoExecutionPlanBuilder {
                 parsedDisabledRules,
                 assumeCentralizedSecurity,
                 autoDetectCentralizedSecurity,
+                autoDetectProjectWideKeyGenerator,
                 parsedSecurityAnnotations,
                 parsedCacheDefaultKeyCacheNames
         );

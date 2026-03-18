@@ -69,6 +69,9 @@ public final class CacheableWithoutKeyRule extends AbstractSpringRule {
 
     @Override
     public List<LintIssue> evaluate(SourceUnit sourceUnit, ProjectContext context) {
+        if (context.options().autoDetectProjectWideKeyGenerator() && context.hasProjectWideKeyGeneratorBean()) {
+            return List.of();
+        }
         List<LintIssue> issues = new ArrayList<>();
         SpringSemanticFacts facts = context.springFacts(sourceUnit);
         for (TypeDeclaration<?> typeDeclaration : sourceUnit.structure().typeDeclarations()) {

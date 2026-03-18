@@ -29,6 +29,7 @@ public final class ProjectContext {
     private final Map<Path, SpringSemanticFacts> semanticFactsBySourcePath = new ConcurrentHashMap<>();
     private volatile TypeResolutionIndex typeResolutionIndex;
     private volatile Boolean securityFilterChainBeanPresent;
+    private volatile Boolean keyGeneratorBeanPresent;
 
     private ProjectContext(
             Path projectRoot,
@@ -210,6 +211,37 @@ public final class ProjectContext {
         }
     }
 
+    public boolean hasProjectWideKeyGeneratorBean() {
+        Boolean cached = keyGeneratorBeanPresent;
+        if (cached != null) {
+            return cached;
+        }
+        synchronized (this) {
+            if (keyGeneratorBeanPresent != null) {
+                return keyGeneratorBeanPresent;
+            }
+            boolean found = false;
+            for (SourceDocument sourceDocument : sourceDocuments) {
+                SourceUnit sourceUnit = sourceUnitFor(sourceDocument);
+                SpringSemanticFacts facts = springFacts(sourceUnit);
+                for (com.github.javaparser.ast.body.MethodDeclaration method : sourceUnit.structure().methods()) {
+                    if (!facts.hasAnnotation(method, "Bean")) {
+                        continue;
+                    }
+                    if (isKeyGeneratorType(method.getType().toString())) {
+                        found = true;
+                        break;
+                    }
+                }
+                if (found) {
+                    break;
+                }
+            }
+            keyGeneratorBeanPresent = found;
+            return found;
+        }
+    }
+
     private boolean isSecurityFilterChainType(String rawType) {
         if (rawType == null || rawType.isBlank()) {
             return false;
@@ -222,5 +254,19 @@ public final class ProjectContext {
         int lastDot = stripped.lastIndexOf('.');
         String simpleName = lastDot >= 0 ? stripped.substring(lastDot + 1) : stripped;
         return "SecurityFilterChain".equals(simpleName) || "SecurityWebFilterChain".equals(simpleName);
+    }
+
+    private boolean isKeyGeneratorType(String rawType) {
+        if (rawType == null || rawType.isBlank()) {
+            return false;
+        }
+        String stripped = rawType.trim();
+        int genericStart = stripped.indexOf('<');
+        if (genericStart >= 0) {
+            stripped = stripped.substring(0, genericStart);
+        }
+        int lastDot = stripped.lastIndexOf('.');
+        String simpleName = lastDot >= 0 ? stripped.substring(lastDot + 1) : stripped;
+        return "KeyGenerator".equals(simpleName);
     }
 }

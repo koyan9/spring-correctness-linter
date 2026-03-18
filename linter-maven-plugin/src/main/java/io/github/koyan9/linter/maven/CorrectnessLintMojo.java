@@ -121,6 +121,9 @@ public class CorrectnessLintMojo extends AbstractMojo {
     @Parameter(property = "spring.correctness.linter.cacheDefaultKeyCacheNames")
     private String cacheDefaultKeyCacheNames;
 
+    @Parameter(property = "spring.correctness.linter.autoDetectProjectWideKeyGenerator", defaultValue = "false")
+    private boolean autoDetectProjectWideKeyGenerator;
+
     @Parameter(property = "spring.correctness.linter.cacheFile", defaultValue = "${project.build.directory}/spring-correctness-linter/analysis-cache.txt")
     private java.io.File cacheFile;
 
@@ -180,6 +183,7 @@ public class CorrectnessLintMojo extends AbstractMojo {
                     assumeCentralizedSecurity,
                     autoDetectCentralizedSecurity,
                     securityAnnotations,
+                    autoDetectProjectWideKeyGenerator,
                     cacheDefaultKeyCacheNames
             );
             ProjectLinter linter = new ProjectLinter(plan.rules());

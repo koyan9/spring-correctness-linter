@@ -228,6 +228,7 @@ Rule ids are normalized to uppercase. Rule domains are case-insensitive and acce
 | `spring.correctness.linter.autoDetectCentralizedSecurity` | `false` | `true` / `false` | Auto-skips `SPRING_ENDPOINT_SECURITY` when a `SecurityFilterChain` or `SecurityWebFilterChain` bean is detected in the source tree. |
 | `spring.correctness.linter.securityAnnotations` | _empty_ | Annotation names | Treats additional annotations as explicit security intent. Accepts simple or fully qualified names (leading `@` is allowed). |
 | `spring.correctness.linter.cacheDefaultKeyCacheNames` | _empty_ | Cache names or `*` | Allows default cache keys for specific cache names. `*` allows all caches. |
+| `spring.correctness.linter.autoDetectProjectWideKeyGenerator` | `false` | `true` / `false` | Auto-skips `SPRING_CACHEABLE_KEY` when a project-level `@Bean KeyGenerator` is detected in the source tree. |
 | `spring.correctness.linter.cacheFile` | `${project.build.directory}/spring-correctness-linter/analysis-cache.txt` | Path | Incremental cache file path (ignored when cache is disabled or split by module). |
 | `spring.correctness.linter.useIncrementalCache` | `true` | `true` / `false` | Enables file-content-based incremental cache reuse. |
 | `spring.correctness.linter.parallelFileAnalysis` | `true` | `true` / `false` | Enables per-file parallel analysis when multiple source files are present. |
@@ -258,6 +259,14 @@ If some caches intentionally rely on Spring's default key generation, you can al
 <configuration>
   <cacheDefaultKeyCacheNames>users,orders</cacheDefaultKeyCacheNames>
   <!-- Use '*' to allow default keys for all caches -->
+</configuration>
+```
+
+If the project standardizes on a global `KeyGenerator` bean, you can opt into auto-detection:
+
+```xml
+<configuration>
+  <autoDetectProjectWideKeyGenerator>true</autoDetectProjectWideKeyGenerator>
 </configuration>
 ```
 

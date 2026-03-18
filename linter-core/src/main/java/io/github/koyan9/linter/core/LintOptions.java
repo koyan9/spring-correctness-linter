@@ -25,16 +25,17 @@ public record LintOptions(
         Set<String> disabledRuleIds,
         boolean assumeCentralizedSecurity,
         boolean autoDetectCentralizedSecurity,
+        boolean autoDetectProjectWideKeyGenerator,
         Set<String> customSecurityAnnotations,
         Set<String> cacheDefaultKeyCacheNames
 ) {
 
     public LintOptions(boolean honorInlineSuppressions, boolean applyBaseline, Path baselineFile) {
-        this(honorInlineSuppressions, applyBaseline, baselineFile, null, false, true, 0, Map.of(), Map.of(), Set.of(), Set.of(), Set.of(), Set.of(), false, false, Set.of(), Set.of());
+        this(honorInlineSuppressions, applyBaseline, baselineFile, null, false, true, 0, Map.of(), Map.of(), Set.of(), Set.of(), Set.of(), Set.of(), false, false, false, Set.of(), Set.of());
     }
 
     public LintOptions(boolean honorInlineSuppressions, boolean applyBaseline, Path baselineFile, Path analysisCacheFile, boolean useIncrementalCache) {
-        this(honorInlineSuppressions, applyBaseline, baselineFile, analysisCacheFile, useIncrementalCache, true, 0, Map.of(), Map.of(), Set.of(), Set.of(), Set.of(), Set.of(), false, false, Set.of(), Set.of());
+        this(honorInlineSuppressions, applyBaseline, baselineFile, analysisCacheFile, useIncrementalCache, true, 0, Map.of(), Map.of(), Set.of(), Set.of(), Set.of(), Set.of(), false, false, false, Set.of(), Set.of());
     }
 
     public LintOptions(
@@ -48,7 +49,7 @@ public record LintOptions(
             Map<String, Path> moduleBaselineFiles,
             Map<String, Path> moduleAnalysisCacheFiles
     ) {
-        this(honorInlineSuppressions, applyBaseline, baselineFile, analysisCacheFile, useIncrementalCache, parallelFileAnalysis, fileAnalysisParallelism, moduleBaselineFiles, moduleAnalysisCacheFiles, Set.of(), Set.of(), Set.of(), Set.of(), false, false, Set.of(), Set.of());
+        this(honorInlineSuppressions, applyBaseline, baselineFile, analysisCacheFile, useIncrementalCache, parallelFileAnalysis, fileAnalysisParallelism, moduleBaselineFiles, moduleAnalysisCacheFiles, Set.of(), Set.of(), Set.of(), Set.of(), false, false, false, Set.of(), Set.of());
     }
 
     public LintOptions {
@@ -66,7 +67,7 @@ public record LintOptions(
     }
 
     public static LintOptions defaults() {
-        return new LintOptions(true, true, null, null, false, true, 0, Map.of(), Map.of(), Set.of(), Set.of(), Set.of(), Set.of(), false, false, Set.of(), Set.of());
+        return new LintOptions(true, true, null, null, false, true, 0, Map.of(), Map.of(), Set.of(), Set.of(), Set.of(), Set.of(), false, false, false, Set.of(), Set.of());
     }
 
     public LintOptions withAssumeCentralizedSecurity(boolean value) {
@@ -86,6 +87,7 @@ public record LintOptions(
                 disabledRuleIds,
                 value,
                 autoDetectCentralizedSecurity,
+                autoDetectProjectWideKeyGenerator,
                 customSecurityAnnotations,
                 cacheDefaultKeyCacheNames
         );
@@ -107,6 +109,30 @@ public record LintOptions(
                 enabledRuleIds,
                 disabledRuleIds,
                 assumeCentralizedSecurity,
+                value,
+                autoDetectProjectWideKeyGenerator,
+                customSecurityAnnotations,
+                cacheDefaultKeyCacheNames
+        );
+    }
+
+    public LintOptions withAutoDetectProjectWideKeyGenerator(boolean value) {
+        return new LintOptions(
+                honorInlineSuppressions,
+                applyBaseline,
+                baselineFile,
+                analysisCacheFile,
+                useIncrementalCache,
+                parallelFileAnalysis,
+                fileAnalysisParallelism,
+                moduleBaselineFiles,
+                moduleAnalysisCacheFiles,
+                enabledRuleDomains,
+                disabledRuleDomains,
+                enabledRuleIds,
+                disabledRuleIds,
+                assumeCentralizedSecurity,
+                autoDetectCentralizedSecurity,
                 value,
                 customSecurityAnnotations,
                 cacheDefaultKeyCacheNames
@@ -130,6 +156,7 @@ public record LintOptions(
                 disabledRuleIds,
                 assumeCentralizedSecurity,
                 autoDetectCentralizedSecurity,
+                autoDetectProjectWideKeyGenerator,
                 annotations,
                 cacheDefaultKeyCacheNames
         );
@@ -152,6 +179,7 @@ public record LintOptions(
                 disabledRuleIds,
                 assumeCentralizedSecurity,
                 autoDetectCentralizedSecurity,
+                autoDetectProjectWideKeyGenerator,
                 customSecurityAnnotations,
                 cacheNames
         );
@@ -174,6 +202,7 @@ public record LintOptions(
                 disabledRuleIds,
                 assumeCentralizedSecurity,
                 autoDetectCentralizedSecurity,
+                autoDetectProjectWideKeyGenerator,
                 customSecurityAnnotations,
                 cacheDefaultKeyCacheNames
         );
@@ -196,6 +225,7 @@ public record LintOptions(
                 disabledRuleIds,
                 assumeCentralizedSecurity,
                 autoDetectCentralizedSecurity,
+                autoDetectProjectWideKeyGenerator,
                 customSecurityAnnotations,
                 cacheDefaultKeyCacheNames
         );
