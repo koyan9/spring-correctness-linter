@@ -39,22 +39,29 @@ Current recommended adoption strategy:
 
 Track rule-accuracy follow-ups and regression-test priorities in `docs/ACCURACY_BACKLOG.md`.
 
-- Deepen runtime metrics where useful, especially around module-level timing summaries and large-repository diagnosis
-- Continue tightening report wording, quality-gate messages, and sample-based verification flows
-- Keep the recommended bundle guidance in README, `rules-reference.md`, and sample docs aligned as adoption patterns evolve
-- Add small, high-confidence correctness checks only if they fit the current reporting and testing model cleanly
-- Gather real-user feedback from sample-driven adoption before committing to broader rule expansion
+- Keep report and plugin regression coverage aligned with new configuration flags and output variants
+- Continue tightening remaining rule-accuracy boundaries where the expected behavior is testable and low-noise
+- Keep sample documentation and README guidance aligned with the latest cache, governance, and rollout workflows
+- Gather real-user feedback from bundle-first adoption before committing to broader rule expansion or external extension APIs
 
-## Planned improvements (priority order)
+## Recently completed
 
-1. Validate configuration inputs and warn on unknown report formats or empty outputs
-2. Stream baseline and cache loading to reduce memory pressure on large repositories
-3. Surface cache invalidation hints in logs to explain cache-miss causes
-4. Export a governance snapshot (rule status/severity) for audit workflows
-5. Tackle the top items from `docs/ACCURACY_BACKLOG.md` with focused regression tests
-6. Add module-level extra source root configuration for reactor scans
-7. Evaluate safe per-file parallel analysis for performance gains
-8. Add optional report-field toggles for lightweight outputs
+- Configuration validation now warns on unknown report formats and empty core output selections
+- Baseline and cache loading now stream file contents to reduce memory pressure
+- Cache miss hints are surfaced in plugin logs when incremental cache is enabled but no entries are reused
+- Governance-oriented outputs now include `rules-governance.json`
+- Reactor scans now support module-level extra source roots
+- File analysis now supports explicit concurrency controls instead of relying on the common fork-join pool
+- JSON reporting now supports a lightweight output mode for large repositories
+- The highest-value accuracy follow-ups for cache, endpoint security, self-invocation, and scheduled trigger parsing have been covered with regression tests and semantic-layer improvements
+
+## Current remaining priorities
+
+1. Continue refining `SPRING_CACHEABLE_KEY` only through explicit, low-noise project-convention signals
+2. Revisit `SPRING_ENDPOINT_SECURITY` only for high-confidence centralized-policy hints; avoid speculative config parsing
+3. Expand report and plugin regression coverage whenever new output fields or configuration flags are added
+4. Keep samples and contributor docs aligned with the current governance, cache, and rollout workflows
+5. Prefer focused semantic improvements over adding broad new rule families
 
 ## Later candidates
 

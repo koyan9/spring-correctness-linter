@@ -60,8 +60,16 @@
 - Improved `CONTRIBUTING.md`, `CHANGELOG.md`, and release note templates.
 - Added clear project highlights for external presentation.
 
+## Milestone 10: Accuracy and Governance Polish
+
+- Added governance-oriented outputs such as `rules-governance.json` and lightweight JSON report mode.
+- Tightened cache-related accuracy boundaries around blank key strategies, exact allowlist matching, composed cache metadata, and project-wide key-generator conventions.
+- Tightened endpoint-security accuracy around inherited security annotations and centralized-security auto-detection for both servlet and reactive Spring Security styles.
+- Hardened self-invocation detection with direct method-reference coverage and aligned async/transaction behavior.
+- Added explicit file-analysis concurrency controls and strengthened regression coverage around new plugin and core options.
+
 ## Current Status
 
-- The project now provides a practical Spring correctness linting workflow suitable for local development, CI enforcement, legacy baseline adoption, and multi-module repository governance.
-- Future work should focus on incremental polish and real-user feedback rather than large new feature batches.
+- The project now provides a practical Spring correctness linting workflow suitable for local development, CI enforcement, legacy baseline adoption, multi-module repository governance, and policy-oriented rollout workflows.
+- Future work should continue focusing on incremental polish, rule-accuracy discipline, and real-user adoption feedback rather than large new feature batches.
 - For the current near-term direction, see `docs/ROADMAP.md`.
