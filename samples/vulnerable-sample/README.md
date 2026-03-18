@@ -14,9 +14,13 @@ This sample intentionally contains several Spring design and correctness issues 
    - `target/spring-correctness-linter/lint-report.html`
    - `target/spring-correctness-linter/lint-report.sarif.json`
    - `target/spring-correctness-linter/baseline-diff.html` (when baseline diff output is enabled)
+   - `target/spring-correctness-linter/rules-reference.md`
+   - `target/spring-correctness-linter/rules-governance.json`
 
 The JSON and HTML reports also expose runtime metrics such as analyzed files, cached files, cache hit rate, phase timings,
 and slow-module summaries when multiple modules are scanned.
+
+The governance snapshot is especially useful when you want to verify which rule ids, domains, and severities are actually active in the current run.
 
 ## Recommended bundles
 
@@ -46,6 +50,23 @@ Example commands:
   - `mvn -q verify "-Dspring.correctness.linter.securityAnnotations=InternalEndpoint"`
 - Allow default cache keys for selected caches:
   - `mvn -q verify "-Dspring.correctness.linter.cacheDefaultKeyCacheNames=users,orders"`
+- Auto-detect a project-wide cache key strategy:
+  - `mvn -q verify "-Dspring.correctness.linter.autoDetectProjectWideKeyGenerator=true"`
+- Write a lightweight JSON report:
+  - `mvn -q verify "-Dspring.correctness.linter.formats=json" "-Dspring.correctness.linter.lightweightReports=true"`
+- Control file-analysis concurrency explicitly:
+  - `mvn -q verify "-Dspring.correctness.linter.parallelFileAnalysis=false"`
+  - `mvn -q verify "-Dspring.correctness.linter.fileAnalysisParallelism=4"`
+
+## Report demo
+
+- Governance-oriented output:
+  - `mvn -q verify`
+  - Inspect `target/spring-correctness-linter/rules-governance.json`
+- Lightweight JSON output:
+  - `mvn -q verify "-Dspring.correctness.linter.formats=json" "-Dspring.correctness.linter.lightweightReports=true"`
+  - Inspect `target/spring-correctness-linter/lint-report.json`
+  - This mode keeps the summary and rule-selection sections, but omits the heavier findings and runtime detail sections.
 
 
 ## Centralized security example
@@ -61,3 +82,4 @@ If the sample is used in an environment where security is enforced in a gateway 
 - Default baseline file: `spring-correctness-linter-baseline.txt`
 - Run `mvn -q verify` again to keep only issues not already recorded in the baseline.
 - Re-run `mvn -q verify` without changing sources to observe cache reuse in `lint-report.json`.
+- Inspect `target/spring-correctness-linter/baseline-diff.html` or `baseline-diff.json` to see new vs matched vs stale entries.

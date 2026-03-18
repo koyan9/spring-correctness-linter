@@ -13,6 +13,8 @@ This sample demonstrates multi-module scanning with `spring-correctness-linter`.
    - `samples/reactor-sample/target/spring-correctness-linter/lint-report.json`
    - `samples/reactor-sample/target/spring-correctness-linter/lint-report.html`
    - `samples/reactor-sample/target/spring-correctness-linter/baseline-diff.html`
+   - `samples/reactor-sample/target/spring-correctness-linter/rules-reference.md`
+   - `samples/reactor-sample/target/spring-correctness-linter/rules-governance.json`
 
 The reactor report includes runtime metrics, per-module cache hit rates, analyzed vs cached timing, and a slowest-modules summary, which makes it easier
 to confirm cache reuse and identify slower modules.
@@ -30,6 +32,8 @@ Example commands:
 
 - `mvn -q -f samples/reactor-sample/pom.xml -DskipTests verify "-Dspring.correctness.linter.enabledRuleDomains=ASYNC,TRANSACTION,WEB"`
 - `mvn -q -f samples/reactor-sample/pom.xml -DskipTests verify "-Dspring.correctness.linter.enabledRuleDomains=ASYNC"`
+- `mvn -q -f samples/reactor-sample/pom.xml -DskipTests verify "-Dspring.correctness.linter.formats=json" "-Dspring.correctness.linter.lightweightReports=true"`
+- `mvn -q -f samples/reactor-sample/pom.xml -DskipTests verify "-Dspring.correctness.linter.fileAnalysisParallelism=2"`
 
 ## Module Output
 
@@ -39,3 +43,15 @@ Example commands:
 The parent reactor report groups findings by module, and child modules are skipped automatically when `scanReactorModules=true`.
 
 Run the same verification command twice to see per-module cache hits increase in the reactor root `lint-report.json`.
+
+## Report demo
+
+- Governance-oriented output:
+  - `mvn -q -f samples/reactor-sample/pom.xml -DskipTests verify`
+  - Inspect `samples/reactor-sample/target/spring-correctness-linter/rules-governance.json`
+- Lightweight JSON output:
+  - `mvn -q -f samples/reactor-sample/pom.xml -DskipTests verify "-Dspring.correctness.linter.formats=json" "-Dspring.correctness.linter.lightweightReports=true"`
+  - Inspect `samples/reactor-sample/target/spring-correctness-linter/lint-report.json`
+- Parallelism tuning:
+  - `mvn -q -f samples/reactor-sample/pom.xml -DskipTests verify "-Dspring.correctness.linter.parallelFileAnalysis=false"`
+  - `mvn -q -f samples/reactor-sample/pom.xml -DskipTests verify "-Dspring.correctness.linter.fileAnalysisParallelism=2"`
