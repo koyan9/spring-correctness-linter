@@ -127,6 +127,12 @@ public class CorrectnessLintMojo extends AbstractMojo {
     @Parameter(property = "spring.correctness.linter.useIncrementalCache", defaultValue = "true")
     private boolean useIncrementalCache;
 
+    @Parameter(property = "spring.correctness.linter.parallelFileAnalysis", defaultValue = "true")
+    private boolean parallelFileAnalysis;
+
+    @Parameter(property = "spring.correctness.linter.fileAnalysisParallelism", defaultValue = "0")
+    private int fileAnalysisParallelism;
+
     @Parameter(property = "spring.correctness.linter.splitBaselineByModule", defaultValue = "false")
     private boolean splitBaselineByModule;
 
@@ -160,6 +166,8 @@ public class CorrectnessLintMojo extends AbstractMojo {
                     honorInlineSuppressions,
                     applyBaseline,
                     useIncrementalCache,
+                    parallelFileAnalysis,
+                    fileAnalysisParallelism,
                     splitBaselineByModule,
                     splitCacheByModule,
                     scanReactorModules,

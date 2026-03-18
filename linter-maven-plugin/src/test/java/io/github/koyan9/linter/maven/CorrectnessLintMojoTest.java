@@ -697,6 +697,39 @@ class CorrectnessLintMojoTest {
     }
 
     @Test
+    void acceptsParallelAnalysisConfiguration() throws Exception {
+        Path sourceDirectory = writeSource("""
+                package demo;
+
+                import org.springframework.scheduling.annotation.Async;
+
+                class AsyncOnly {
+
+                    @Async
+                    public void runAsync() {
+                    }
+                }
+                """);
+        Path reportsDirectory = tempDir.resolve("target/reports-parallel");
+
+        CorrectnessLintMojo mojo = configuredMojo(
+                sourceDirectory,
+                reportsDirectory,
+                tempDir.resolve("spring-correctness-linter-baseline.txt")
+        );
+        setField(mojo, "applyBaseline", false);
+        setField(mojo, "parallelFileAnalysis", true);
+        setField(mojo, "fileAnalysisParallelism", 2);
+        setField(mojo, "formats", new LinkedHashSet<>(Set.of("json")));
+
+        mojo.execute();
+
+        String json = Files.readString(reportsDirectory.resolve("lint-report.json"));
+        assertTrue(json.contains("\"issueCount\": 1"));
+        assertTrue(json.contains("\"runtimeMetrics\""));
+    }
+
+    @Test
     void includesModuleSpecificSourceDirectories() throws Exception {
         Path sourceDirectory = writeSource("""
                 package demo;
@@ -726,7 +759,7 @@ class CorrectnessLintMojoTest {
                 tempDir.resolve("spring-correctness-linter-baseline.txt")
         );
         setField(mojo, "applyBaseline", false);
-        setField(mojo, "moduleSourceDirectories", tempDir.getFileName().toString() + "=custom-src");
+        setField(mojo, "moduleSourceDirectories", "empty-project=custom-src");
         setField(mojo, "formats", new LinkedHashSet<>(Set.of("json")));
 
         mojo.execute();

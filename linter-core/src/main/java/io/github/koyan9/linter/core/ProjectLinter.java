@@ -14,9 +14,19 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 public final class ProjectLinter {
+
+    private static final Set<String> TYPE_RESOLUTION_RULE_IDS = Set.of(
+            "SPRING_ASYNC_SELF_INVOCATION",
+            "SPRING_TX_SELF_INVOCATION",
+            "SPRING_ENDPOINT_SECURITY"
+    );
 
     private final List<LintRule> rules;
 
@@ -65,7 +75,9 @@ public final class ProjectLinter {
         Map<String, String> fileModules = new HashMap<>();
         Map<String, ModuleAccumulator> modules = initializeModules(context);
 
-        context.typeResolutionIndex();
+        if (requiresTypeResolution()) {
+            context.typeResolutionIndex();
+        }
 
         long fileAnalysisStartNanos = System.nanoTime();
         List<FileAnalysisResult> fileResults = analyzeDocuments(context, options, cachedAnalyses);
@@ -314,14 +326,37 @@ public final class ProjectLinter {
             Map<String, CachedFileAnalysis> cachedAnalyses
     ) {
         List<SourceDocument> documents = context.sourceDocuments();
-        if (documents.size() <= 1) {
+        if (documents.size() <= 1 || !options.parallelFileAnalysis()) {
             return documents.stream()
                     .map(document -> analyzeDocument(document, context, options, cachedAnalyses))
                     .toList();
         }
-        return documents.parallelStream()
-                .map(document -> analyzeDocument(document, context, options, cachedAnalyses))
-                .toList();
+        int parallelism = resolveParallelism(documents.size(), options.fileAnalysisParallelism());
+        if (parallelism <= 1) {
+            return documents.stream()
+                    .map(document -> analyzeDocument(document, context, options, cachedAnalyses))
+                    .toList();
+        }
+
+        ExecutorService executor = Executors.newFixedThreadPool(parallelism);
+        try {
+            List<Future<FileAnalysisResult>> futures = new ArrayList<>(documents.size());
+            for (SourceDocument document : documents) {
+                futures.add(executor.submit(() -> analyzeDocument(document, context, options, cachedAnalyses)));
+            }
+            List<FileAnalysisResult> results = new ArrayList<>(documents.size());
+            for (Future<FileAnalysisResult> future : futures) {
+                results.add(future.get());
+            }
+            return results;
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted while analyzing source files", exception);
+        } catch (ExecutionException exception) {
+            throw new IllegalStateException("Failed to analyze source files", exception.getCause());
+        } finally {
+            executor.shutdownNow();
+        }
     }
 
     private FileAnalysisResult analyzeDocument(
@@ -359,7 +394,7 @@ public final class ProjectLinter {
             );
         }
 
-        SourceUnit sourceUnit = sourceDocument.toSourceUnit(context.parseOutcomeFor(sourceDocument));
+        SourceUnit sourceUnit = context.sourceUnitFor(sourceDocument);
         List<SourceParseProblem> parseProblems = sourceUnit.hasParseProblems()
                 ? List.of(new SourceParseProblem(sourceUnit.path(), sourceUnit.parseProblems()))
                 : List.of();
@@ -425,6 +460,17 @@ public final class ProjectLinter {
             return rootPath.substring(markerIndex).replace('\\', '/');
         }
         return rootPath.replace('\\', '/');
+    }
+
+    private boolean requiresTypeResolution() {
+        return rules.stream().anyMatch(rule -> TYPE_RESOLUTION_RULE_IDS.contains(rule.id()));
+    }
+
+    private int resolveParallelism(int documentCount, int configuredParallelism) {
+        int resolved = configuredParallelism > 0
+                ? configuredParallelism
+                : Runtime.getRuntime().availableProcessors();
+        return Math.max(1, Math.min(documentCount, resolved));
     }
 
     private static final class ModuleAccumulator {

@@ -230,6 +230,8 @@ Rule ids are normalized to uppercase. Rule domains are case-insensitive and acce
 | `spring.correctness.linter.cacheDefaultKeyCacheNames` | _empty_ | Cache names or `*` | Allows default cache keys for specific cache names. `*` allows all caches. |
 | `spring.correctness.linter.cacheFile` | `${project.build.directory}/spring-correctness-linter/analysis-cache.txt` | Path | Incremental cache file path (ignored when cache is disabled or split by module). |
 | `spring.correctness.linter.useIncrementalCache` | `true` | `true` / `false` | Enables file-content-based incremental cache reuse. |
+| `spring.correctness.linter.parallelFileAnalysis` | `true` | `true` / `false` | Enables per-file parallel analysis when multiple source files are present. |
+| `spring.correctness.linter.fileAnalysisParallelism` | `0` | Integer `>= 0` | Caps file-analysis worker count. `0` means auto-detect from available processors. |
 | `spring.correctness.linter.splitBaselineByModule` | `false` | `true` / `false` | Writes module-scoped baseline files under `modules/<module>/` next to the baseline file parent directory. |
 | `spring.correctness.linter.splitCacheByModule` | `false` | `true` / `false` | Writes module-scoped cache files under `modules/<module>/` next to the cache file parent directory. |
 
@@ -493,6 +495,15 @@ Reactor scan with per-module baseline/cache:
   <splitBaselineByModule>true</splitBaselineByModule>
   <splitCacheByModule>true</splitCacheByModule>
   <useIncrementalCache>true</useIncrementalCache>
+</configuration>
+```
+
+Control file-analysis concurrency explicitly:
+
+```xml
+<configuration>
+  <parallelFileAnalysis>true</parallelFileAnalysis>
+  <fileAnalysisParallelism>4</fileAnalysisParallelism>
 </configuration>
 ```
 

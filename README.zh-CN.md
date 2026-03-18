@@ -233,6 +233,8 @@ JSON 和 HTML 报告现在还会包含运行期指标，便于观察：
 | `spring.correctness.linter.cacheDefaultKeyCacheNames` | 空 | cache 名称或 `*` | 指定 cache 名称允许默认 key；`*` 表示全部允许。 |
 | `spring.correctness.linter.cacheFile` | `${project.build.directory}/spring-correctness-linter/analysis-cache.txt` | 路径 | 增量缓存文件路径（缓存关闭或按模块拆分时忽略）。 |
 | `spring.correctness.linter.useIncrementalCache` | `true` | `true` / `false` | 是否启用增量缓存复用。 |
+| `spring.correctness.linter.parallelFileAnalysis` | `true` | `true` / `false` | 当存在多个源码文件时，是否启用按文件并行分析。 |
+| `spring.correctness.linter.fileAnalysisParallelism` | `0` | 大于等于 `0` 的整数 | 控制文件分析线程数上限。`0` 表示自动按 CPU 核数决定。 |
 | `spring.correctness.linter.splitBaselineByModule` | `false` | `true` / `false` | 按模块拆分 baseline，输出到 `modules/<module>/` 下。 |
 | `spring.correctness.linter.splitCacheByModule` | `false` | `true` / `false` | 按模块拆分缓存文件，输出到 `modules/<module>/` 下。 |
 
@@ -495,6 +497,15 @@ Reactor 扫描并按模块拆分 baseline/cache：
   <splitBaselineByModule>true</splitBaselineByModule>
   <splitCacheByModule>true</splitCacheByModule>
   <useIncrementalCache>true</useIncrementalCache>
+</configuration>
+```
+
+显式控制文件分析并发度：
+
+```xml
+<configuration>
+  <parallelFileAnalysis>true</parallelFileAnalysis>
+  <fileAnalysisParallelism>4</fileAnalysisParallelism>
 </configuration>
 ```
 

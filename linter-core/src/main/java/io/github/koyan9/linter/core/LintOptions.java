@@ -15,6 +15,8 @@ public record LintOptions(
         Path baselineFile,
         Path analysisCacheFile,
         boolean useIncrementalCache,
+        boolean parallelFileAnalysis,
+        int fileAnalysisParallelism,
         Map<String, Path> moduleBaselineFiles,
         Map<String, Path> moduleAnalysisCacheFiles,
         Set<RuleDomain> enabledRuleDomains,
@@ -28,11 +30,11 @@ public record LintOptions(
 ) {
 
     public LintOptions(boolean honorInlineSuppressions, boolean applyBaseline, Path baselineFile) {
-        this(honorInlineSuppressions, applyBaseline, baselineFile, null, false, Map.of(), Map.of(), Set.of(), Set.of(), Set.of(), Set.of(), false, false, Set.of(), Set.of());
+        this(honorInlineSuppressions, applyBaseline, baselineFile, null, false, true, 0, Map.of(), Map.of(), Set.of(), Set.of(), Set.of(), Set.of(), false, false, Set.of(), Set.of());
     }
 
     public LintOptions(boolean honorInlineSuppressions, boolean applyBaseline, Path baselineFile, Path analysisCacheFile, boolean useIncrementalCache) {
-        this(honorInlineSuppressions, applyBaseline, baselineFile, analysisCacheFile, useIncrementalCache, Map.of(), Map.of(), Set.of(), Set.of(), Set.of(), Set.of(), false, false, Set.of(), Set.of());
+        this(honorInlineSuppressions, applyBaseline, baselineFile, analysisCacheFile, useIncrementalCache, true, 0, Map.of(), Map.of(), Set.of(), Set.of(), Set.of(), Set.of(), false, false, Set.of(), Set.of());
     }
 
     public LintOptions(
@@ -41,13 +43,18 @@ public record LintOptions(
             Path baselineFile,
             Path analysisCacheFile,
             boolean useIncrementalCache,
+            boolean parallelFileAnalysis,
+            int fileAnalysisParallelism,
             Map<String, Path> moduleBaselineFiles,
             Map<String, Path> moduleAnalysisCacheFiles
     ) {
-        this(honorInlineSuppressions, applyBaseline, baselineFile, analysisCacheFile, useIncrementalCache, moduleBaselineFiles, moduleAnalysisCacheFiles, Set.of(), Set.of(), Set.of(), Set.of(), false, false, Set.of(), Set.of());
+        this(honorInlineSuppressions, applyBaseline, baselineFile, analysisCacheFile, useIncrementalCache, parallelFileAnalysis, fileAnalysisParallelism, moduleBaselineFiles, moduleAnalysisCacheFiles, Set.of(), Set.of(), Set.of(), Set.of(), false, false, Set.of(), Set.of());
     }
 
     public LintOptions {
+        if (fileAnalysisParallelism < 0) {
+            throw new IllegalArgumentException("fileAnalysisParallelism must be >= 0");
+        }
         moduleBaselineFiles = Map.copyOf(moduleBaselineFiles);
         moduleAnalysisCacheFiles = Map.copyOf(moduleAnalysisCacheFiles);
         enabledRuleDomains = Set.copyOf(enabledRuleDomains);
@@ -59,7 +66,7 @@ public record LintOptions(
     }
 
     public static LintOptions defaults() {
-        return new LintOptions(true, true, null, null, false, Map.of(), Map.of(), Set.of(), Set.of(), Set.of(), Set.of(), false, false, Set.of(), Set.of());
+        return new LintOptions(true, true, null, null, false, true, 0, Map.of(), Map.of(), Set.of(), Set.of(), Set.of(), Set.of(), false, false, Set.of(), Set.of());
     }
 
     public LintOptions withAssumeCentralizedSecurity(boolean value) {
@@ -69,6 +76,8 @@ public record LintOptions(
                 baselineFile,
                 analysisCacheFile,
                 useIncrementalCache,
+                parallelFileAnalysis,
+                fileAnalysisParallelism,
                 moduleBaselineFiles,
                 moduleAnalysisCacheFiles,
                 enabledRuleDomains,
@@ -89,6 +98,8 @@ public record LintOptions(
                 baselineFile,
                 analysisCacheFile,
                 useIncrementalCache,
+                parallelFileAnalysis,
+                fileAnalysisParallelism,
                 moduleBaselineFiles,
                 moduleAnalysisCacheFiles,
                 enabledRuleDomains,
@@ -109,6 +120,8 @@ public record LintOptions(
                 baselineFile,
                 analysisCacheFile,
                 useIncrementalCache,
+                parallelFileAnalysis,
+                fileAnalysisParallelism,
                 moduleBaselineFiles,
                 moduleAnalysisCacheFiles,
                 enabledRuleDomains,
@@ -129,6 +142,8 @@ public record LintOptions(
                 baselineFile,
                 analysisCacheFile,
                 useIncrementalCache,
+                parallelFileAnalysis,
+                fileAnalysisParallelism,
                 moduleBaselineFiles,
                 moduleAnalysisCacheFiles,
                 enabledRuleDomains,
@@ -139,6 +154,50 @@ public record LintOptions(
                 autoDetectCentralizedSecurity,
                 customSecurityAnnotations,
                 cacheNames
+        );
+    }
+
+    public LintOptions withParallelFileAnalysis(boolean value) {
+        return new LintOptions(
+                honorInlineSuppressions,
+                applyBaseline,
+                baselineFile,
+                analysisCacheFile,
+                useIncrementalCache,
+                value,
+                fileAnalysisParallelism,
+                moduleBaselineFiles,
+                moduleAnalysisCacheFiles,
+                enabledRuleDomains,
+                disabledRuleDomains,
+                enabledRuleIds,
+                disabledRuleIds,
+                assumeCentralizedSecurity,
+                autoDetectCentralizedSecurity,
+                customSecurityAnnotations,
+                cacheDefaultKeyCacheNames
+        );
+    }
+
+    public LintOptions withFileAnalysisParallelism(int value) {
+        return new LintOptions(
+                honorInlineSuppressions,
+                applyBaseline,
+                baselineFile,
+                analysisCacheFile,
+                useIncrementalCache,
+                parallelFileAnalysis,
+                value,
+                moduleBaselineFiles,
+                moduleAnalysisCacheFiles,
+                enabledRuleDomains,
+                disabledRuleDomains,
+                enabledRuleIds,
+                disabledRuleIds,
+                assumeCentralizedSecurity,
+                autoDetectCentralizedSecurity,
+                customSecurityAnnotations,
+                cacheDefaultKeyCacheNames
         );
     }
 }

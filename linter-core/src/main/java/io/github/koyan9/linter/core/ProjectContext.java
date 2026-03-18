@@ -25,7 +25,8 @@ public final class ProjectContext {
     private final Map<Path, JavaSourceInspector.ParseOutcome> parseOutcomes;
     private final AnnotationMetadataIndex annotationMetadataIndex;
     private final LintOptions options;
-    private final Map<SourceUnit, SpringSemanticFacts> semanticFactsBySourceUnit = new ConcurrentHashMap<>();
+    private final Map<Path, SourceUnit> sourceUnitsByPath = new ConcurrentHashMap<>();
+    private final Map<Path, SpringSemanticFacts> semanticFactsBySourcePath = new ConcurrentHashMap<>();
     private volatile TypeResolutionIndex typeResolutionIndex;
     private volatile Boolean securityFilterChainBeanPresent;
 
@@ -134,7 +135,7 @@ public final class ProjectContext {
 
     public List<SourceUnit> sourceUnits() {
         return sourceDocuments.stream()
-                .map(document -> document.toSourceUnit(parseOutcomes.get(document.path())))
+                .map(this::sourceUnitFor)
                 .toList();
     }
 
@@ -150,8 +151,17 @@ public final class ProjectContext {
         return parseOutcomes.get(sourceDocument.path());
     }
 
+    SourceUnit sourceUnitFor(SourceDocument sourceDocument) {
+        Path key = sourceDocument.path().toAbsolutePath().normalize();
+        return sourceUnitsByPath.computeIfAbsent(
+                key,
+                ignored -> sourceDocument.toSourceUnit(parseOutcomeFor(sourceDocument))
+        );
+    }
+
     public SpringSemanticFacts springFacts(SourceUnit sourceUnit) {
-        return semanticFactsBySourceUnit.computeIfAbsent(sourceUnit, ignored -> SpringSemanticFacts.create(this));
+        Path key = sourceUnit.path().toAbsolutePath().normalize();
+        return semanticFactsBySourcePath.computeIfAbsent(key, ignored -> SpringSemanticFacts.create(this));
     }
 
     public TypeResolutionIndex typeResolutionIndex() {
@@ -159,9 +169,14 @@ public final class ProjectContext {
         if (cached != null) {
             return cached;
         }
-        TypeResolutionIndex built = TypeResolutionIndex.build(this);
-        typeResolutionIndex = built;
-        return built;
+        synchronized (this) {
+            if (typeResolutionIndex != null) {
+                return typeResolutionIndex;
+            }
+            TypeResolutionIndex built = TypeResolutionIndex.build(this);
+            typeResolutionIndex = built;
+            return built;
+        }
     }
 
     public boolean hasSecurityFilterChainBean() {
@@ -175,7 +190,7 @@ public final class ProjectContext {
             }
             boolean found = false;
             for (SourceDocument sourceDocument : sourceDocuments) {
-                SourceUnit sourceUnit = sourceDocument.toSourceUnit(parseOutcomeFor(sourceDocument));
+                SourceUnit sourceUnit = sourceUnitFor(sourceDocument);
                 SpringSemanticFacts facts = springFacts(sourceUnit);
                 for (com.github.javaparser.ast.body.MethodDeclaration method : sourceUnit.structure().methods()) {
                     if (!facts.hasAnnotation(method, "Bean")) {
