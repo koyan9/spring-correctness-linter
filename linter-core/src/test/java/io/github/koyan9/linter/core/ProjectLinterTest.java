@@ -19,6 +19,7 @@ import java.util.stream.Collectors;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ProjectLinterTest {
@@ -936,6 +937,103 @@ class ProjectLinterTest {
         assertEquals(0, secondRun.cachedFileCount());
         assertNotEquals(firstRun.runtimeMetrics().analysisFingerprint(), secondRun.runtimeMetrics().analysisFingerprint());
         assertTrue(secondRun.issues().stream().anyMatch(issue -> issue.ruleId().equals("SPRING_ASYNC_VOID") && issue.severity() == LintSeverity.ERROR));
+    }
+
+    @Test
+    void analyzesMultipleFilesWhenParallelAnalysisDisabled() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("AsyncOnly.java"), """
+                package demo;
+
+                import org.springframework.scheduling.annotation.Async;
+
+                class AsyncOnly {
+
+                    @Async
+                    public void runAsync() {
+                    }
+                }
+                """);
+        Files.writeString(sourceDirectory.resolve("PrivateAsyncOnly.java"), """
+                package demo;
+
+                import org.springframework.scheduling.annotation.Async;
+
+                class PrivateAsyncOnly {
+
+                    @Async
+                    private void runAsync() {
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintOptions options = LintOptions.defaults()
+                .withParallelFileAnalysis(false)
+                .withAutoDetectCentralizedSecurity(false);
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"), options).report();
+        Set<String> issueIds = report.issues().stream().map(LintIssue::ruleId).collect(Collectors.toSet());
+
+        assertEquals(3, report.issueCount());
+        assertEquals(2, report.runtimeMetrics().sourceFileCount());
+        assertEquals(2, report.runtimeMetrics().analyzedFileCount());
+        assertEquals(0, report.runtimeMetrics().cachedFileCount());
+        assertTrue(issueIds.contains("SPRING_ASYNC_VOID"));
+        assertTrue(issueIds.contains("SPRING_ASYNC_PRIVATE_METHOD"));
+    }
+
+    @Test
+    void analyzesMultipleFilesWhenParallelismIsOne() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("AsyncOnly.java"), """
+                package demo;
+
+                import org.springframework.scheduling.annotation.Async;
+
+                class AsyncOnly {
+
+                    @Async
+                    public void runAsync() {
+                    }
+                }
+                """);
+        Files.writeString(sourceDirectory.resolve("TransactionalPrivateOnly.java"), """
+                package demo;
+
+                import org.springframework.transaction.annotation.Transactional;
+
+                class TransactionalPrivateOnly {
+
+                    @Transactional
+                    private void runTransactional() {
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintOptions options = LintOptions.defaults()
+                .withParallelFileAnalysis(true)
+                .withFileAnalysisParallelism(1);
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"), options).report();
+        Set<String> issueIds = report.issues().stream().map(LintIssue::ruleId).collect(Collectors.toSet());
+
+        assertEquals(2, report.issueCount());
+        assertEquals(2, report.runtimeMetrics().sourceFileCount());
+        assertEquals(2, report.runtimeMetrics().analyzedFileCount());
+        assertTrue(issueIds.contains("SPRING_ASYNC_VOID"));
+        assertTrue(issueIds.contains("SPRING_TX_PRIVATE_METHOD"));
+    }
+
+    @Test
+    void rejectsNegativeFileAnalysisParallelism() {
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> LintOptions.defaults().withFileAnalysisParallelism(-1)
+        );
+
+        assertTrue(exception.getMessage().contains("fileAnalysisParallelism"));
     }
 
     @Test
