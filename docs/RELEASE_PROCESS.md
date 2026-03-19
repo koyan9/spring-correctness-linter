@@ -18,10 +18,12 @@ Template fallback is acceptable for small internal or prerelease builds when you
 Run these commands from the repository root before triggering the release workflow:
 
 - `mvnw.cmd -q verify` on Windows, or `./mvnw -q verify` on macOS / Linux
+- `mvnw.cmd -q -Prelease-artifacts verify` on Windows, or `./mvnw -q -Prelease-artifacts verify` on macOS / Linux
 - `mvnw.cmd -q -DskipTests install` on Windows, or `./mvnw -q -DskipTests install` on macOS / Linux
 - `mvnw.cmd -q -f samples/vulnerable-sample/pom.xml -DskipTests verify` on Windows, or `./mvnw -q -f samples/vulnerable-sample/pom.xml -DskipTests verify` on macOS / Linux
 - `mvnw.cmd -q -f samples/reactor-sample/pom.xml -DskipTests verify` on Windows, or `./mvnw -q -f samples/reactor-sample/pom.xml -DskipTests verify` on macOS / Linux
 - `mvnw.cmd -q -f samples/adoption-suite/pom.xml -DskipTests verify` on Windows, or `./mvnw -q -f samples/adoption-suite/pom.xml -DskipTests verify` on macOS / Linux
+- `mvnw.cmd -q -Pcentral-publish -DskipTests verify` on Windows, or `./mvnw -q -Pcentral-publish -DskipTests verify` on macOS / Linux
 
 Also confirm the following before release:
 
@@ -39,11 +41,20 @@ Trigger `.github/workflows/release.yml` with these inputs:
 
 The workflow currently:
 
+- checks out the requested Git tag instead of the branch tip
+- imports Maven Central credentials and GPG signing material from GitHub Secrets
 - runs `mvn -B -q verify`
-- builds release artifacts with the `release-artifacts` profile
-- collects generated JARs from `linter-core` and `linter-maven-plugin`
+- runs `mvn -B -q -Pcentral-publish -DskipTests -Dcentral.publish.auto=true -Dcentral.publish.waitUntil=published deploy`
+- collects generated JARs, POMs, and ASCII-armored signatures from `linter-core` and `linter-maven-plugin`
 - uses `RELEASE_NOTES_vX.Y.Z.md` when present, otherwise falls back to `RELEASE_NOTES_TEMPLATE.md`
-- creates the GitHub release with the generated notes and collected artifacts
+- creates the GitHub release with the generated notes and collected artifacts only after Central publication is acknowledged
+
+Required GitHub Secrets:
+
+- `MAVEN_CENTRAL_USERNAME`
+- `MAVEN_CENTRAL_PASSWORD`
+- `MAVEN_GPG_PRIVATE_KEY`
+- `MAVEN_GPG_PASSPHRASE`
 
 ## Current release scope
 
@@ -53,14 +64,7 @@ The current repository is prepared for:
 - GitHub release note generation
 - GitHub release artifact publication
 - local Maven Central publication through the `central-publish` profile
-
-The current repository is **not yet automated** for Maven Central publication from GitHub Actions.
-
-Remaining automation gaps include:
-
-- CI secrets for Central Portal credentials
-- CI handling for GPG signing material
-- a dedicated workflow step or workflow that runs `deploy` with the `central-publish` profile
+- GitHub Actions based Maven Central publication for tagged releases
 
 ## Local Maven Central publication
 
@@ -70,6 +74,7 @@ Current local publication prerequisites:
 - that `server` uses a Sonatype Central Portal user token, not a normal website password
 - GPG signing is available locally
 - the namespace for `io.github.koyan9` is already verified in Sonatype Central Portal
+- local credentials are provided through environment variables or encrypted Maven settings, not plaintext values committed to the repository
 
 The parent `pom.xml` now provides a `central-publish` profile that:
 
@@ -77,6 +82,34 @@ The parent `pom.xml` now provides a `central-publish` profile that:
 - attaches javadocs
 - signs artifacts with GPG
 - publishes through `org.sonatype.central:central-publishing-maven-plugin`
+- defaults to manual Central publication locally and can be overridden in CI with `-Dcentral.publish.auto=true -Dcentral.publish.waitUntil=published`
+
+Recommended secure `settings.xml` pattern:
+
+```xml
+<settings>
+  <servers>
+    <server>
+      <id>central</id>
+      <username>${env.MAVEN_CENTRAL_USERNAME}</username>
+      <password>${env.MAVEN_CENTRAL_PASSWORD}</password>
+    </server>
+  </servers>
+  <profiles>
+    <profile>
+      <id>central</id>
+      <properties>
+        <gpg.passphrase>${env.MAVEN_GPG_PASSPHRASE}</gpg.passphrase>
+      </properties>
+    </profile>
+  </profiles>
+  <activeProfiles>
+    <activeProfile>central</activeProfile>
+  </activeProfiles>
+</settings>
+```
+
+If `gpg` is not on `PATH`, define `gpg.executable` in a local-only Maven profile instead of hardcoding it into the repository.
 
 Recommended local publish command:
 
@@ -89,10 +122,12 @@ If your GPG setup requires loopback passphrase handling, provide the passphrase 
 
 Recommended dry run before the real publish:
 
-- `mvnw.cmd -q -Pcentral-publish -DskipTests package` on Windows
-- `./mvnw -q -Pcentral-publish -DskipTests package` on macOS / Linux
+- `mvnw.cmd -q -Pcentral-publish -DskipTests verify` on Windows
+- `./mvnw -q -Pcentral-publish -DskipTests verify` on macOS / Linux
 
 This validates sources, javadocs, and signing configuration before a real deploy attempt.
+
+For local deploys, the default `central-publish` profile uploads for manual review only. The GitHub Actions workflow overrides this to automatic publish and waits for the deployment to reach the `published` state before creating the GitHub release.
 
 ## Suggested release-note content
 

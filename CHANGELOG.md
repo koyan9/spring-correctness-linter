@@ -72,6 +72,8 @@ All notable changes to `spring-correctness-linter` will be documented in this fi
 - Incremental cache reuse is now documented with explicit fingerprint-based invalidation semantics
 - `README.zh-CN.md` is aligned with the English README for runtime metrics, cache guidance, and code scanning integration
 - Analysis now reuses annotation parse results and avoids redundant hashing to improve end-to-end scan performance
+- Release workflow now checks out the requested tag, publishes to Maven Central, and only then creates the GitHub release
+- Release documentation now recommends environment-backed Maven Central and GPG credentials instead of plaintext settings examples
 
 ### Fixed
 

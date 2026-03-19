@@ -32,6 +32,7 @@
   - Added `lightweightReports` for smaller JSON output
   - Added `autoDetectCentralizedSecurity` and `autoDetectProjectWideKeyGenerator` for explicit opt-in convention detection
   - Unknown report formats now warn instead of failing silently
+  - GitHub Actions release automation now imports Central credentials and GPG signing material, publishes to Maven Central, and only then creates the GitHub release
 - Report generation changes:
   - Added `rules-governance.json`
   - Added lightweight JSON output mode
@@ -74,6 +75,7 @@
   - `spring.correctness.linter.autoDetectProjectWideKeyGenerator`
 - Maven Central publication:
   - The repository now includes a `central-publish` Maven profile for local Sonatype Central publication with sources, javadocs, and GPG signing
+  - Local `settings.xml` examples now use environment-backed credentials and passphrases instead of plaintext token values
 - Cache invalidation or analysis fingerprint notes:
   - Incremental cache reuse is still invalidated automatically when effective rule configuration or implementation changes
 - PowerShell, sample, or CI workflow notes:

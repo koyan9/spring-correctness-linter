@@ -38,7 +38,7 @@
         <connection>scm:git:https://github.com/koyan9/spring-correctness-linter.git</connection>
         <developerConnection>scm:git:ssh://git@github.com/koyan9/spring-correctness-linter.git</developerConnection>
         <url>https://github.com/koyan9/spring-correctness-linter</url>
-        <tag>HEAD</tag>
+        <tag>v0.1.1</tag>
     </scm>
     <issueManagement>
         <system>GitHub Issues</system>
@@ -65,6 +65,8 @@
         <maven.plugin.api.version>3.9.9</maven.plugin.api.version>
         <maven.plugin.tools.version>3.15.1</maven.plugin.tools.version>
         <sonatype.central.plugin.version>0.9.0</sonatype.central.plugin.version>
+        <central.publish.auto>false</central.publish.auto>
+        <central.publish.waitUntil>validated</central.publish.waitUntil>
         <maven.source.plugin.version>3.3.1</maven.source.plugin.version>
         <maven.surefire.plugin.version>3.3.1</maven.surefire.plugin.version>
         <project.build.outputTimestamp>2026-03-06T00:00:00Z</project.build.outputTimestamp>
@@ -225,7 +227,8 @@
                         <configuration>
                             <publishingServerId>central</publishingServerId>
                             <deploymentName>${project.groupId}:${project.artifactId}:${project.version}</deploymentName>
-                            <autoPublish>false</autoPublish>
+                            <autoPublish>${central.publish.auto}</autoPublish>
+                            <waitUntil>${central.publish.waitUntil}</waitUntil>
                         </configuration>
                     </plugin>
                 </plugins>
