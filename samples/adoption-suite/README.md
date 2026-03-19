@@ -27,18 +27,31 @@ Each app is intentionally small and focused:
 - a conventional plugin declaration in a consumer project
 - normal JSON / HTML outputs
 - visible findings with no baseline or special conventions enabled
+- expected result: non-zero issues
 
 ### `centralized-security-app`
 
 - public controller endpoints
 - a centralized `SecurityFilterChain` bean
 - `autoDetectCentralizedSecurity=true` suppressing controller-security noise
+- expected result: `0` visible issues
 
 ### `cache-convention-app`
 
 - parameterized `@Cacheable` methods without explicit key declarations
 - a project-wide key convention through `CachingConfigurerSupport`
 - `autoDetectProjectWideKeyGenerator=true` suppressing cache-key noise
+- expected result: `0` visible issues
+
+## Expected Findings
+
+- `basic-app`
+  - expected to report visible findings
+  - currently demonstrates `SPRING_ASYNC_VOID` and `SPRING_ENDPOINT_SECURITY`
+- `centralized-security-app`
+  - expected to report `0` visible issues because centralized-security auto-detection is enabled
+- `cache-convention-app`
+  - expected to report `0` visible issues because project-wide key-generator auto-detection is enabled
 
 ## Suggested Validation Commands
 

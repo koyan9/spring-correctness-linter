@@ -22,6 +22,24 @@ and slow-module summaries when multiple modules are scanned.
 
 The governance snapshot is especially useful when you want to verify which rule ids, domains, and severities are actually active in the current run.
 
+## Expected Findings
+
+This sample is intentionally noisy. Under the default rule set, visible findings are expected.
+
+Typical findings include:
+
+- `SPRING_ENDPOINT_SECURITY` from `DemoController.openEndpoint()`
+- `SPRING_PROFILE_CONTROLLER` from the controller-level `@Profile`
+- `SPRING_ASYNC_VOID`, `SPRING_ASYNC_PRIVATE_METHOD`, and `SPRING_ASYNC_FINAL_METHOD` from the async methods in `DemoService`
+- `SPRING_TX_SELF_INVOCATION`, `SPRING_TX_PRIVATE_METHOD`, `SPRING_TX_FINAL_METHOD`, and `SPRING_TX_HIGH_RISK_PROPAGATION` from transactional patterns in `DemoService`
+- `SPRING_TX_FINAL_CLASS` from `FinalTransactionalService`
+- `SPRING_EVENT_LISTENER_TRANSACTIONAL` and `SPRING_TRANSACTIONAL_EVENT_LISTENER` from event listener boundaries
+- `SPRING_SCHEDULED_*` findings from intentionally conflicting or unsafe scheduling definitions
+- `SPRING_LIFECYCLE_*` and `SPRING_STARTUP_*` findings from lifecycle / startup callbacks
+- `SPRING_CONDITIONAL_BEAN_CONFLICT` from `ConditionalConfig`
+
+Some of these are deterministic proxy-boundary mistakes. Others are advisory Spring runtime-risk reviews by design. This sample exists to demonstrate both kinds.
+
 ## Recommended bundles
 
 This sample is the best fit when you want to validate domain bundles that focus on single-module runtime semantics:
