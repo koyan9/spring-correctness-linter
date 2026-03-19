@@ -44,6 +44,23 @@ The parent reactor report groups findings by module, and child modules are skipp
 
 Run the same verification command twice to see per-module cache hits increase in the reactor root `lint-report.json`.
 
+## Expected Findings
+
+On the default configuration, this sample is expected to produce 4 visible findings:
+
+- `module-a`
+  - `SPRING_ASYNC_VOID` from `ModuleAsyncService.runAsync()`
+  - `SPRING_ASYNC_PRIVATE_METHOD` from `ModuleAsyncService.runAsync()`
+- `root-app`
+  - `SPRING_ASYNC_VOID` from `RootAsyncService.runAsync()`
+  - `SPRING_TX_SELF_INVOCATION` from `RootTransactionalService.run(...)` calling inherited transactional method `process(...)`
+
+This is intentional. The sample exists to confirm that:
+
+- findings are grouped by module correctly
+- cross-module inherited transactional self-invocation is still detected
+- async findings in different modules are aggregated into one reactor report
+
 ## Report demo
 
 - Governance-oriented output:
