@@ -45,6 +45,25 @@ The workflow currently:
 - uses `RELEASE_NOTES_vX.Y.Z.md` when present, otherwise falls back to `RELEASE_NOTES_TEMPLATE.md`
 - creates the GitHub release with the generated notes and collected artifacts
 
+## Current release scope
+
+The current repository is prepared for:
+
+- version bumps in the Maven project metadata
+- GitHub release note generation
+- GitHub release artifact publication
+
+The current repository is **not yet configured** for publishing to Maven Central or another remote Maven repository.
+
+Missing pieces for Maven-repository publication typically include:
+
+- `distributionManagement` or a dedicated publish plugin configuration
+- repository credentials and CI secrets
+- artifact signing (for example GPG-based signing if required by the target repository)
+- a release workflow step that runs `deploy` or the repository-specific publish command
+
+Before announcing Maven-repository publication support, add and validate those pieces explicitly.
+
 ## Suggested release-note content
 
 For non-trivial releases, prefer filling these sections explicitly:
