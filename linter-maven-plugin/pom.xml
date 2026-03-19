@@ -16,6 +16,8 @@
 
     <artifactId>spring-correctness-linter-maven-plugin</artifactId>
     <packaging>maven-plugin</packaging>
+    <name>spring-correctness-linter-maven-plugin</name>
+    <description>Maven plugin that runs spring-correctness-linter against Spring projects during the build.</description>
 
     <dependencies>
         <dependency>

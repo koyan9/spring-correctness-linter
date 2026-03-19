@@ -16,6 +16,8 @@
 
     <artifactId>spring-correctness-linter-core</artifactId>
     <packaging>jar</packaging>
+    <name>spring-correctness-linter-core</name>
+    <description>Core AST-based Spring correctness analysis engine used by the Maven plugin.</description>
 
     <dependencies>
         <dependency>
