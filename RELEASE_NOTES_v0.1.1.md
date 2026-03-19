@@ -72,6 +72,8 @@
   - `spring.correctness.linter.lightweightReports`
   - `spring.correctness.linter.autoDetectCentralizedSecurity`
   - `spring.correctness.linter.autoDetectProjectWideKeyGenerator`
+- Maven Central publication:
+  - The repository now includes a `central-publish` Maven profile for local Sonatype Central publication with sources, javadocs, and GPG signing
 - Cache invalidation or analysis fingerprint notes:
   - Incremental cache reuse is still invalidated automatically when effective rule configuration or implementation changes
 - PowerShell, sample, or CI workflow notes:

@@ -52,17 +52,47 @@ The current repository is prepared for:
 - version bumps in the Maven project metadata
 - GitHub release note generation
 - GitHub release artifact publication
+- local Maven Central publication through the `central-publish` profile
 
-The current repository is **not yet configured** for publishing to Maven Central or another remote Maven repository.
+The current repository is **not yet automated** for Maven Central publication from GitHub Actions.
 
-Missing pieces for Maven-repository publication typically include:
+Remaining automation gaps include:
 
-- `distributionManagement` or a dedicated publish plugin configuration
-- repository credentials and CI secrets
-- artifact signing (for example GPG-based signing if required by the target repository)
-- a release workflow step that runs `deploy` or the repository-specific publish command
+- CI secrets for Central Portal credentials
+- CI handling for GPG signing material
+- a dedicated workflow step or workflow that runs `deploy` with the `central-publish` profile
 
-Before announcing Maven-repository publication support, add and validate those pieces explicitly.
+## Local Maven Central publication
+
+Current local publication prerequisites:
+
+- `settings.xml` contains a `server` with id `central`
+- that `server` uses a Sonatype Central Portal user token, not a normal website password
+- GPG signing is available locally
+- the namespace for `io.github.koyan9` is already verified in Sonatype Central Portal
+
+The parent `pom.xml` now provides a `central-publish` profile that:
+
+- attaches sources
+- attaches javadocs
+- signs artifacts with GPG
+- publishes through `org.sonatype.central:central-publishing-maven-plugin`
+
+Recommended local publish command:
+
+- Windows:
+  - `mvnw.cmd -q -Pcentral-publish -DskipTests deploy`
+- macOS / Linux:
+  - `./mvnw -q -Pcentral-publish -DskipTests deploy`
+
+If your GPG setup requires loopback passphrase handling, provide the passphrase in the way your local GPG setup expects before running the command.
+
+Recommended dry run before the real publish:
+
+- `mvnw.cmd -q -Pcentral-publish -DskipTests package` on Windows
+- `./mvnw -q -Pcentral-publish -DskipTests package` on macOS / Linux
+
+This validates sources, javadocs, and signing configuration before a real deploy attempt.
 
 ## Suggested release-note content
 
