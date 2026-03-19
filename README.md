@@ -2,6 +2,8 @@
 
 [中文说明](README.zh-CN.md)
 
+Detailed adoption guide: [quick-start.md](quick-start.md)
+
 `spring-correctness-linter` is a Maven-first static analysis tool for Spring applications. It focuses on **correctness and runtime semantics**, not general Java style. The project is designed to catch Spring-specific problems that compile successfully but often fail later in CI, integration testing, or production.
 
 ## Highlights
@@ -47,6 +49,7 @@ Supporting directories:
 
 - `samples/vulnerable-sample/`: single-module sample for baseline, reports, and common rule behavior
 - `samples/reactor-sample/`: multi-module reactor sample for module-aware scanning and per-module outputs
+- `samples/adoption-suite/`: consumer-style sample apps that demonstrate realistic plugin adoption patterns
 
 ## Analysis Flow
 
@@ -78,6 +81,8 @@ The default rule set currently focuses on:
 Some rules that need type resolution (for example `SPRING_TX_SELF_INVOCATION`) use a conservative lookup strategy: same-package matches first, then explicit or wildcard imports, and finally unique simple-name matches when unambiguous. The shared implementation lives in `TypeResolutionIndex` under `linter-core/`. See `docs/RULE_DEVELOPMENT.md` for the current resolution guidance.
 
 ## Quick Start
+
+For a scenario-oriented, step-by-step adoption guide, see [quick-start.md](quick-start.md).
 
 ### Build and verify
 
@@ -695,17 +700,27 @@ A multi-module Maven reactor sample that demonstrates:
 - per-module baseline output
 - per-module incremental cache output
 
+### `samples/adoption-suite/`
+
+A set of small consumer-style applications that demonstrate how real projects can adopt the plugin with:
+
+- baseline and report generation
+- centralized-security auto-detection
+- project-wide cache key conventions
+
 ## Repository Structure
 
 - `linter-core/`: core analysis engine and rules
 - `linter-maven-plugin/`: Maven integration
 - `samples/vulnerable-sample/`: single-module validation sample
 - `samples/reactor-sample/`: reactor validation sample
+- `samples/adoption-suite/`: adoption-oriented sample suite
 - `CHANGELOG.md`: release history
 - `RELEASE_NOTES_TEMPLATE.md`: release notes template
 - `docs/RELEASE_PROCESS.md`: release checklist and workflow guide
 - `docs/RULE_DEVELOPMENT.md`: rule implementation and semantic-facts guide
 - `docs/ACCURACY_BACKLOG.md`: prioritized rule-accuracy and regression-test backlog
+- `quick-start.md`: detailed adoption and rollout guide
 
 ## Current Status
 
