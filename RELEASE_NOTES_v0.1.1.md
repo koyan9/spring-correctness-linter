@@ -85,3 +85,4 @@
 - `./mvnw -q -pl linter-maven-plugin -am test`
 - `./mvnw -q -f samples/vulnerable-sample/pom.xml -DskipTests verify`
 - `./mvnw -q -f samples/reactor-sample/pom.xml -DskipTests verify`
+- `./mvnw -q -f samples/adoption-suite/pom.xml -DskipTests verify`

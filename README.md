@@ -676,6 +676,7 @@ Recommended validation flow:
 2. Re-run the affected sample:
    - `samples/vulnerable-sample/` for single-module, report, suppression, and baseline changes
    - `samples/reactor-sample/` for reactor, multi-root, module grouping, and per-module baseline/cache changes
+   - `samples/adoption-suite/` for consumer-style plugin adoption, centralized security, and project-wide cache-key convention changes
 3. Run `./mvnw -q -DskipTests install` before release-sensitive or sample-installation-sensitive changes
 
 Coverage:

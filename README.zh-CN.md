@@ -678,6 +678,7 @@ SARIF 结果中还包含 `moduleId` 字段，方便按模块定位问题。
 2. 根据改动范围重跑样例：
    - `samples/vulnerable-sample/`：单模块、报告、baseline、suppressions 相关
    - `samples/reactor-sample/`：模块扫描、reactor、模块拆分 baseline/cache 相关
+   - `samples/adoption-suite/`：真实接入路径、集中式安全、项目级 cache key 约定相关
 3. 对发布前或样例安装链路有影响时，再运行 `./mvnw -q -DskipTests install`
 
 覆盖率：

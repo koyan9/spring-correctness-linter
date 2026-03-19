@@ -21,6 +21,7 @@ Run these commands from the repository root before triggering the release workfl
 - `mvnw.cmd -q -DskipTests install` on Windows, or `./mvnw -q -DskipTests install` on macOS / Linux
 - `mvnw.cmd -q -f samples/vulnerable-sample/pom.xml -DskipTests verify` on Windows, or `./mvnw -q -f samples/vulnerable-sample/pom.xml -DskipTests verify` on macOS / Linux
 - `mvnw.cmd -q -f samples/reactor-sample/pom.xml -DskipTests verify` on Windows, or `./mvnw -q -f samples/reactor-sample/pom.xml -DskipTests verify` on macOS / Linux
+- `mvnw.cmd -q -f samples/adoption-suite/pom.xml -DskipTests verify` on Windows, or `./mvnw -q -f samples/adoption-suite/pom.xml -DskipTests verify` on macOS / Linux
 
 Also confirm the following before release:
 
