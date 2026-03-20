@@ -88,23 +88,23 @@ jobs:
           else
             cp RELEASE_NOTES_TEMPLATE.md RELEASE_NOTES.md
             python - <<'PY'
-from pathlib import Path
-import os
+            from pathlib import Path
+            import os
 
-path = Path("RELEASE_NOTES.md")
-lines = path.read_text(encoding="utf-8").splitlines()
-if lines:
-    lines[0] = f"# {os.environ['RELEASE_NAME']}"
+            path = Path("RELEASE_NOTES.md")
+            lines = path.read_text(encoding="utf-8").splitlines()
+            if lines:
+                lines[0] = f"# {os.environ['RELEASE_NAME']}"
 
-lines.extend([
-    "",
-    "> Drafted automatically from `RELEASE_NOTES_TEMPLATE.md`.",
-    f"> Tag: `{os.environ['RELEASE_TAG']}`",
-    f"> Prerelease: `{os.environ['RELEASE_PRERELEASE']}`",
-])
+            lines.extend([
+                "",
+                "> Drafted automatically from `RELEASE_NOTES_TEMPLATE.md`.",
+                f"> Tag: `{os.environ['RELEASE_TAG']}`",
+                f"> Prerelease: `{os.environ['RELEASE_PRERELEASE']}`",
+            ])
 
-path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-PY
+            path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            PY
             echo "Using templated release notes for ${RELEASE_TAG}"
           fi
 
