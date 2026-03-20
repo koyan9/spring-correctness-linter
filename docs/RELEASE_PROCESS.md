@@ -81,7 +81,7 @@ Recommended GitHub branch protection for `main`:
 - require passing checks:
   - `Verify (Java 17)`
   - `Verify (Java 21)`
-- allow direct pushes only for the repository owner
+- on this personal repository, collaborators must use PRs while the repository owner retains admin-level bypass
 
 This keeps external collaborators on a PR-based workflow while preserving an owner override for emergencies.
 
