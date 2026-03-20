@@ -719,6 +719,7 @@ A set of small consumer-style applications that demonstrate how real projects ca
 - `CHANGELOG.md`: release history
 - `RELEASE_NOTES_TEMPLATE.md`: release notes template
 - `docs/RELEASE_PROCESS.md`: release checklist and workflow guide
+- `docs/MAINTAINER_GUIDE.md`: branch protection, release ownership, and maintainer operations
 - `docs/RULE_DEVELOPMENT.md`: rule implementation and semantic-facts guide
 - `docs/ACCURACY_BACKLOG.md`: prioritized rule-accuracy and regression-test backlog
 - `quick-start.md`: detailed adoption and rollout guide

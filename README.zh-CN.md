@@ -721,6 +721,7 @@ SARIF 结果中还包含 `moduleId` 字段，方便按模块定位问题。
 - `CHANGELOG.md`：变更记录
 - `RELEASE_NOTES_TEMPLATE.md`：发布说明模板
 - `docs/RELEASE_PROCESS.md`：发布检查清单与工作流说明
+- `docs/MAINTAINER_GUIDE.md`：维护者的分支保护、发布与运维手册
 - `docs/RULE_DEVELOPMENT.md`：规则实现与语义层开发说明
 - `quick-start.zh-CN.md`：详细接入与落地手册
 
