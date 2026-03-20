@@ -12,10 +12,11 @@
 - Keep changes focused and minimal
 - Add or update tests for behavior changes
 - Update README / CHANGELOG / release notes template when needed
+- Treat `main` as protected: open a PR for normal changes instead of pushing directly
 - Validate project-local samples before release if your change affects integration behavior
 - Validate both `samples/vulnerable-sample/` and `samples/reactor-sample/` when changing plugin integration, module scanning, baseline handling, or report generation
-- When preparing a release, add `RELEASE_NOTES_vX.Y.Z.md`; if a versioned file is missing, the workflow falls back to `RELEASE_NOTES_TEMPLATE.md` and auto-fills release name / tag metadata
-- Follow `docs/RELEASE_PROCESS.md` for the recommended release checklist, workflow inputs, and release-note expectations
+- When preparing a release, add `RELEASE_NOTES_vX.Y.Z.md`; pushing the annotated `vX.Y.Z` tag then triggers automatic publication
+- Follow `docs/RELEASE_PROCESS.md` for the recommended release checklist, protected-branch expectations, and release-note guidance
 - Follow `docs/RULE_DEVELOPMENT.md` when adding or refactoring rules so semantic helpers and rule structure stay consistent
 - Check `docs/ACCURACY_BACKLOG.md` when choosing the next rule-hardening or false-positive-reduction task
 

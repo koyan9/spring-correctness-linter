@@ -31,16 +31,19 @@ Also confirm the following before release:
 - `README.md` and `README.zh-CN.md` are aligned if user-facing behavior changed
 - release notes mention any new Maven properties, cache invalidation semantics, or SARIF / CI integration changes
 
-## Release workflow inputs
+## Release workflow triggers
 
-Trigger `.github/workflows/release.yml` with these inputs:
+The primary release path is now automatic:
 
-- `tag`: Git tag to release, for example `v0.1.1`
-- `release_name`: Human-readable GitHub release title
-- `prerelease`: Set to `true` for preview builds and `false` for stable releases
+- push an annotated tag such as `v0.1.1`
+- GitHub Actions publishes the Maven Central bundle
+- GitHub Actions creates the GitHub Release after Central publication succeeds
+
+Manual fallback is still available through `.github/workflows/release.yml` with a single `tag` input when you need to rerun a tagged release job.
 
 The workflow currently:
 
+- runs only for `v*` tags or explicit manual fallback
 - checks out the requested Git tag instead of the branch tip
 - imports Maven Central credentials and GPG signing material from GitHub Secrets
 - runs `mvn -B -q verify`
@@ -65,6 +68,22 @@ The current repository is prepared for:
 - GitHub release artifact publication
 - local Maven Central publication through the `central-publish` profile
 - GitHub Actions based Maven Central publication for tagged releases
+- protected-branch contribution flow on `main`
+
+## Protected main branch
+
+Recommended GitHub branch protection for `main`:
+
+- require pull requests before merge
+- require one approving review
+- dismiss stale reviews when new commits are pushed
+- require conversation resolution before merge
+- require passing checks:
+  - `Verify (Java 17)`
+  - `Verify (Java 21)`
+- allow direct pushes only for the repository owner
+
+This keeps external collaborators on a PR-based workflow while preserving an owner override for emergencies.
 
 ## Local Maven Central publication
 

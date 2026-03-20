@@ -17,6 +17,7 @@ concurrency:
 
 jobs:
   verify:
+    name: Verify (Java ${{ matrix.java-version }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
