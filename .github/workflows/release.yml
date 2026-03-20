@@ -87,24 +87,7 @@ jobs:
             echo "Using versioned release notes from $NOTES_FILE"
           else
             cp RELEASE_NOTES_TEMPLATE.md RELEASE_NOTES.md
-            python - <<'PY'
-            from pathlib import Path
-            import os
-
-            path = Path("RELEASE_NOTES.md")
-            lines = path.read_text(encoding="utf-8").splitlines()
-            if lines:
-                lines[0] = f"# {os.environ['RELEASE_NAME']}"
-
-            lines.extend([
-                "",
-                "> Drafted automatically from `RELEASE_NOTES_TEMPLATE.md`.",
-                f"> Tag: `{os.environ['RELEASE_TAG']}`",
-                f"> Prerelease: `{os.environ['RELEASE_PRERELEASE']}`",
-            ])
-
-            path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-            PY
+            python3 -c "from pathlib import Path; import os; path = Path('RELEASE_NOTES.md'); lines = path.read_text(encoding='utf-8').splitlines(); lines[0] = f\"# {os.environ['RELEASE_NAME']}\" if lines else f\"# {os.environ['RELEASE_NAME']}\"; lines.extend(['', '> Drafted automatically from `RELEASE_NOTES_TEMPLATE.md`.', f\"> Tag: `{os.environ['RELEASE_TAG']}`\", f\"> Prerelease: `{os.environ['RELEASE_PRERELEASE']}`\"]); path.write_text('\n'.join(lines) + '\n', encoding='utf-8')"
             echo "Using templated release notes for ${RELEASE_TAG}"
           fi
 
