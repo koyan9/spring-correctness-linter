@@ -76,39 +76,48 @@ public final class CacheableWithoutKeyRule extends AbstractSpringRule {
         SpringSemanticFacts facts = context.springFacts(sourceUnit);
         for (TypeDeclaration<?> typeDeclaration : sourceUnit.structure().typeDeclarations()) {
             for (MethodDeclaration method : sourceUnit.structure().methodsOf(typeDeclaration)) {
-                MethodSemanticFacts methodFacts = facts.methodFacts(typeDeclaration, method);
-                if (methodFacts.shouldDeclareExplicitCacheKey()) {
-                    if (isDefaultCacheKeyAllowed(typeDeclaration, method, facts, context.options().cacheDefaultKeyCacheNames())) {
-                        continue;
+                List<SpringSemanticFacts.CacheableOperation> cacheableOperations = facts.cacheableOperations(typeDeclaration, method);
+                if (cacheableOperations.isEmpty() || method.getParameters().isEmpty()) {
+                    continue;
+                }
+                if (cacheableOperations.stream().anyMatch(operation -> !operation.explicitKeyStrategy())) {
+                    if (!isDefaultCacheKeyAllowed(typeDeclaration, cacheableOperations, facts, context.options().cacheDefaultKeyCacheNames())) {
+                        issues.add(issue(sourceUnit, JavaSourceInspector.lineOf(method), "@Cacheable method '" + method.getNameAsString() + "' does not declare an explicit cache key strategy."));
                     }
-                    issues.add(issue(sourceUnit, JavaSourceInspector.lineOf(method), "@Cacheable method '" + method.getNameAsString() + "' does not declare an explicit cache key strategy."));
                 }
             }
         }
         return issues;
     }
 
-    private boolean isDefaultCacheKeyAllowed(TypeDeclaration<?> typeDeclaration, MethodDeclaration method, SpringSemanticFacts facts, java.util.Set<String> cacheNames) {
+    private boolean isDefaultCacheKeyAllowed(
+            TypeDeclaration<?> typeDeclaration,
+            List<SpringSemanticFacts.CacheableOperation> cacheableOperations,
+            SpringSemanticFacts facts,
+            java.util.Set<String> cacheNames
+    ) {
         if (cacheNames.isEmpty()) {
             return false;
         }
         if (cacheNames.contains("*")) {
             return true;
         }
-        for (String cacheName : cacheNames) {
-            if (cacheName.isBlank()) {
+        java.util.Set<String> typeCacheNames = facts.typeCacheNames(typeDeclaration);
+        for (SpringSemanticFacts.CacheableOperation operation : cacheableOperations) {
+            if (operation.explicitKeyStrategy()) {
                 continue;
             }
-            if (facts.annotationMemberContainsExactStringLiteral(method, "Cacheable", "cacheNames", cacheName)
-                    || facts.annotationMemberContainsExactStringLiteral(method, "Cacheable", "value", cacheName)) {
-                return true;
+            java.util.Set<String> effectiveCacheNames = operation.cacheNames().isEmpty() ? typeCacheNames : operation.cacheNames();
+            if (effectiveCacheNames.isEmpty()) {
+                return false;
             }
-            if (typeDeclaration != null
-                    && (facts.annotationMemberContainsExactStringLiteral(typeDeclaration, "CacheConfig", "cacheNames", cacheName)
-                    || facts.annotationMemberContainsExactStringLiteral(typeDeclaration, "CacheConfig", "value", cacheName))) {
-                return true;
+            boolean allowed = effectiveCacheNames.stream()
+                    .filter(cacheName -> !cacheName.isBlank())
+                    .anyMatch(cacheNames::contains);
+            if (!allowed) {
+                return false;
             }
         }
-        return false;
+        return true;
     }
 }

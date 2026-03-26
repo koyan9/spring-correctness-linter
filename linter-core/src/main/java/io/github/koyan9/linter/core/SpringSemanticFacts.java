@@ -7,9 +7,12 @@ package io.github.koyan9.linter.core;
 
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.TypeDeclaration;
+import com.github.javaparser.ast.expr.AnnotationExpr;
 import com.github.javaparser.ast.nodeTypes.NodeWithAnnotations;
 
 import java.util.IdentityHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -22,6 +25,8 @@ public final class SpringSemanticFacts {
     private final Map<MethodDeclaration, Boolean> requestMappingCache = new IdentityHashMap<>();
     private final Map<TypeDeclaration<?>, TypeSemanticFacts> typeFactsCache = new IdentityHashMap<>();
     private final Map<MethodDeclaration, Map<TypeDeclaration<?>, MethodSemanticFacts>> methodFactsCache = new IdentityHashMap<>();
+    private final Map<TypeDeclaration<?>, Set<String>> typeCacheNamesCache = new IdentityHashMap<>();
+    private final Map<MethodDeclaration, Map<TypeDeclaration<?>, List<CacheableOperation>>> cacheableOperationsCache = new IdentityHashMap<>();
 
     private SpringSemanticFacts(ProjectContext context) {
         this.context = context;
@@ -91,9 +96,10 @@ public final class SpringSemanticFacts {
     }
 
     public MethodSemanticFacts methodFacts(TypeDeclaration<?> typeDeclaration, MethodDeclaration methodDeclaration) {
-        boolean cacheConfigKeyGenerator = typeDeclaration != null
-                && annotationDeclaresMember(typeDeclaration, "CacheConfig", "keyGenerator")
-                && !annotationMemberIsEmpty(typeDeclaration, "CacheConfig", "keyGenerator");
+        List<CacheableOperation> cacheableOperations = cacheableOperations(typeDeclaration, methodDeclaration);
+        boolean hasCacheableOperation = !cacheableOperations.isEmpty();
+        boolean explicitCacheKeyStrategy = hasCacheableOperation
+                && cacheableOperations.stream().allMatch(CacheableOperation::explicitKeyStrategy);
         return methodFactsCache
                 .computeIfAbsent(methodDeclaration, ignored -> new IdentityHashMap<>())
                 .computeIfAbsent(typeDeclaration, ignored -> new MethodSemanticFacts(
@@ -107,15 +113,29 @@ public final class SpringSemanticFacts {
                         hasAnnotation(methodDeclaration, "TransactionalEventListener"),
                         isInitializationCallback(typeDeclaration, methodDeclaration),
                         isStartupLifecycleMethod(typeDeclaration, methodDeclaration),
-                        hasAnnotation(methodDeclaration, "Cacheable")
-                                && ((annotationDeclaresMember(methodDeclaration, "Cacheable", "key")
-                                && !annotationMemberIsEmpty(methodDeclaration, "Cacheable", "key"))
-                                || (annotationDeclaresMember(methodDeclaration, "Cacheable", "keyGenerator")
-                                && !annotationMemberIsEmpty(methodDeclaration, "Cacheable", "keyGenerator"))
-                                || cacheConfigKeyGenerator),
+                        hasCacheableOperation,
+                        explicitCacheKeyStrategy,
                         annotationMemberContains(methodDeclaration, "Transactional", "propagation", "REQUIRES_NEW"),
                         annotationMemberContains(methodDeclaration, "Transactional", "propagation", "NESTED")
                 ));
+    }
+
+    public List<CacheableOperation> cacheableOperations(TypeDeclaration<?> typeDeclaration, MethodDeclaration methodDeclaration) {
+        return cacheableOperationsCache
+                .computeIfAbsent(methodDeclaration, ignored -> new IdentityHashMap<>())
+                .computeIfAbsent(typeDeclaration, ignored -> buildCacheableOperations(typeDeclaration, methodDeclaration));
+    }
+
+    public Set<String> typeCacheNames(TypeDeclaration<?> typeDeclaration) {
+        if (typeDeclaration == null) {
+            return Set.of();
+        }
+        return typeCacheNamesCache.computeIfAbsent(typeDeclaration, ignored -> {
+            Set<String> names = new LinkedHashSet<>();
+            names.addAll(annotationMemberStringLiterals(typeDeclaration, "CacheConfig", "cacheNames"));
+            names.addAll(annotationMemberStringLiterals(typeDeclaration, "CacheConfig", "value"));
+            return Set.copyOf(names);
+        });
     }
 
     public ScheduledTriggerSummary scheduledTriggerSummary(MethodDeclaration methodDeclaration) {
@@ -145,6 +165,55 @@ public final class SpringSemanticFacts {
 
     public long annotationMatchCount(NodeWithAnnotations<?> node, String simpleName) {
         return JavaSourceInspector.annotationMatchCount(node, context, simpleName);
+    }
+
+    private List<CacheableOperation> buildCacheableOperations(TypeDeclaration<?> typeDeclaration, MethodDeclaration methodDeclaration) {
+        boolean cacheConfigKeyGenerator = typeDeclaration != null
+                && annotationDeclaresMember(typeDeclaration, "CacheConfig", "keyGenerator")
+                && !annotationMemberIsEmpty(typeDeclaration, "CacheConfig", "keyGenerator");
+        java.util.ArrayList<CacheableOperation> operations = new java.util.ArrayList<>();
+        if (hasAnnotation(methodDeclaration, "Cacheable")) {
+            Set<String> cacheNames = new LinkedHashSet<>();
+            cacheNames.addAll(annotationMemberStringLiterals(methodDeclaration, "Cacheable", "cacheNames"));
+            cacheNames.addAll(annotationMemberStringLiterals(methodDeclaration, "Cacheable", "value"));
+            boolean explicitKeyStrategy = (annotationDeclaresMember(methodDeclaration, "Cacheable", "key")
+                    && !annotationMemberIsEmpty(methodDeclaration, "Cacheable", "key"))
+                    || (annotationDeclaresMember(methodDeclaration, "Cacheable", "keyGenerator")
+                    && !annotationMemberIsEmpty(methodDeclaration, "Cacheable", "keyGenerator"))
+                    || cacheConfigKeyGenerator;
+            operations.add(new CacheableOperation(explicitKeyStrategy, Set.copyOf(cacheNames)));
+        }
+        for (AnnotationExpr nestedCacheable : JavaSourceInspector.nestedAnnotationMembers(methodDeclaration, "Caching", "cacheable")) {
+            if (!JavaSourceInspector.annotationSimpleName(nestedCacheable).equals("Cacheable")) {
+                continue;
+            }
+            Set<String> cacheNames = new LinkedHashSet<>();
+            cacheNames.addAll(annotationMemberStringLiterals(nestedCacheable, "cacheNames"));
+            cacheNames.addAll(annotationMemberStringLiterals(nestedCacheable, "value"));
+            boolean explicitKeyStrategy = (JavaSourceInspector.annotationDeclaresMember(nestedCacheable, "key")
+                    && !JavaSourceInspector.annotationMemberIsEmpty(nestedCacheable, "key"))
+                    || (JavaSourceInspector.annotationDeclaresMember(nestedCacheable, "keyGenerator")
+                    && !JavaSourceInspector.annotationMemberIsEmpty(nestedCacheable, "keyGenerator"))
+                    || cacheConfigKeyGenerator;
+            operations.add(new CacheableOperation(explicitKeyStrategy, Set.copyOf(cacheNames)));
+        }
+        return List.copyOf(operations);
+    }
+
+    private Set<String> annotationMemberStringLiterals(NodeWithAnnotations<?> node, String annotationName, String memberName) {
+        return annotationMemberValue(node, annotationName, memberName)
+                .map(JavaSourceInspector::stringLiteralValues)
+                .map(LinkedHashSet::new)
+                .map(Set::copyOf)
+                .orElse(Set.of());
+    }
+
+    private Set<String> annotationMemberStringLiterals(AnnotationExpr annotationExpr, String memberName) {
+        return JavaSourceInspector.annotationMemberValue(annotationExpr, memberName)
+                .map(JavaSourceInspector::stringLiteralValues)
+                .map(LinkedHashSet::new)
+                .map(Set::copyOf)
+                .orElse(Set.of());
     }
 
     private TriggerValue stringTriggerValue(MethodDeclaration methodDeclaration, String memberName) {
@@ -251,6 +320,12 @@ public final class SpringSemanticFacts {
 
         public static TriggerValue placeholderValue() {
             return new TriggerValue(true, false, true);
+        }
+    }
+
+    public record CacheableOperation(boolean explicitKeyStrategy, Set<String> cacheNames) {
+        public CacheableOperation {
+            cacheNames = Set.copyOf(cacheNames);
         }
     }
 }

@@ -14,6 +14,7 @@ import com.github.javaparser.ast.body.EnumDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.RecordDeclaration;
 import com.github.javaparser.ast.body.TypeDeclaration;
+import com.github.javaparser.ast.expr.ArrayInitializerExpr;
 import com.github.javaparser.ast.expr.AnnotationExpr;
 import com.github.javaparser.ast.expr.Expression;
 import com.github.javaparser.ast.expr.NormalAnnotationExpr;
@@ -161,16 +162,50 @@ public final class JavaSourceInspector {
     }
 
     public static Optional<String> annotationMemberValue(AnnotationExpr annotationExpr, String memberName) {
+        return annotationMemberExpression(annotationExpr, memberName).map(JavaSourceInspector::expressionText);
+    }
+
+    static Optional<Expression> annotationMemberExpression(AnnotationExpr annotationExpr, String memberName) {
         if (annotationExpr instanceof NormalAnnotationExpr normalAnnotationExpr) {
             return normalAnnotationExpr.getPairs().stream()
                     .filter(pair -> pair.getNameAsString().equals(memberName))
-                    .map(pair -> expressionText(pair.getValue()))
+                    .map(com.github.javaparser.ast.expr.MemberValuePair::getValue)
                     .findFirst();
         }
         if (annotationExpr instanceof SingleMemberAnnotationExpr singleMemberAnnotationExpr && "value".equals(memberName)) {
-            return Optional.of(expressionText(singleMemberAnnotationExpr.getMemberValue()));
+            return Optional.of(singleMemberAnnotationExpr.getMemberValue());
         }
         return Optional.empty();
+    }
+
+    static List<AnnotationExpr> nestedAnnotationMembers(NodeWithAnnotations<?> node, String annotationName, String memberName) {
+        List<AnnotationExpr> nestedAnnotations = new ArrayList<>();
+        for (AnnotationExpr annotationExpr : node.getAnnotations()) {
+            if (!annotationSimpleName(annotationExpr).equals(annotationName)) {
+                continue;
+            }
+            nestedAnnotations.addAll(nestedAnnotationMembers(annotationExpr, memberName));
+        }
+        return nestedAnnotations;
+    }
+
+    static List<AnnotationExpr> nestedAnnotationMembers(AnnotationExpr annotationExpr, String memberName) {
+        return annotationMemberExpression(annotationExpr, memberName)
+                .map(JavaSourceInspector::nestedAnnotationExpressions)
+                .orElse(List.of());
+    }
+
+    private static List<AnnotationExpr> nestedAnnotationExpressions(Expression expression) {
+        if (expression instanceof AnnotationExpr nestedAnnotation) {
+            return List.of(nestedAnnotation);
+        }
+        if (expression instanceof ArrayInitializerExpr arrayInitializerExpr) {
+            return arrayInitializerExpr.getValues().stream()
+                    .filter(AnnotationExpr.class::isInstance)
+                    .map(AnnotationExpr.class::cast)
+                    .toList();
+        }
+        return List.of();
     }
 
     public static Set<String> annotationNames(NodeWithAnnotations<?> node) {
@@ -350,7 +385,7 @@ public final class JavaSourceInspector {
         return false;
     }
 
-    private static List<String> stringLiteralValues(String rawValue) {
+    static List<String> stringLiteralValues(String rawValue) {
         if (rawValue == null || rawValue.isBlank()) {
             return List.of();
         }

@@ -22,6 +22,7 @@ public record MethodSemanticFacts(
         boolean transactionalEventListener,
         boolean initializationCallback,
         boolean startupLifecycleMethod,
+        boolean cacheableOperation,
         boolean explicitCacheKeyStrategy,
         boolean transactionRequiresNew,
         boolean transactionNested
@@ -120,8 +121,12 @@ public record MethodSemanticFacts(
         return explicitCacheKeyStrategy;
     }
 
+    public boolean hasCacheableOperation() {
+        return cacheableOperation;
+    }
+
     public boolean shouldDeclareExplicitCacheKey() {
-        return hasAnnotation("Cacheable")
+        return cacheableOperation
                 && !explicitCacheKeyStrategy
                 && !declaration.getParameters().isEmpty();
     }

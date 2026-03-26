@@ -3243,6 +3243,67 @@ class ProjectLinterTest {
     }
 
     @Test
+    void flagsInheritedSecurityOverloadsWithDifferentParameterTypes() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("InheritedSecurityOverloads.java"), """
+                package demo;
+
+                import org.springframework.security.access.prepost.PreAuthorize;
+                import org.springframework.web.bind.annotation.GetMapping;
+                import org.springframework.web.bind.annotation.RestController;
+
+                import java.util.UUID;
+
+                interface SecuredApi {
+
+                    @PreAuthorize("hasRole('ADMIN')")
+                    String secure(String id);
+                }
+
+                @RestController
+                class OverloadedInterfaceController implements SecuredApi {
+
+                    @Override
+                    public String secure(String id) {
+                        return id;
+                    }
+
+                    @GetMapping("/secure")
+                    public String secure(UUID id) {
+                        return id.toString();
+                    }
+                }
+
+                abstract class SecuredBaseController {
+
+                    @PreAuthorize("hasRole('ADMIN')")
+                    String base(String id) {
+                        return id;
+                    }
+                }
+
+                @RestController
+                class OverloadedBaseController extends SecuredBaseController {
+
+                    @GetMapping("/base")
+                    public String base(Integer id) {
+                        return id.toString();
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        List<LintIssue> issues = linter.analyze(tempDir, tempDir.resolve("src/main/java")).issues().stream()
+                .filter(issue -> issue.ruleId().equals("SPRING_ENDPOINT_SECURITY"))
+                .toList();
+
+        assertEquals(2, issues.size());
+        assertTrue(issues.stream().anyMatch(issue -> issue.message().contains("secure")));
+        assertTrue(issues.stream().anyMatch(issue -> issue.message().contains("base")));
+    }
+
+    @Test
     void resolvesAmbiguousSecurityAnnotationsByImports() throws Exception {
         Path sourceDirectory = tempDir.resolve("src/main/java");
         Files.createDirectories(sourceDirectory.resolve("a"));
@@ -3359,6 +3420,65 @@ class ProjectLinterTest {
 
         assertEquals(1, cacheIssues.size());
         assertTrue(cacheIssues.get(0).message().contains("lookup"));
+    }
+
+    @Test
+    void flagsCachingContainerWithoutExplicitKeyStrategy() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("CachingContainerDemo.java"), """
+                package demo;
+
+                import org.springframework.cache.annotation.Caching;
+                import org.springframework.cache.annotation.Cacheable;
+
+                class CachingContainerDemo {
+
+                    @Caching(cacheable = @Cacheable(cacheNames = "demo"))
+                    public String load(String id) {
+                        return id;
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        List<LintIssue> issues = linter.analyze(tempDir, tempDir.resolve("src/main/java")).issues().stream()
+                .filter(issue -> issue.ruleId().equals("SPRING_CACHEABLE_KEY"))
+                .toList();
+
+        assertEquals(1, issues.size());
+        assertTrue(issues.get(0).message().contains("load"));
+    }
+
+    @Test
+    void honorsCachingContainerKeyGeneratorAndAllowlist() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("CachingContainerAllowlistDemo.java"), """
+                package demo;
+
+                import org.springframework.cache.annotation.Caching;
+                import org.springframework.cache.annotation.Cacheable;
+
+                class CachingContainerAllowlistDemo {
+
+                    @Caching(cacheable = {
+                            @Cacheable(cacheNames = "safe"),
+                            @Cacheable(cacheNames = "safe", keyGenerator = "demoKeyGenerator")
+                    })
+                    public String load(String id) {
+                        return id;
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintOptions options = LintOptions.defaults().withCacheDefaultKeyCacheNames(Set.of("safe"));
+        Set<String> issueIds = linter.analyze(tempDir, tempDir.resolve("src/main/java"), options).report().issues().stream()
+                .map(LintIssue::ruleId)
+                .collect(Collectors.toSet());
+
+        assertFalse(issueIds.contains("SPRING_CACHEABLE_KEY"));
     }
 
     @Test

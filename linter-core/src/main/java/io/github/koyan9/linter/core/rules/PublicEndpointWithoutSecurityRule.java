@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 public final class PublicEndpointWithoutSecurityRule extends AbstractSpringRule {
 
@@ -149,10 +150,74 @@ public final class PublicEndpointWithoutSecurityRule extends AbstractSpringRule 
     }
 
     private MethodSignature signatureOf(MethodDeclaration method) {
-        return new MethodSignature(method.getNameAsString(), method.getParameters().size());
+        return new MethodSignature(
+                method.getNameAsString(),
+                method.getParameters().stream()
+                        .map(parameter -> normalizeParameterType(parameter.getType().toString(), parameter.isVarArgs()))
+                        .toList()
+        );
     }
 
-    private record MethodSignature(String name, int arity) {
+    private String normalizeParameterType(String rawType, boolean varArgs) {
+        String simplified = simplifyQualifiedType(eraseGenerics(rawType).replaceAll("\\s+", ""));
+        if (varArgs) {
+            return simplified.endsWith("...") ? simplified : simplified + "...";
+        }
+        return simplified;
+    }
+
+    private String eraseGenerics(String rawType) {
+        if (rawType == null || rawType.isBlank()) {
+            return "";
+        }
+        StringBuilder builder = new StringBuilder();
+        int genericDepth = 0;
+        for (char current : rawType.toCharArray()) {
+            if (current == '<') {
+                genericDepth++;
+                continue;
+            }
+            if (current == '>') {
+                genericDepth = Math.max(0, genericDepth - 1);
+                continue;
+            }
+            if (genericDepth == 0) {
+                builder.append(current);
+            }
+        }
+        return builder.toString();
+    }
+
+    private String simplifyQualifiedType(String rawType) {
+        StringBuilder current = new StringBuilder();
+        List<String> segments = new ArrayList<>();
+        for (int index = 0; index < rawType.length(); index++) {
+            char currentChar = rawType.charAt(index);
+            if (Character.isJavaIdentifierPart(currentChar) || currentChar == '.') {
+                current.append(currentChar);
+                continue;
+            }
+            if (current.length() > 0) {
+                segments.add(simplifyQualifiedIdentifier(current.toString()));
+                current.setLength(0);
+            }
+            segments.add(String.valueOf(currentChar));
+        }
+        if (current.length() > 0) {
+            segments.add(simplifyQualifiedIdentifier(current.toString()));
+        }
+        return segments.stream().collect(Collectors.joining());
+    }
+
+    private String simplifyQualifiedIdentifier(String identifier) {
+        int lastDot = identifier.lastIndexOf('.');
+        return lastDot >= 0 ? identifier.substring(lastDot + 1) : identifier;
+    }
+
+    private record MethodSignature(String name, List<String> parameterTypes) {
+        private MethodSignature {
+            parameterTypes = List.copyOf(parameterTypes);
+        }
     }
 
     private record SecurityInheritance(boolean classSecured, Set<MethodSignature> securedMethodSignatures) {

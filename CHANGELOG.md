@@ -25,6 +25,8 @@ All notable changes to `spring-correctness-linter` will be documented in this fi
 - `SPRING_ENDPOINT_SECURITY` and `SPRING_CACHEABLE_KEY` no longer silently reuse stale incremental-cache findings after project-level semantic changes such as new Spring security-chain beans, project-wide key generators, or composed annotation updates
 - Centralized-security and project-wide key-generator auto-detection no longer misfire on unrelated application types that only share Spring simple names
 - Stale baseline entries from non-standard or additional source roots now remain attributed to the correct module in module-aware baseline diff output
+- `SPRING_ENDPOINT_SECURITY` no longer treats inherited secured overloads with the same method name and arity but different parameter types as implicitly protected endpoints
+- `SPRING_CACHEABLE_KEY` now recognizes `@Caching(cacheable = @Cacheable(...))` declarations for explicit key-strategy checks and default-key allowlists
 
 ## [0.1.2] - 2026-03-26
 

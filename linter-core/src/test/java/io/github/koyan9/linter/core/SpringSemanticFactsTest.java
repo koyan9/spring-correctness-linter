@@ -32,6 +32,7 @@ class SpringSemanticFactsTest {
                 import jakarta.annotation.PostConstruct;
                 import org.springframework.beans.factory.InitializingBean;
                 import org.springframework.cache.annotation.CacheConfig;
+                import org.springframework.cache.annotation.Caching;
                 import org.springframework.cache.annotation.Cacheable;
                 import org.springframework.context.event.EventListener;
                 import org.springframework.scheduling.annotation.Async;
@@ -74,6 +75,11 @@ class SpringSemanticFactsTest {
 
                     @Cacheable(cacheNames = "demo")
                     public String cacheableWithoutKey(String id) {
+                        return id;
+                    }
+
+                    @Caching(cacheable = @Cacheable(cacheNames = "batched", keyGenerator = "demoKeyGenerator"))
+                    public String cacheableWithCachingContainer(String id) {
                         return id;
                     }
 
@@ -132,6 +138,7 @@ class SpringSemanticFactsTest {
         MethodDeclaration afterPropertiesSet = sourceUnit.structure().methods().stream().filter(method -> method.getNameAsString().equals("afterPropertiesSet")).findFirst().orElseThrow();
         MethodDeclaration cacheableWithKeyGenerator = sourceUnit.structure().methods().stream().filter(method -> method.getNameAsString().equals("cacheableWithKeyGenerator")).findFirst().orElseThrow();
         MethodDeclaration cacheableWithoutKey = sourceUnit.structure().methods().stream().filter(method -> method.getNameAsString().equals("cacheableWithoutKey")).findFirst().orElseThrow();
+        MethodDeclaration cacheableWithCachingContainer = sourceUnit.structure().methods().stream().filter(method -> method.getNameAsString().equals("cacheableWithCachingContainer")).findFirst().orElseThrow();
         MethodDeclaration cacheableWithoutArgs = sourceUnit.structure().methods().stream().filter(method -> method.getNameAsString().equals("cacheableWithoutArgs")).findFirst().orElseThrow();
         MethodDeclaration transactionalRequiresNew = sourceUnit.structure().methods().stream().filter(method -> method.getNameAsString().equals("transactionalRequiresNew")).findFirst().orElseThrow();
 
@@ -145,6 +152,7 @@ class SpringSemanticFactsTest {
         MethodSemanticFacts afterPropertiesFacts = facts.methodFacts(typeDeclaration, afterPropertiesSet);
         MethodSemanticFacts cacheFacts = facts.methodFacts(typeDeclaration, cacheableWithKeyGenerator);
         MethodSemanticFacts cacheWithoutKeyFacts = facts.methodFacts(typeDeclaration, cacheableWithoutKey);
+        MethodSemanticFacts cacheWithCachingContainerFacts = facts.methodFacts(typeDeclaration, cacheableWithCachingContainer);
         MethodSemanticFacts cacheWithoutArgsFacts = facts.methodFacts(typeDeclaration, cacheableWithoutArgs);
         MethodSemanticFacts requiresNewFacts = facts.methodFacts(typeDeclaration, transactionalRequiresNew);
 
@@ -178,6 +186,9 @@ class SpringSemanticFactsTest {
         assertFalse(cacheFacts.shouldDeclareExplicitCacheKey());
         assertTrue(cacheWithoutKeyFacts.hasExplicitCacheKeyStrategy());
         assertFalse(cacheWithoutKeyFacts.shouldDeclareExplicitCacheKey());
+        assertTrue(cacheWithCachingContainerFacts.hasCacheableOperation());
+        assertTrue(cacheWithCachingContainerFacts.hasExplicitCacheKeyStrategy());
+        assertFalse(cacheWithCachingContainerFacts.shouldDeclareExplicitCacheKey());
         assertFalse(cacheWithoutArgsFacts.shouldDeclareExplicitCacheKey());
         assertTrue(requiresNewFacts.hasHighRiskTransactionPropagation());
         assertTrue(requiresNewFacts.highRiskTransactionPropagationName().equals("REQUIRES_NEW"));
