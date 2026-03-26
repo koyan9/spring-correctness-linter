@@ -556,6 +556,34 @@ class ProjectLinterTest {
     }
 
     @Test
+    void flagsBlankCacheableKey() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("BlankCacheKey.java"), """
+                package demo;
+
+                import org.springframework.cache.annotation.Cacheable;
+
+                class BlankCacheKey {
+
+                    @Cacheable(cacheNames = "demo", key = "")
+                    public String load(String id) {
+                        return id;
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
+        List<LintIssue> cacheIssues = report.issues().stream()
+                .filter(issue -> issue.ruleId().equals("SPRING_CACHEABLE_KEY"))
+                .toList();
+
+        assertEquals(1, cacheIssues.size());
+        assertTrue(cacheIssues.get(0).message().contains("load"));
+    }
+
+    @Test
     void flagsBlankCacheConfigKeyGenerator() throws Exception {
         Path sourceDirectory = tempDir.resolve("src/main/java/demo");
         Files.createDirectories(sourceDirectory);
@@ -583,6 +611,73 @@ class ProjectLinterTest {
 
         assertEquals(1, cacheIssues.size());
         assertTrue(cacheIssues.get(0).message().contains("load"));
+    }
+
+    @Test
+    void honorsComposedCacheConfigKeyGeneratorAliasOnType() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("ComposedCacheConfigKeyGenerator.java"), """
+                package demo;
+
+                import org.springframework.cache.annotation.CacheConfig;
+                import org.springframework.cache.annotation.Cacheable;
+                import org.springframework.core.annotation.AliasFor;
+
+                import java.lang.annotation.ElementType;
+                import java.lang.annotation.Retention;
+                import java.lang.annotation.RetentionPolicy;
+                import java.lang.annotation.Target;
+
+                @Target(ElementType.TYPE)
+                @Retention(RetentionPolicy.RUNTIME)
+                @CacheConfig
+                @interface SharedCachePolicy {
+
+                    @AliasFor(annotation = CacheConfig.class, attribute = "keyGenerator")
+                    String keyGenerator() default "";
+                }
+
+                @SharedCachePolicy(keyGenerator = "demoKeyGenerator")
+                class CacheService {
+
+                    @Cacheable(cacheNames = "demo")
+                    public String load(String id) {
+                        return id;
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
+        Set<String> issueIds = report.issues().stream().map(LintIssue::ruleId).collect(Collectors.toSet());
+
+        assertFalse(issueIds.contains("SPRING_CACHEABLE_KEY"));
+    }
+
+    @Test
+    void skipsZeroArgumentCacheableMethods() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("ZeroArgCacheable.java"), """
+                package demo;
+
+                import org.springframework.cache.annotation.Cacheable;
+
+                class ZeroArgCacheable {
+
+                    @Cacheable(cacheNames = "demo")
+                    public String load() {
+                        return "ok";
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
+        Set<String> issueIds = report.issues().stream().map(LintIssue::ruleId).collect(Collectors.toSet());
+
+        assertFalse(issueIds.contains("SPRING_CACHEABLE_KEY"));
     }
 
     @Test
@@ -709,6 +804,47 @@ class ProjectLinterTest {
                 class CacheService {
 
                     @Cacheable("safe")
+                    public String load(String id) {
+                        return id;
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintOptions options = LintOptions.defaults().withCacheDefaultKeyCacheNames(Set.of("safe"));
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"), options).report();
+        Set<String> issueIds = report.issues().stream().map(LintIssue::ruleId).collect(Collectors.toSet());
+
+        assertFalse(issueIds.contains("SPRING_CACHEABLE_KEY"));
+    }
+
+    @Test
+    void allowsComposedSingleMemberCacheableValueInDefaultKeyAllowlist() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("ComposedSingleMemberCacheAllowlist.java"), """
+                package demo;
+
+                import org.springframework.cache.annotation.Cacheable;
+                import org.springframework.core.annotation.AliasFor;
+
+                import java.lang.annotation.ElementType;
+                import java.lang.annotation.Retention;
+                import java.lang.annotation.RetentionPolicy;
+                import java.lang.annotation.Target;
+
+                @Target(ElementType.METHOD)
+                @Retention(RetentionPolicy.RUNTIME)
+                @Cacheable
+                @interface LocalCache {
+
+                    @AliasFor(annotation = Cacheable.class, attribute = "value")
+                    String[] value() default {};
+                }
+
+                class CacheService {
+
+                    @LocalCache("safe")
                     public String load(String id) {
                         return id;
                     }
@@ -2313,6 +2449,149 @@ class ProjectLinterTest {
         ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
         LintOptions options = LintOptions.defaults().withCustomSecurityAnnotations(Set.of("InternalEndpoint"));
         LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"), options).report();
+        Set<String> issueIds = report.issues().stream().map(LintIssue::ruleId).collect(Collectors.toSet());
+
+        assertFalse(issueIds.contains("SPRING_ENDPOINT_SECURITY"));
+    }
+
+    @Test
+    void honorsClassLevelCustomSecurityAnnotations() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("ClassLevelCustomSecurity.java"), """
+                package demo;
+
+                import org.springframework.web.bind.annotation.GetMapping;
+                import org.springframework.web.bind.annotation.RestController;
+
+                import java.lang.annotation.ElementType;
+                import java.lang.annotation.Retention;
+                import java.lang.annotation.RetentionPolicy;
+                import java.lang.annotation.Target;
+
+                @Target(ElementType.TYPE)
+                @Retention(RetentionPolicy.RUNTIME)
+                @interface InternalEndpoint {
+                }
+
+                @InternalEndpoint
+                @RestController
+                class InternalController {
+
+                    @GetMapping("/internal")
+                    public String internal() {
+                        return "ok";
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintOptions options = LintOptions.defaults().withCustomSecurityAnnotations(Set.of("InternalEndpoint"));
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"), options).report();
+        Set<String> issueIds = report.issues().stream().map(LintIssue::ruleId).collect(Collectors.toSet());
+
+        assertFalse(issueIds.contains("SPRING_ENDPOINT_SECURITY"));
+    }
+
+    @Test
+    void honorsInheritedCustomSecurityAnnotations() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("InheritedCustomSecurity.java"), """
+                package demo;
+
+                import org.springframework.web.bind.annotation.GetMapping;
+                import org.springframework.web.bind.annotation.RestController;
+
+                import java.lang.annotation.ElementType;
+                import java.lang.annotation.Retention;
+                import java.lang.annotation.RetentionPolicy;
+                import java.lang.annotation.Target;
+
+                @Target({ElementType.TYPE, ElementType.METHOD})
+                @Retention(RetentionPolicy.RUNTIME)
+                @interface InternalEndpoint {
+                }
+
+                @InternalEndpoint
+                interface SecuredApi {
+
+                    String inheritedTypeSecurity();
+
+                    @InternalEndpoint
+                    String inheritedMethodSecurity();
+                }
+
+                @RestController
+                class InternalController implements SecuredApi {
+
+                    @Override
+                    @GetMapping("/type")
+                    public String inheritedTypeSecurity() {
+                        return "ok";
+                    }
+
+                    @Override
+                    @GetMapping("/method")
+                    public String inheritedMethodSecurity() {
+                        return "ok";
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintOptions options = LintOptions.defaults().withCustomSecurityAnnotations(Set.of("InternalEndpoint"));
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"), options).report();
+        Set<String> issueIds = report.issues().stream().map(LintIssue::ruleId).collect(Collectors.toSet());
+
+        assertFalse(issueIds.contains("SPRING_ENDPOINT_SECURITY"));
+    }
+
+    @Test
+    void honorsInheritedComposedMethodSecurityAnnotations() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("InheritedComposedSecurity.java"), """
+                package demo;
+
+                import org.springframework.core.annotation.AliasFor;
+                import org.springframework.security.access.prepost.PreAuthorize;
+                import org.springframework.web.bind.annotation.GetMapping;
+                import org.springframework.web.bind.annotation.RestController;
+
+                import java.lang.annotation.ElementType;
+                import java.lang.annotation.Retention;
+                import java.lang.annotation.RetentionPolicy;
+                import java.lang.annotation.Target;
+
+                @Target(ElementType.METHOD)
+                @Retention(RetentionPolicy.RUNTIME)
+                @PreAuthorize("hasRole('ADMIN')")
+                @interface SecurePolicy {
+
+                    @AliasFor(annotation = PreAuthorize.class, attribute = "value")
+                    String value() default "hasRole('ADMIN')";
+                }
+
+                interface SecuredApi {
+
+                    @SecurePolicy
+                    String secure();
+                }
+
+                @RestController
+                class SecureController implements SecuredApi {
+
+                    @Override
+                    @GetMapping("/secure")
+                    public String secure() {
+                        return "ok";
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
         Set<String> issueIds = report.issues().stream().map(LintIssue::ruleId).collect(Collectors.toSet());
 
         assertFalse(issueIds.contains("SPRING_ENDPOINT_SECURITY"));
