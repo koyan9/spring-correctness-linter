@@ -84,6 +84,87 @@ class CorrectnessLintMojoTest {
     }
 
     @Test
+    void failOnSeverityTakesPrecedenceOverFailOnError() throws Exception {
+        Path sourceDirectory = writeSource("""
+                package demo;
+
+                import org.springframework.scheduling.annotation.Async;
+
+                class AsyncOnly {
+
+                    @Async
+                    public void runAsync() {
+                    }
+                }
+                """);
+        Path reportsDirectory = tempDir.resolve("target/reports-fail-on-precedence");
+
+        CorrectnessLintMojo mojo = configuredMojo(
+                sourceDirectory,
+                reportsDirectory,
+                tempDir.resolve("spring-correctness-linter-baseline.txt")
+        );
+        setField(mojo, "applyBaseline", false);
+        setField(mojo, "failOnSeverity", "ERROR");
+        setField(mojo, "failOnError", true);
+        setField(mojo, "formats", new LinkedHashSet<>(Set.of("json")));
+
+        mojo.execute();
+
+        assertTrue(Files.exists(reportsDirectory.resolve("lint-report.json")));
+    }
+
+    @Test
+    void failsBuildWhenFailOnErrorIsTrueWithoutSeverityThreshold() throws Exception {
+        Path sourceDirectory = writeSource("""
+                package demo;
+
+                import org.springframework.scheduling.annotation.Async;
+
+                class AsyncOnly {
+
+                    @Async
+                    public void runAsync() {
+                    }
+                }
+                """);
+        Path reportsDirectory = tempDir.resolve("target/reports-fail-on-error");
+
+        CorrectnessLintMojo mojo = configuredMojo(
+                sourceDirectory,
+                reportsDirectory,
+                tempDir.resolve("spring-correctness-linter-baseline.txt")
+        );
+        setField(mojo, "applyBaseline", false);
+        setField(mojo, "failOnError", true);
+        setField(mojo, "formats", new LinkedHashSet<>(Set.of("json")));
+
+        assertThrows(MojoFailureException.class, mojo::execute);
+        assertTrue(Files.exists(reportsDirectory.resolve("lint-report.json")));
+    }
+
+    @Test
+    void rejectsInvalidFailOnSeverityValue() throws Exception {
+        Path sourceDirectory = writeSource("""
+                package demo;
+
+                class AsyncOnly {
+                }
+                """);
+
+        CorrectnessLintMojo mojo = configuredMojo(
+                sourceDirectory,
+                tempDir.resolve("target/reports-invalid-severity"),
+                tempDir.resolve("spring-correctness-linter-baseline.txt")
+        );
+        setField(mojo, "applyBaseline", false);
+        setField(mojo, "failOnSeverity", "not-a-severity");
+
+        Exception exception = assertThrows(Exception.class, mojo::execute);
+        assertTrue(containsMessage(exception, "Invalid failOnSeverity value"));
+    }
+
+    @Test
     void writesParseProblemSummaryIntoJsonReport() throws Exception {
         Path sourceDirectory = tempDir.resolve("src/main/java/demo");
         Files.createDirectories(sourceDirectory);
@@ -142,6 +223,27 @@ class CorrectnessLintMojoTest {
         assertTrue(json.contains("\"disabledRuleIds\""));
         assertTrue(json.contains("SPRING_ASYNC_VOID"));
         assertFalse(json.contains("\"ruleId\": \"SPRING_ASYNC_VOID\""));
+    }
+
+    @Test
+    void rejectsUnknownEnabledRuleIds() throws Exception {
+        Path sourceDirectory = writeSource("""
+                package demo;
+
+                class AsyncOnly {
+                }
+                """);
+
+        CorrectnessLintMojo mojo = configuredMojo(
+                sourceDirectory,
+                tempDir.resolve("target/reports-invalid-rule-id"),
+                tempDir.resolve("spring-correctness-linter-baseline.txt")
+        );
+        setField(mojo, "applyBaseline", false);
+        setField(mojo, "enabledRules", "RULE_DOES_NOT_EXIST");
+
+        Exception exception = assertThrows(Exception.class, mojo::execute);
+        assertTrue(containsMessage(exception, "Unknown rule id(s) in enabledRules"));
     }
 
     @Test
@@ -238,6 +340,92 @@ class CorrectnessLintMojoTest {
         setField(mojo, "failOnSeverity", "ERROR");
 
         assertThrows(MojoFailureException.class, mojo::execute);
+    }
+
+    @Test
+    void rejectsInvalidSeverityOverridesSyntax() throws Exception {
+        Path sourceDirectory = writeSource("""
+                package demo;
+
+                class AsyncOnly {
+                }
+                """);
+
+        CorrectnessLintMojo mojo = configuredMojo(
+                sourceDirectory,
+                tempDir.resolve("target/reports-invalid-overrides"),
+                tempDir.resolve("spring-correctness-linter-baseline.txt")
+        );
+        setField(mojo, "applyBaseline", false);
+        setField(mojo, "severityOverrides", "SPRING_ASYNC_VOID");
+
+        Exception exception = assertThrows(Exception.class, mojo::execute);
+        assertTrue(containsMessage(exception, "Invalid severityOverrides entry"));
+    }
+
+    @Test
+    void rejectsUnknownSeverityOverrideRuleIds() throws Exception {
+        Path sourceDirectory = writeSource("""
+                package demo;
+
+                class AsyncOnly {
+                }
+                """);
+
+        CorrectnessLintMojo mojo = configuredMojo(
+                sourceDirectory,
+                tempDir.resolve("target/reports-unknown-override-rule"),
+                tempDir.resolve("spring-correctness-linter-baseline.txt")
+        );
+        setField(mojo, "applyBaseline", false);
+        setField(mojo, "severityOverrides", "RULE_DOES_NOT_EXIST=WARNING");
+
+        Exception exception = assertThrows(Exception.class, mojo::execute);
+        assertTrue(containsMessage(exception, "Unknown rule id(s) in severityOverrides"));
+    }
+
+    @Test
+    void rejectsOverlappingEnabledAndDisabledRules() throws Exception {
+        Path sourceDirectory = writeSource("""
+                package demo;
+
+                class AsyncOnly {
+                }
+                """);
+
+        CorrectnessLintMojo mojo = configuredMojo(
+                sourceDirectory,
+                tempDir.resolve("target/reports-overlapping-rules"),
+                tempDir.resolve("spring-correctness-linter-baseline.txt")
+        );
+        setField(mojo, "applyBaseline", false);
+        setField(mojo, "enabledRules", "SPRING_ASYNC_VOID");
+        setField(mojo, "disabledRules", "SPRING_ASYNC_VOID");
+
+        Exception exception = assertThrows(Exception.class, mojo::execute);
+        assertTrue(containsMessage(exception, "Rules cannot be both enabled and disabled"));
+    }
+
+    @Test
+    void rejectsOverlappingEnabledAndDisabledRuleDomains() throws Exception {
+        Path sourceDirectory = writeSource("""
+                package demo;
+
+                class AsyncOnly {
+                }
+                """);
+
+        CorrectnessLintMojo mojo = configuredMojo(
+                sourceDirectory,
+                tempDir.resolve("target/reports-overlapping-domains"),
+                tempDir.resolve("spring-correctness-linter-baseline.txt")
+        );
+        setField(mojo, "applyBaseline", false);
+        setField(mojo, "enabledRuleDomains", "ASYNC");
+        setField(mojo, "disabledRuleDomains", "ASYNC");
+
+        Exception exception = assertThrows(Exception.class, mojo::execute);
+        assertTrue(containsMessage(exception, "Rule domains cannot be both enabled and disabled"));
     }
 
     @Test
@@ -820,6 +1008,270 @@ class CorrectnessLintMojoTest {
     }
 
     @Test
+    void skipsBaselineDiffWhenDisabled() throws Exception {
+        Path sourceDirectory = writeSource("""
+                package demo;
+
+                import org.springframework.scheduling.annotation.Async;
+
+                class AsyncOnly {
+
+                    @Async
+                    public void runAsync() {
+                    }
+                }
+                """);
+        Path reportsDirectory = tempDir.resolve("target/reports-no-baseline-diff");
+
+        CorrectnessLintMojo mojo = configuredMojo(
+                sourceDirectory,
+                reportsDirectory,
+                tempDir.resolve("spring-correctness-linter-baseline.txt")
+        );
+        setField(mojo, "applyBaseline", false);
+        setField(mojo, "writeBaselineDiff", false);
+        setField(mojo, "formats", new LinkedHashSet<>(Set.of("json")));
+
+        mojo.execute();
+
+        assertTrue(Files.exists(reportsDirectory.resolve("lint-report.json")));
+        assertFalse(Files.exists(reportsDirectory.resolve("baseline-diff.json")));
+        assertFalse(Files.exists(reportsDirectory.resolve("baseline-diff.html")));
+    }
+
+    @Test
+    void governanceSnapshotReflectsEnabledDomains() throws Exception {
+        Path sourceDirectory = writeSource("""
+                package demo;
+
+                import org.springframework.scheduling.annotation.Async;
+
+                class AsyncOnly {
+
+                    @Async
+                    public void runAsync() {
+                    }
+                }
+                """);
+        Path reportsDirectory = tempDir.resolve("target/reports-domains");
+
+        CorrectnessLintMojo mojo = configuredMojo(
+                sourceDirectory,
+                reportsDirectory,
+                tempDir.resolve("spring-correctness-linter-baseline.txt")
+        );
+        setField(mojo, "applyBaseline", false);
+        setField(mojo, "enabledRuleDomains", "async");
+        setField(mojo, "formats", new LinkedHashSet<>(Set.of("json")));
+
+        mojo.execute();
+
+        Path governanceFile = reportsDirectory.resolve("rules-governance.json");
+        assertTrue(Files.exists(governanceFile));
+        String json = Files.readString(governanceFile);
+        assertTrue(json.contains("\"enabledDomains\""));
+        assertTrue(json.contains("\"enabledDomains\": [\"ASYNC\"]"));
+        assertTrue(json.contains("\"effectiveDomains\": [\"ASYNC\"]"));
+        assertFalse(json.contains("\"domain\": \"TRANSACTION\""));
+    }
+
+    @Test
+    void writesRuleDocsToConfiguredRelativePath() throws Exception {
+        Path sourceDirectory = writeSource("""
+                package demo;
+
+                import org.springframework.scheduling.annotation.Async;
+
+                class AsyncOnly {
+
+                    @Async
+                    public void runAsync() {
+                    }
+                }
+                """);
+        Path reportsDirectory = tempDir.resolve("target/reports-custom-rule-docs");
+
+        CorrectnessLintMojo mojo = configuredMojo(
+                sourceDirectory,
+                reportsDirectory,
+                tempDir.resolve("spring-correctness-linter-baseline.txt")
+        );
+        setField(mojo, "applyBaseline", false);
+        setField(mojo, "ruleDocsFileName", "docs/custom-rules.md");
+        setField(mojo, "formats", new LinkedHashSet<>(Set.of("json")));
+
+        mojo.execute();
+
+        assertTrue(Files.exists(reportsDirectory.resolve("docs/custom-rules.md")));
+        assertFalse(Files.exists(reportsDirectory.resolve("rules-reference.md")));
+        assertTrue(Files.exists(reportsDirectory.resolve("rules-governance.json")));
+    }
+
+    @Test
+    void fallsBackToDefaultRuleDocsFileNameWhenBlank() throws Exception {
+        Path sourceDirectory = writeSource("""
+                package demo;
+
+                import org.springframework.scheduling.annotation.Async;
+
+                class AsyncOnly {
+
+                    @Async
+                    public void runAsync() {
+                    }
+                }
+                """);
+        Path reportsDirectory = tempDir.resolve("target/reports-blank-rule-docs-name");
+
+        CorrectnessLintMojo mojo = configuredMojo(
+                sourceDirectory,
+                reportsDirectory,
+                tempDir.resolve("spring-correctness-linter-baseline.txt")
+        );
+        setField(mojo, "applyBaseline", false);
+        setField(mojo, "ruleDocsFileName", "   ");
+        setField(mojo, "formats", new LinkedHashSet<>(Set.of("json")));
+
+        mojo.execute();
+
+        assertTrue(Files.exists(reportsDirectory.resolve("rules-reference.md")));
+        assertTrue(Files.exists(reportsDirectory.resolve("rules-governance.json")));
+    }
+
+    @Test
+    void writesGovernanceOutputsEvenWhenNoCoreFormatsAreValid() throws Exception {
+        Path sourceDirectory = writeSource("""
+                package demo;
+
+                import org.springframework.scheduling.annotation.Async;
+
+                class AsyncOnly {
+
+                    @Async
+                    public void runAsync() {
+                    }
+                }
+                """);
+        Path reportsDirectory = tempDir.resolve("target/reports-governance-only");
+
+        CorrectnessLintMojo mojo = configuredMojo(
+                sourceDirectory,
+                reportsDirectory,
+                tempDir.resolve("spring-correctness-linter-baseline.txt")
+        );
+        setField(mojo, "applyBaseline", false);
+        setField(mojo, "formats", new LinkedHashSet<>(Set.of("markdown")));
+
+        mojo.execute();
+
+        assertFalse(Files.exists(reportsDirectory.resolve("lint-report.json")));
+        assertFalse(Files.exists(reportsDirectory.resolve("lint-report.html")));
+        assertFalse(Files.exists(reportsDirectory.resolve("lint-report.sarif.json")));
+        assertTrue(Files.exists(reportsDirectory.resolve("rules-reference.md")));
+        assertTrue(Files.exists(reportsDirectory.resolve("rules-governance.json")));
+    }
+
+    @Test
+    void writesValidFormatsEvenWhenUnknownFormatsArePresent() throws Exception {
+        Path sourceDirectory = writeSource("""
+                package demo;
+
+                import org.springframework.scheduling.annotation.Async;
+
+                class AsyncOnly {
+
+                    @Async
+                    public void runAsync() {
+                    }
+                }
+                """);
+        Path reportsDirectory = tempDir.resolve("target/reports-mixed-formats");
+
+        CorrectnessLintMojo mojo = configuredMojo(
+                sourceDirectory,
+                reportsDirectory,
+                tempDir.resolve("spring-correctness-linter-baseline.txt")
+        );
+        setField(mojo, "applyBaseline", false);
+        setField(mojo, "formats", new LinkedHashSet<>(Set.of("JSON", "markdown")));
+
+        mojo.execute();
+
+        assertTrue(Files.exists(reportsDirectory.resolve("lint-report.json")));
+        assertFalse(Files.exists(reportsDirectory.resolve("lint-report.html")));
+        assertFalse(Files.exists(reportsDirectory.resolve("lint-report.sarif.json")));
+        assertTrue(Files.exists(reportsDirectory.resolve("rules-reference.md")));
+        assertTrue(Files.exists(reportsDirectory.resolve("rules-governance.json")));
+    }
+
+    @Test
+    void writesBaselineDiffEvenWhenNoCoreFormatsAreValid() throws Exception {
+        Path sourceDirectory = writeSource("""
+                package demo;
+
+                import org.springframework.scheduling.annotation.Async;
+
+                class AsyncOnly {
+
+                    @Async
+                    public void runAsync() {
+                    }
+                }
+                """);
+        Path reportsDirectory = tempDir.resolve("target/reports-baseline-diff-only");
+
+        CorrectnessLintMojo mojo = configuredMojo(
+                sourceDirectory,
+                reportsDirectory,
+                tempDir.resolve("spring-correctness-linter-baseline.txt")
+        );
+        setField(mojo, "applyBaseline", false);
+        setField(mojo, "formats", new LinkedHashSet<>(Set.of("markdown")));
+
+        mojo.execute();
+
+        assertFalse(Files.exists(reportsDirectory.resolve("lint-report.json")));
+        assertFalse(Files.exists(reportsDirectory.resolve("lint-report.html")));
+        assertFalse(Files.exists(reportsDirectory.resolve("lint-report.sarif.json")));
+        assertTrue(Files.exists(reportsDirectory.resolve("baseline-diff.json")));
+        assertTrue(Files.exists(reportsDirectory.resolve("baseline-diff.html")));
+        assertTrue(Files.exists(reportsDirectory.resolve("rules-reference.md")));
+        assertTrue(Files.exists(reportsDirectory.resolve("rules-governance.json")));
+    }
+
+    @Test
+    void skipsRuleDocsAndGovernanceOutputsWhenDisabled() throws Exception {
+        Path sourceDirectory = writeSource("""
+                package demo;
+
+                import org.springframework.scheduling.annotation.Async;
+
+                class AsyncOnly {
+
+                    @Async
+                    public void runAsync() {
+                    }
+                }
+                """);
+        Path reportsDirectory = tempDir.resolve("target/reports-no-rule-docs");
+
+        CorrectnessLintMojo mojo = configuredMojo(
+                sourceDirectory,
+                reportsDirectory,
+                tempDir.resolve("spring-correctness-linter-baseline.txt")
+        );
+        setField(mojo, "applyBaseline", false);
+        setField(mojo, "writeRuleDocs", false);
+        setField(mojo, "formats", new LinkedHashSet<>(Set.of("json")));
+
+        mojo.execute();
+
+        assertTrue(Files.exists(reportsDirectory.resolve("lint-report.json")));
+        assertFalse(Files.exists(reportsDirectory.resolve("rules-reference.md")));
+        assertFalse(Files.exists(reportsDirectory.resolve("rules-governance.json")));
+    }
+
+    @Test
     void writesLightweightJsonReportWhenEnabled() throws Exception {
         Path sourceDirectory = writeSource("""
                 package demo;
@@ -908,6 +1360,64 @@ class CorrectnessLintMojoTest {
     }
 
     @Test
+    void includesTestSourceRootsWhenEnabled() throws Exception {
+        Path mainSourceDirectory = tempDir.resolve("src/main/java/demo");
+        Path testSourceDirectory = tempDir.resolve("src/test/java/demo");
+        Files.createDirectories(mainSourceDirectory);
+        Files.createDirectories(testSourceDirectory);
+        Files.writeString(mainSourceDirectory.resolve("MainOnly.java"), """
+                package demo;
+
+                class MainOnly {
+                }
+                """);
+        Files.writeString(testSourceDirectory.resolve("TestAsyncOnly.java"), """
+                package demo;
+
+                import org.springframework.scheduling.annotation.Async;
+
+                class TestAsyncOnly {
+
+                    @Async
+                    public void runAsync() {
+                    }
+                }
+                """);
+        Path reportsDirectory = tempDir.resolve("target/reports-test-roots");
+        MavenProject project = mavenProject("empty-project", tempDir.resolve("pom.xml"), true, tempDir.resolve("src/main/java"));
+        project.getTestCompileSourceRoots().add(tempDir.resolve("src/test/java").toString());
+
+        CorrectnessLintMojo defaultMojo = configuredMojo(
+                tempDir.resolve("src/main/java"),
+                reportsDirectory,
+                tempDir.resolve("spring-correctness-linter-baseline.txt")
+        );
+        setField(defaultMojo, "project", project);
+        setField(defaultMojo, "applyBaseline", false);
+        setField(defaultMojo, "formats", new LinkedHashSet<>(Set.of("json")));
+        defaultMojo.execute();
+
+        String defaultJson = Files.readString(reportsDirectory.resolve("lint-report.json"));
+        assertTrue(defaultJson.contains("\"issueCount\": 0"));
+
+        CorrectnessLintMojo includeTestsMojo = configuredMojo(
+                tempDir.resolve("src/main/java"),
+                reportsDirectory,
+                tempDir.resolve("spring-correctness-linter-baseline.txt")
+        );
+        setField(includeTestsMojo, "project", project);
+        setField(includeTestsMojo, "applyBaseline", false);
+        setField(includeTestsMojo, "includeTestSourceRoots", true);
+        setField(includeTestsMojo, "formats", new LinkedHashSet<>(Set.of("json")));
+        includeTestsMojo.execute();
+
+        String json = Files.readString(reportsDirectory.resolve("lint-report.json"));
+        assertTrue(json.contains("\"issueCount\": 1"));
+        assertTrue(json.contains("\"ruleId\": \"SPRING_ASYNC_VOID\""));
+        assertTrue(json.contains("TestAsyncOnly.java"));
+    }
+
+    @Test
     void includesModuleSpecificSourceDirectories() throws Exception {
         Path sourceDirectory = writeSource("""
                 package demo;
@@ -945,6 +1455,69 @@ class CorrectnessLintMojoTest {
         String json = Files.readString(reportsDirectory.resolve("lint-report.json"));
         assertTrue(json.contains("\"issueCount\": 1"));
         assertTrue(json.contains("\"ruleId\": \"SPRING_ASYNC_VOID\""));
+    }
+
+    @Test
+    void rejectsUnknownModuleSourceDirectoriesModuleId() throws Exception {
+        Path sourceDirectory = writeSource("""
+                package demo;
+
+                class BaseService {
+                }
+                """);
+
+        CorrectnessLintMojo mojo = configuredMojo(
+                sourceDirectory,
+                tempDir.resolve("target/reports-unknown-module-root"),
+                tempDir.resolve("spring-correctness-linter-baseline.txt")
+        );
+        setField(mojo, "applyBaseline", false);
+        setField(mojo, "moduleSourceDirectories", "unknown-module=src/generated/java");
+
+        Exception exception = assertThrows(Exception.class, mojo::execute);
+        assertTrue(containsMessage(exception, "Unknown module id(s) in moduleSourceDirectories"));
+    }
+
+    @Test
+    void rejectsInvalidModuleSourceDirectoriesSyntax() throws Exception {
+        Path sourceDirectory = writeSource("""
+                package demo;
+
+                class BaseService {
+                }
+                """);
+
+        CorrectnessLintMojo mojo = configuredMojo(
+                sourceDirectory,
+                tempDir.resolve("target/reports-invalid-module-roots"),
+                tempDir.resolve("spring-correctness-linter-baseline.txt")
+        );
+        setField(mojo, "applyBaseline", false);
+        setField(mojo, "moduleSourceDirectories", "broken-entry");
+
+        Exception exception = assertThrows(Exception.class, mojo::execute);
+        assertTrue(containsMessage(exception, "Invalid moduleSourceDirectories entry"));
+    }
+
+    @Test
+    void rejectsBlankModuleSourceDirectoriesPathList() throws Exception {
+        Path sourceDirectory = writeSource("""
+                package demo;
+
+                class BaseService {
+                }
+                """);
+
+        CorrectnessLintMojo mojo = configuredMojo(
+                sourceDirectory,
+                tempDir.resolve("target/reports-blank-module-roots"),
+                tempDir.resolve("spring-correctness-linter-baseline.txt")
+        );
+        setField(mojo, "applyBaseline", false);
+        setField(mojo, "moduleSourceDirectories", "empty-project=");
+
+        Exception exception = assertThrows(Exception.class, mojo::execute);
+        assertTrue(containsMessage(exception, "Invalid moduleSourceDirectories entry"));
     }
 
     @Test
