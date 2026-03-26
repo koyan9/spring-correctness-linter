@@ -46,6 +46,9 @@ jobs:
       - name: Verify reactor sample
         run: mvn -B -q -f samples/reactor-sample/pom.xml -DskipTests verify
 
+      - name: Verify adoption suite
+        run: mvn -B -q -f samples/adoption-suite/pom.xml -DskipTests verify
+
       - name: Upload JaCoCo reports
         uses: actions/upload-artifact@v6
         with:

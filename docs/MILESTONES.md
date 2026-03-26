@@ -39,7 +39,7 @@
 - Added plugin-level tests covering rule selection, severity overrides, cache reuse, reactor scanning, and per-module output behavior.
 - Extended core tests for parse problems, baseline diff behavior, multi-source-root analysis, and cache reuse.
 - Added a new multi-module reactor sample alongside the single-module vulnerable sample.
-- Updated CI to validate both sample projects.
+- Updated CI to validate `samples/vulnerable-sample/`, `samples/reactor-sample/`, and `samples/adoption-suite/`.
 
 ## Milestone 7: Quality Gates and Coverage
 

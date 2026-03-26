@@ -205,6 +205,7 @@ Or add your internal security annotations:
   <securityAnnotations>InternalEndpoint,TeamSecure</securityAnnotations>
 </configuration>
 ```
+<!-- Package and `@` prefixes are ignored when the plugin normalizes security annotations; only the simple name matters. -->
 
 ### Cache conventions
 
@@ -267,6 +268,8 @@ For a Maven reactor build:
   <splitCacheByModule>true</splitCacheByModule>
 </configuration>
 ```
+
+Only modules that actually contribute Java source files will appear in module reports and per-module outputs.
 
 If some modules need extra source roots:
 
@@ -357,6 +360,8 @@ Use the built-in samples as references:
 - `samples/adoption-suite/basic-app/`
 - `samples/adoption-suite/centralized-security-app/`
 - `samples/adoption-suite/cache-convention-app/`
+
+Use `samples/adoption-suite/` when you want to validate consumer-style rollout paths such as centralized security and project-wide cache-key conventions.
 
 ## 14. Related Docs
 

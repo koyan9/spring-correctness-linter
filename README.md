@@ -199,6 +199,7 @@ When reactor scanning is enabled:
 - reports group findings by module
 - quality gate failures mention the affected module IDs
 - baseline and cache files can be split by module
+- only modules that actually contribute Java source files appear in module reports and per-module outputs
 
 ## Key Configuration Properties
 
@@ -219,19 +220,19 @@ Rule ids are normalized to uppercase. Rule domains are case-insensitive and acce
 | `spring.correctness.linter.applyBaseline` | `true` | `true` / `false` | Applies baseline filtering to hide known issues. |
 | `spring.correctness.linter.writeBaseline` | `false` | `true` / `false` | Writes a new baseline file (or per-module baseline files when splitting). |
 | `spring.correctness.linter.writeBaselineDiff` | `true` | `true` / `false` | Writes `baseline-diff.json` and `baseline-diff.html` when a baseline path is configured. |
-| `spring.correctness.linter.writeRuleDocs` | `true` | `true` / `false` | Writes the generated rule reference markdown. |
+| `spring.correctness.linter.writeRuleDocs` | `true` | `true` / `false` | Writes both `rules-reference.md` and the `rules-governance.json` snapshot (governance/audit workflows rely on this file). |
 | `spring.correctness.linter.ruleDocsFileName` | `rules-reference.md` | File name or path | File name (or relative path) for the generated rules reference under the report directory. |
 | `spring.correctness.linter.lightweightReports` | `false` | `true` / `false` | Writes a lightweight `lint-report.json` (summary + selection only) to reduce report size. HTML/SARIF outputs are unchanged. |
 | `spring.correctness.linter.failOnSeverity` | _unset_ | `INFO`, `WARNING`, `ERROR` | Fails the build when any visible issue meets or exceeds the threshold. Takes precedence over `failOnError`. |
 | `spring.correctness.linter.failOnError` | `false` | `true` / `false` | Fails the build when any visible issue remains, only when `failOnSeverity` is not set. |
 | `spring.correctness.linter.enabledRules` | _empty_ | Rule IDs | Enables only the specified rule IDs. Unknown IDs fail the build. |
 | `spring.correctness.linter.disabledRules` | _empty_ | Rule IDs | Disables the specified rule IDs. Unknown IDs fail the build. |
-| `spring.correctness.linter.enabledRuleDomains` | _empty_ | `ASYNC`, `LIFECYCLE`, `SCHEDULED`, `CACHE`, `WEB`, `TRANSACTION`, `EVENTS`, `CONFIGURATION`, `GENERAL` | Enables only selected rule domains. Unknown domains fail the build. |
+| `spring.correctness.linter.enabledRuleDomains` | _empty_ | `ASYNC`, `LIFECYCLE`, `SCHEDULED`, `CACHE`, `WEB`, `TRANSACTION`, `EVENTS`, `CONFIGURATION` | Enables only selected rule domains. Unknown domains fail the build (`GENERAL` is accepted but no bundled rule uses it today). |
 | `spring.correctness.linter.disabledRuleDomains` | _empty_ | Same as above | Disables selected rule domains. |
 | `spring.correctness.linter.severityOverrides` | _empty_ | `RULE_ID=INFO|WARNING|ERROR` | Overrides per-rule severities. Unknown rule IDs fail the build. |
 | `spring.correctness.linter.assumeCentralizedSecurity` | `false` | `true` / `false` | Skips `SPRING_ENDPOINT_SECURITY` when security is enforced centrally. |
 | `spring.correctness.linter.autoDetectCentralizedSecurity` | `false` | `true` / `false` | Auto-skips `SPRING_ENDPOINT_SECURITY` when a `SecurityFilterChain` or `SecurityWebFilterChain` bean is detected in the source tree. |
-| `spring.correctness.linter.securityAnnotations` | _empty_ | Annotation names | Treats additional annotations as explicit security intent. Accepts simple or fully qualified names (leading `@` is allowed). |
+| `spring.correctness.linter.securityAnnotations` | _empty_ | Annotation names | Treats additional annotations as explicit security intent. Input values are normalized to simple annotation names (leading `@` and package prefixes are ignored), so the same simple name in different packages cannot be distinguished. |
 | `spring.correctness.linter.cacheDefaultKeyCacheNames` | _empty_ | Cache names or `*` | Allows default cache keys for specific cache names. `*` allows all caches. |
 | `spring.correctness.linter.autoDetectProjectWideKeyGenerator` | `false` | `true` / `false` | Auto-skips `SPRING_CACHEABLE_KEY` when a project-level `@Bean KeyGenerator` or `CachingConfigurer` / `CachingConfigurerSupport` key generator is detected in the source tree. |
 | `spring.correctness.linter.cacheFile` | `${project.build.directory}/spring-correctness-linter/analysis-cache.txt` | Path | Incremental cache file path (ignored when cache is disabled or split by module). |
@@ -252,7 +253,7 @@ disabling the endpoint-security rule globally or by providing your internal secu
   <!-- Or detect SecurityFilterChain / SecurityWebFilterChain automatically -->
   <!-- <autoDetectCentralizedSecurity>true</autoDetectCentralizedSecurity> -->
   <securityAnnotations>InternalEndpoint,TeamSecure</securityAnnotations>
-  <!-- Also supported: @InternalEndpoint or com.example.InternalEndpoint -->
+  <!-- Values are normalized to simple annotation names, so package prefixes are ignored. -->
 </configuration>
 ```
 
@@ -277,7 +278,7 @@ If the project standardizes on a global `KeyGenerator` bean or a `CachingConfigu
 
 PowerShell note: quote dotted `-Dspring.correctness.linter.*` properties or invoke Maven through `cmd /c`.
 
-Available built-in rule domains currently include `ASYNC`, `LIFECYCLE`, `SCHEDULED`, `CACHE`, `WEB`, `TRANSACTION`, `EVENTS`, `CONFIGURATION`, and `GENERAL`.
+Available built-in rule domains currently include `ASYNC`, `LIFECYCLE`, `SCHEDULED`, `CACHE`, `WEB`, `TRANSACTION`, `EVENTS`, and `CONFIGURATION`; `GENERAL` is accepted but not populated by any bundled rule today.
 
 Recommended starter bundles:
 
@@ -481,6 +482,7 @@ Only JSON output, custom report directory, no rule docs:
   <writeRuleDocs>false</writeRuleDocs>
 </configuration>
 ```
+This also disables the generated `rules-governance.json` snapshot.
 
 Run a narrow rule set with overrides:
 
@@ -541,9 +543,10 @@ Treat custom security annotations as explicit intent:
 
 ```xml
 <configuration>
-  <securityAnnotations>InternalEndpoint,com.example.TeamSecure</securityAnnotations>
+  <securityAnnotations>InternalEndpoint,TeamSecure</securityAnnotations>
 </configuration>
 ```
+<!-- Use the simple names shown above; package prefixes are stripped when the plugin normalizes the list. -->
 
 ## FAQ
 
@@ -700,6 +703,7 @@ A multi-module Maven reactor sample that demonstrates:
 - module summaries in reports
 - per-module baseline output
 - per-module incremental cache output
+- filtering out aggregator-only modules that do not contribute Java source files
 
 ### `samples/adoption-suite/`
 
@@ -708,6 +712,7 @@ A set of small consumer-style applications that demonstrate how real projects ca
 - baseline and report generation
 - centralized-security auto-detection
 - project-wide cache key conventions
+- explicit CI verification of these consumer-style adoption paths
 
 ## Repository Structure
 

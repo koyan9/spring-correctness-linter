@@ -4,6 +4,19 @@ All notable changes to `spring-correctness-linter` will be documented in this fi
 
 ## [Unreleased]
 
+### Added
+
+- CI now validates `samples/adoption-suite/` alongside the vulnerable and reactor samples
+- Plugin regression coverage now includes `failOnError`, `failOnSeverity` precedence, invalid severity values, mixed valid/invalid report formats, and custom `ruleDocsFileName` handling
+- Plugin regression coverage now includes `includeTestSourceRoots` and `moduleSourceDirectories` validation paths for multi-root and multi-module configuration
+- Core regression coverage now includes inherited custom/composed security intent scenarios and additional cache-key convention boundaries
+
+### Changed
+
+- Reactor and source-root normalization now exclude nonexistent or Java-empty roots from module reports and per-module baseline/cache outputs
+- Documentation and sample guides now consistently explain `rules-governance.json`, `securityAnnotations` normalization, `GENERAL` domain semantics, and reactor filtering behavior
+- Adoption-oriented sample guidance now reflects explicit CI validation and clearer consumer rollout positioning
+
 ## [0.1.1] - 2026-03-18
 
 ### Added

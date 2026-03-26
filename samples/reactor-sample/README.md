@@ -41,6 +41,7 @@ Example commands:
 - Per-module caches: `samples/reactor-sample/target/spring-correctness-linter/modules/<module>/analysis-cache.txt`
 
 The parent reactor report groups findings by module, and child modules are skipped automatically when `scanReactorModules=true`.
+Only modules that actually contribute Java source files appear in module reports and per-module outputs.
 
 Run the same verification command twice to see per-module cache hits increase in the reactor root `lint-report.json`.
 

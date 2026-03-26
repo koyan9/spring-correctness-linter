@@ -28,6 +28,7 @@ Current recommended adoption strategy:
 - Use generated `rules-reference.md` to expand bundles into concrete rule IDs after the first rollout pass
 - Validate `CI Starter`, transaction, web, and configuration-oriented adoption paths with `samples/vulnerable-sample/`
 - Validate reactor/module grouping and async-heavy bundle behavior with `samples/reactor-sample/`
+- Validate consumer-style rollout paths such as centralized security and project-wide cache conventions with `samples/adoption-suite/`
 
 ### 3. Maintainable rule growth
 

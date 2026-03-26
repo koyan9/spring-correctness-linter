@@ -201,6 +201,7 @@ mvn -q io.github.koyan9:spring-correctness-linter-maven-plugin:0.1.1:lint \
   <securityAnnotations>InternalEndpoint,TeamSecure</securityAnnotations>
 </configuration>
 ```
+<!-- 插件会去掉 `@` 与包名前缀，必须按配置的简单名使用注解。 -->
 
 ### Cache 约定
 
@@ -261,6 +262,8 @@ mvn -q io.github.koyan9:spring-correctness-linter-maven-plugin:0.1.1:lint \
   <splitCacheByModule>true</splitCacheByModule>
 </configuration>
 ```
+
+只有真正贡献 Java 源码的模块才会出现在模块报告和按模块产物中。
 
 如果某些模块有额外源码根：
 
@@ -334,6 +337,8 @@ mvn -B -q verify \
 - `samples/adoption-suite/basic-app/`
 - `samples/adoption-suite/centralized-security-app/`
 - `samples/adoption-suite/cache-convention-app/`
+
+如果你想验证集中式安全或项目级 cache key 约定这类真实接入路径，优先参考 `samples/adoption-suite/`。
 
 ## 14. 相关文档
 

@@ -67,3 +67,4 @@ Each app is intentionally small and focused:
 
 - This suite is not part of the main repository build modules on purpose.
 - It exists to validate real-project adoption paths without coupling consumer scenarios to the core product build.
+- It is still verified explicitly in CI so these consumer-style adoption paths remain covered.
