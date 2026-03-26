@@ -963,6 +963,46 @@ class ProjectLinterTest {
     }
 
     @Test
+    void doesNotAutoDetectCustomCachingConfigurerBySimpleName() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("CustomCachingConfigurer.java"), """
+                package demo;
+
+                import org.springframework.cache.annotation.Cacheable;
+
+                interface KeyGenerator {
+                }
+
+                interface CachingConfigurer {
+                    KeyGenerator keyGenerator();
+                }
+
+                class LocalCachingConfigurer implements CachingConfigurer {
+
+                    @Override
+                    public KeyGenerator keyGenerator() {
+                        return null;
+                    }
+                }
+
+                class CacheService {
+
+                    @Cacheable(cacheNames = "demo")
+                    public String load(String id) {
+                        return id;
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintOptions options = LintOptions.defaults().withAutoDetectProjectWideKeyGenerator(true);
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"), options).report();
+
+        assertTrue(report.issues().stream().anyMatch(issue -> issue.ruleId().equals("SPRING_CACHEABLE_KEY")));
+    }
+
+    @Test
     void recognizesPostAuthorizeEndpointsAndZeroArgCacheDefaults() throws Exception {
         Path sourceDirectory = tempDir.resolve("src/main/java/demo");
         Files.createDirectories(sourceDirectory);
@@ -1205,6 +1245,272 @@ class ProjectLinterTest {
     }
 
     @Test
+    void invalidatesIncrementalCacheWhenCentralizedSecurityContextChanges() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("PublicController.java"), """
+                package demo;
+
+                import org.springframework.web.bind.annotation.GetMapping;
+                import org.springframework.web.bind.annotation.RestController;
+
+                @RestController
+                class PublicController {
+
+                    @GetMapping("/open")
+                    public String open() {
+                        return "ok";
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        Path cacheFile = tempDir.resolve("target/analysis-cache.txt");
+        LintOptions options = new LintOptions(true, false, null, cacheFile, true)
+                .withAutoDetectCentralizedSecurity(true);
+
+        LintReport firstRun = linter.analyze(tempDir, tempDir.resolve("src/main/java"), options).report();
+        assertTrue(firstRun.issues().stream().anyMatch(issue -> issue.ruleId().equals("SPRING_ENDPOINT_SECURITY")));
+
+        Files.writeString(sourceDirectory.resolve("SecurityConfig.java"), """
+                package demo;
+
+                import org.springframework.context.annotation.Bean;
+                import org.springframework.security.web.SecurityFilterChain;
+
+                class SecurityConfig {
+
+                    @Bean
+                    SecurityFilterChain filterChain() {
+                        return null;
+                    }
+                }
+                """);
+
+        LintReport secondRun = linter.analyze(tempDir, tempDir.resolve("src/main/java"), options).report();
+
+        assertEquals(0, secondRun.cachedFileCount());
+        assertNotEquals(firstRun.runtimeMetrics().analysisFingerprint(), secondRun.runtimeMetrics().analysisFingerprint());
+        assertFalse(secondRun.issues().stream().anyMatch(issue -> issue.ruleId().equals("SPRING_ENDPOINT_SECURITY")));
+    }
+
+    @Test
+    void invalidatesIncrementalCacheWhenProjectWideKeyGeneratorContextChanges() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("CacheService.java"), """
+                package demo;
+
+                import org.springframework.cache.annotation.Cacheable;
+
+                class CacheService {
+
+                    @Cacheable(cacheNames = "demo")
+                    public String load(String id) {
+                        return id;
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        Path cacheFile = tempDir.resolve("target/analysis-cache.txt");
+        LintOptions options = new LintOptions(true, false, null, cacheFile, true)
+                .withAutoDetectProjectWideKeyGenerator(true);
+
+        LintReport firstRun = linter.analyze(tempDir, tempDir.resolve("src/main/java"), options).report();
+        assertTrue(firstRun.issues().stream().anyMatch(issue -> issue.ruleId().equals("SPRING_CACHEABLE_KEY")));
+
+        Files.writeString(sourceDirectory.resolve("ProjectKeyGeneratorConfig.java"), """
+                package demo;
+
+                import org.springframework.cache.interceptor.KeyGenerator;
+                import org.springframework.context.annotation.Bean;
+
+                class ProjectKeyGeneratorConfig {
+
+                    @Bean
+                    KeyGenerator keyGenerator() {
+                        return (target, method, params) -> params.length;
+                    }
+                }
+                """);
+
+        LintReport secondRun = linter.analyze(tempDir, tempDir.resolve("src/main/java"), options).report();
+
+        assertEquals(0, secondRun.cachedFileCount());
+        assertNotEquals(firstRun.runtimeMetrics().analysisFingerprint(), secondRun.runtimeMetrics().analysisFingerprint());
+        assertFalse(secondRun.issues().stream().anyMatch(issue -> issue.ruleId().equals("SPRING_CACHEABLE_KEY")));
+    }
+
+    @Test
+    void invalidatesIncrementalCacheWhenComposedAnnotationDefinitionChanges() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("TeamSecure.java"), """
+                package demo;
+
+                import java.lang.annotation.ElementType;
+                import java.lang.annotation.Retention;
+                import java.lang.annotation.RetentionPolicy;
+                import java.lang.annotation.Target;
+
+                @Target({ElementType.TYPE, ElementType.METHOD})
+                @Retention(RetentionPolicy.RUNTIME)
+                @interface TeamSecure {
+                }
+                """);
+        Files.writeString(sourceDirectory.resolve("PublicController.java"), """
+                package demo;
+
+                import org.springframework.web.bind.annotation.GetMapping;
+                import org.springframework.web.bind.annotation.RestController;
+
+                @RestController
+                class PublicController {
+
+                    @GetMapping("/open")
+                    @TeamSecure
+                    public String open() {
+                        return "ok";
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        Path cacheFile = tempDir.resolve("target/analysis-cache.txt");
+        LintOptions options = new LintOptions(true, false, null, cacheFile, true);
+
+        LintReport firstRun = linter.analyze(tempDir, tempDir.resolve("src/main/java"), options).report();
+        assertTrue(firstRun.issues().stream().anyMatch(issue -> issue.ruleId().equals("SPRING_ENDPOINT_SECURITY")));
+
+        Files.writeString(sourceDirectory.resolve("TeamSecure.java"), """
+                package demo;
+
+                import org.springframework.security.access.prepost.PreAuthorize;
+
+                import java.lang.annotation.ElementType;
+                import java.lang.annotation.Retention;
+                import java.lang.annotation.RetentionPolicy;
+                import java.lang.annotation.Target;
+
+                @Target({ElementType.TYPE, ElementType.METHOD})
+                @Retention(RetentionPolicy.RUNTIME)
+                @PreAuthorize("true")
+                @interface TeamSecure {
+                }
+                """);
+
+        LintReport secondRun = linter.analyze(tempDir, tempDir.resolve("src/main/java"), options).report();
+
+        assertEquals(0, secondRun.cachedFileCount());
+        assertNotEquals(firstRun.runtimeMetrics().analysisFingerprint(), secondRun.runtimeMetrics().analysisFingerprint());
+        assertFalse(secondRun.issues().stream().anyMatch(issue -> issue.ruleId().equals("SPRING_ENDPOINT_SECURITY")));
+    }
+
+    @Test
+    void invalidatesIncrementalCacheWhenTypeResolutionContextChanges() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("SecuredApi.java"), """
+                package demo;
+
+                import org.springframework.security.access.prepost.PreAuthorize;
+
+                interface SecuredApi {
+
+                    @PreAuthorize("true")
+                    String open();
+                }
+                """);
+        Files.writeString(sourceDirectory.resolve("PublicController.java"), """
+                package demo;
+
+                import org.springframework.web.bind.annotation.GetMapping;
+                import org.springframework.web.bind.annotation.RestController;
+
+                @RestController
+                class PublicController implements SecuredApi {
+
+                    @Override
+                    @GetMapping("/open")
+                    public String open() {
+                        return "ok";
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        Path cacheFile = tempDir.resolve("target/analysis-cache.txt");
+        LintOptions options = new LintOptions(true, false, null, cacheFile, true);
+
+        LintReport firstRun = linter.analyze(tempDir, tempDir.resolve("src/main/java"), options).report();
+        assertFalse(firstRun.issues().stream().anyMatch(issue -> issue.ruleId().equals("SPRING_ENDPOINT_SECURITY")));
+
+        Files.writeString(sourceDirectory.resolve("SecuredApi.java"), """
+                package demo;
+
+                interface SecuredApi {
+
+                    String open();
+                }
+                """);
+
+        LintReport secondRun = linter.analyze(tempDir, tempDir.resolve("src/main/java"), options).report();
+
+        assertEquals(0, secondRun.cachedFileCount());
+        assertNotEquals(firstRun.runtimeMetrics().analysisFingerprint(), secondRun.runtimeMetrics().analysisFingerprint());
+        assertTrue(secondRun.issues().stream().anyMatch(issue -> issue.ruleId().equals("SPRING_ENDPOINT_SECURITY")));
+    }
+
+    @Test
+    void invalidatesIncrementalCacheWhenCustomSecurityAnnotationOptionsChange() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("InternalEndpoint.java"), """
+                package demo;
+
+                import java.lang.annotation.ElementType;
+                import java.lang.annotation.Retention;
+                import java.lang.annotation.RetentionPolicy;
+                import java.lang.annotation.Target;
+
+                @Target({ElementType.TYPE, ElementType.METHOD})
+                @Retention(RetentionPolicy.RUNTIME)
+                @interface InternalEndpoint {
+                }
+                """);
+        Files.writeString(sourceDirectory.resolve("PublicController.java"), """
+                package demo;
+
+                import org.springframework.web.bind.annotation.GetMapping;
+                import org.springframework.web.bind.annotation.RestController;
+
+                @RestController
+                class PublicController {
+
+                    @GetMapping("/open")
+                    @InternalEndpoint
+                    public String open() {
+                        return "ok";
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        Path cacheFile = tempDir.resolve("target/analysis-cache.txt");
+        LintOptions firstOptions = new LintOptions(true, false, null, cacheFile, true);
+        LintReport firstRun = linter.analyze(tempDir, tempDir.resolve("src/main/java"), firstOptions).report();
+        assertTrue(firstRun.issues().stream().anyMatch(issue -> issue.ruleId().equals("SPRING_ENDPOINT_SECURITY")));
+
+        LintOptions secondOptions = firstOptions.withCustomSecurityAnnotations(Set.of("InternalEndpoint"));
+        LintReport secondRun = linter.analyze(tempDir, tempDir.resolve("src/main/java"), secondOptions).report();
+
+        assertEquals(0, secondRun.cachedFileCount());
+        assertNotEquals(firstRun.runtimeMetrics().analysisFingerprint(), secondRun.runtimeMetrics().analysisFingerprint());
+        assertFalse(secondRun.issues().stream().anyMatch(issue -> issue.ruleId().equals("SPRING_ENDPOINT_SECURITY")));
+    }
+
+    @Test
     void analyzesMultipleFilesWhenParallelAnalysisDisabled() throws Exception {
         Path sourceDirectory = tempDir.resolve("src/main/java/demo");
         Files.createDirectories(sourceDirectory);
@@ -1381,6 +1687,68 @@ class ProjectLinterTest {
         assertEquals("main-module", report.moduleSummaries().get(0).moduleId());
         assertEquals(1, report.runtimeMetrics().moduleMetrics().size());
         assertEquals("main-module", report.runtimeMetrics().moduleMetrics().get(0).moduleId());
+    }
+
+    @Test
+    void assignsStaleBaselineEntriesToLongestMatchingSourceRootModule() throws Exception {
+        Path mainSourceDirectory = tempDir.resolve("src/main/java/demo");
+        Path extraSourceDirectory = tempDir.resolve("custom-src/demo");
+        Files.createDirectories(mainSourceDirectory);
+        Files.createDirectories(extraSourceDirectory);
+        Files.writeString(mainSourceDirectory.resolve("MainOnly.java"), """
+                package demo;
+
+                class MainOnly {
+                }
+                """);
+        Files.writeString(extraSourceDirectory.resolve("ExtraAsyncOnly.java"), """
+                package demo;
+
+                import org.springframework.scheduling.annotation.Async;
+
+                class ExtraAsyncOnly {
+
+                    @Async
+                    public void runAsync() {
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        Path baselineFile = tempDir.resolve("spring-correctness-linter-baseline.txt");
+        List<SourceRoot> sourceRoots = List.of(
+                new SourceRoot(tempDir.resolve("src/main/java"), "main-module"),
+                new SourceRoot(tempDir.resolve("custom-src"), "main-module")
+        );
+
+        LintAnalysisResult firstRun = linter.analyzeSourceRoots(
+                tempDir,
+                sourceRoots,
+                new LintOptions(true, false, null)
+        );
+        new BaselineStore().write(baselineFile, tempDir, firstRun.report().issues());
+
+        Files.writeString(extraSourceDirectory.resolve("ExtraAsyncOnly.java"), """
+                package demo;
+
+                class ExtraAsyncOnly {
+
+                    public String runAsync() {
+                        return "ok";
+                    }
+                }
+                """);
+
+        LintAnalysisResult secondRun = linter.analyzeSourceRoots(
+                tempDir,
+                sourceRoots,
+                new LintOptions(true, true, baselineFile)
+        );
+
+        assertTrue(secondRun.baselineDiffReport().moduleSummaries().stream()
+                .anyMatch(summary -> summary.moduleId().equals("main-module") && summary.staleBaselineCount() == 1));
+        assertFalse(secondRun.baselineDiffReport().moduleSummaries().stream()
+                .anyMatch(summary -> summary.moduleId().equals("custom-src") && summary.staleBaselineCount() > 0));
     }
 
     @Test
@@ -2673,6 +3041,45 @@ class ProjectLinterTest {
         LintOptions options = LintOptions.defaults().withAutoDetectCentralizedSecurity(true);
         LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"), options).report();
         assertFalse(report.issues().stream().anyMatch(issue -> issue.ruleId().equals("SPRING_ENDPOINT_SECURITY")));
+    }
+
+    @Test
+    void doesNotAutoDetectCustomSecurityFilterChainBySimpleName() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("CustomSecurityConfig.java"), """
+                package demo;
+
+                import org.springframework.context.annotation.Bean;
+                import org.springframework.web.bind.annotation.GetMapping;
+                import org.springframework.web.bind.annotation.RestController;
+
+                interface SecurityFilterChain {
+                }
+
+                class CustomSecurityConfig {
+
+                    @Bean
+                    SecurityFilterChain filterChain() {
+                        return null;
+                    }
+                }
+
+                @RestController
+                class PublicController {
+
+                    @GetMapping("/open")
+                    public String open() {
+                        return "ok";
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintOptions options = LintOptions.defaults().withAutoDetectCentralizedSecurity(true);
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"), options).report();
+
+        assertTrue(report.issues().stream().anyMatch(issue -> issue.ruleId().equals("SPRING_ENDPOINT_SECURITY")));
     }
 
     @Test

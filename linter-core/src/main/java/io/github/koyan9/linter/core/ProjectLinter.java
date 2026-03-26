@@ -68,7 +68,7 @@ public final class ProjectLinter {
         List<CachedFileAnalysis> cacheEntries = new ArrayList<>();
 
         long cacheLoadStartNanos = System.nanoTime();
-        LoadedCachedAnalyses loadedCachedAnalyses = loadCachedAnalyses(options);
+        LoadedCachedAnalyses loadedCachedAnalyses = loadCachedAnalyses(context, options);
         long cacheLoadNanos = System.nanoTime() - cacheLoadStartNanos;
         Map<String, CachedFileAnalysis> cachedAnalyses = loadedCachedAnalyses.analyses();
 
@@ -106,8 +106,9 @@ public final class ProjectLinter {
         long cacheWriteNanos = System.nanoTime() - cacheWriteStartNanos;
 
         long baselineLoadStartNanos = System.nanoTime();
-        Set<BaselineEntry> baselineEntries = loadBaselineEntries(options);
+        LoadedBaselineEntries loadedBaselineEntries = loadBaselineEntries(options);
         long baselineLoadNanos = System.nanoTime() - baselineLoadStartNanos;
+        Set<BaselineEntry> baselineEntries = loadedBaselineEntries.entries();
 
         Set<BaselineEntry> matchedEntries = new HashSet<>();
         List<LintIssue> visibleIssues = new ArrayList<>();
@@ -132,12 +133,12 @@ public final class ProjectLinter {
         staleEntries.removeAll(matchedEntries);
         Map<String, String> baselineEntryModules = new HashMap<>();
         for (BaselineEntry staleEntry : staleEntries) {
-            String moduleId = moduleIdForRelativePath(staleEntry.relativePath(), context.sourceRoots());
+            String moduleId = moduleIdForBaselineEntry(staleEntry, loadedBaselineEntries.moduleScopeByEntry(), context);
             baselineEntryModules.put(staleEntry.relativePath(), moduleId);
             baselineModules.computeIfAbsent(moduleId, BaselineDiffAccumulator::new).staleBaselineCount++;
         }
         for (BaselineEntry matchedEntry : matchedEntries) {
-            String moduleId = moduleIdForRelativePath(matchedEntry.relativePath(), context.sourceRoots());
+            String moduleId = moduleIdForBaselineEntry(matchedEntry, loadedBaselineEntries.moduleScopeByEntry(), context);
             baselineEntryModules.putIfAbsent(matchedEntry.relativePath(), moduleId);
         }
 
@@ -226,24 +227,27 @@ public final class ProjectLinter {
         );
     }
 
-    private Set<BaselineEntry> loadBaselineEntries(LintOptions options) throws IOException {
+    private LoadedBaselineEntries loadBaselineEntries(LintOptions options) throws IOException {
         if (!options.applyBaseline()) {
-            return Set.of();
+            return LoadedBaselineEntries.empty();
         }
 
         BaselineStore baselineStore = new BaselineStore();
         Set<BaselineEntry> baselineEntries = new HashSet<>();
+        Map<BaselineEntry, String> moduleScopeByEntry = new HashMap<>();
         if (options.baselineFile() != null) {
             baselineEntries.addAll(baselineStore.load(options.baselineFile()));
         }
-        for (Path moduleBaselineFile : options.moduleBaselineFiles().values()) {
-            baselineEntries.addAll(baselineStore.load(moduleBaselineFile));
+        for (Map.Entry<String, Path> entry : options.moduleBaselineFiles().entrySet()) {
+            Set<BaselineEntry> moduleEntries = baselineStore.load(entry.getValue());
+            baselineEntries.addAll(moduleEntries);
+            moduleEntries.forEach(baselineEntry -> moduleScopeByEntry.putIfAbsent(baselineEntry, entry.getKey()));
         }
-        return baselineEntries;
+        return new LoadedBaselineEntries(baselineEntries, moduleScopeByEntry);
     }
 
-    private LoadedCachedAnalyses loadCachedAnalyses(LintOptions options) throws IOException {
-        String analysisFingerprint = cacheFingerprint(options);
+    private LoadedCachedAnalyses loadCachedAnalyses(ProjectContext context, LintOptions options) throws IOException {
+        String analysisFingerprint = cacheFingerprint(context, options);
         if (!options.useIncrementalCache() || options.analysisCacheFile() == null) {
             if (!options.useIncrementalCache() || options.moduleAnalysisCacheFiles().isEmpty()) {
                 return new LoadedCachedAnalyses(Map.of(), analysisFingerprint);
@@ -279,12 +283,12 @@ public final class ProjectLinter {
         }
     }
 
-    private String cacheFingerprint(LintOptions options) {
+    private String cacheFingerprint(ProjectContext context, LintOptions options) {
         if (!options.useIncrementalCache()) {
             return "";
         }
         AnalysisCacheStore cacheStore = new AnalysisCacheStore();
-        return cacheStore.fingerprint(rules, options.honorInlineSuppressions());
+        return cacheStore.fingerprint(rules, options, context.semanticFingerprintEntries());
     }
 
     private String cacheScope(LintOptions options) {
@@ -439,27 +443,36 @@ public final class ProjectLinter {
         );
     }
 
-    private String moduleIdForRelativePath(String relativePath, List<SourceRoot> sourceRoots) {
-        for (SourceRoot sourceRoot : sourceRoots) {
-            String normalizedRoot = sourceRoot.path().toString().replace('\\', '/');
-            if (relativePath.replace('\\', '/').startsWith(relativePathPrefix(normalizedRoot))) {
-                return sourceRoot.moduleId();
-            }
+    private String moduleIdForBaselineEntry(
+            BaselineEntry entry,
+            Map<BaselineEntry, String> scopedModuleIds,
+            ProjectContext context
+    ) {
+        String scopedModuleId = scopedModuleIds.get(entry);
+        if (scopedModuleId != null && !scopedModuleId.isBlank()) {
+            return scopedModuleId;
         }
-        int slashIndex = relativePath.replace('\\', '/').indexOf('/');
-        return slashIndex > 0 ? relativePath.replace('\\', '/').substring(0, slashIndex) : ".";
+        String resolved = moduleIdForRelativePath(entry.relativePath(), context.projectRoot(), context.sourceRoots());
+        return resolved == null || resolved.isBlank() ? "." : resolved;
     }
 
-    private String relativePathPrefix(String rootPath) {
-        int markerIndex = rootPath.lastIndexOf("src/");
-        if (markerIndex >= 0) {
-            return rootPath.substring(markerIndex).replace('\\', '/');
+    private String moduleIdForRelativePath(String relativePath, Path projectRoot, List<SourceRoot> sourceRoots) {
+        Path resolvedPath = projectRoot.resolve(relativePath).toAbsolutePath().normalize();
+        SourceRoot bestMatch = null;
+        for (SourceRoot sourceRoot : sourceRoots) {
+            if (!resolvedPath.startsWith(sourceRoot.path())) {
+                continue;
+            }
+            if (bestMatch == null || sourceRoot.path().getNameCount() > bestMatch.path().getNameCount()) {
+                bestMatch = sourceRoot;
+            }
         }
-        markerIndex = rootPath.lastIndexOf("src\\");
-        if (markerIndex >= 0) {
-            return rootPath.substring(markerIndex).replace('\\', '/');
+        if (bestMatch != null) {
+            return bestMatch.moduleId();
         }
-        return rootPath.replace('\\', '/');
+        String normalizedRelativePath = relativePath.replace('\\', '/');
+        int slashIndex = normalizedRelativePath.indexOf('/');
+        return slashIndex > 0 ? normalizedRelativePath.substring(0, slashIndex) : ".";
     }
 
     private boolean requiresTypeResolution() {
@@ -523,6 +536,18 @@ public final class ProjectLinter {
         private LoadedCachedAnalyses {
             analyses = Map.copyOf(analyses);
             analysisFingerprint = analysisFingerprint == null ? "" : analysisFingerprint;
+        }
+    }
+
+    private record LoadedBaselineEntries(Set<BaselineEntry> entries, Map<BaselineEntry, String> moduleScopeByEntry) {
+
+        private LoadedBaselineEntries {
+            entries = Set.copyOf(entries);
+            moduleScopeByEntry = Map.copyOf(moduleScopeByEntry);
+        }
+
+        private static LoadedBaselineEntries empty() {
+            return new LoadedBaselineEntries(Set.of(), Map.of());
         }
     }
 

@@ -15,7 +15,6 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 
@@ -120,11 +119,20 @@ public final class AnalysisCacheStore {
         Files.writeString(cacheFile, builder.toString());
     }
 
-    public String fingerprint(List<LintRule> rules, boolean honorInlineSuppressions) {
+    public String fingerprint(List<LintRule> rules, LintOptions options, List<String> semanticFingerprintEntries) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            update(digest, "analysis-cache-v2");
-            update(digest, Boolean.toString(honorInlineSuppressions));
+            update(digest, "analysis-cache-v3");
+            update(digest, Boolean.toString(options.honorInlineSuppressions()));
+            update(digest, Boolean.toString(options.assumeCentralizedSecurity()));
+            update(digest, Boolean.toString(options.autoDetectCentralizedSecurity()));
+            update(digest, Boolean.toString(options.autoDetectProjectWideKeyGenerator()));
+            options.customSecurityAnnotations().stream()
+                    .sorted()
+                    .forEach(annotation -> update(digest, "custom-security-annotation\t" + annotation));
+            options.cacheDefaultKeyCacheNames().stream()
+                    .sorted()
+                    .forEach(cacheName -> update(digest, "cache-default-key\t" + cacheName));
             updateClass(digest, ProjectLinter.class);
             updateClass(digest, InlineSuppressions.class);
             updateClass(digest, JavaSourceInspector.class);
@@ -139,6 +147,9 @@ public final class AnalysisCacheStore {
                         update(digest, rule.implementationIdentity());
                         updateClass(digest, rule.implementationClass());
                     });
+            semanticFingerprintEntries.stream()
+                    .sorted()
+                    .forEach(entry -> update(digest, entry));
 
             return toHex(digest.digest());
         } catch (NoSuchAlgorithmException exception) {

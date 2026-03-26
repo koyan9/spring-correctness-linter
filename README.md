@@ -182,8 +182,10 @@ Incremental cache reuse is invalidated automatically when the effective analysis
 - per-rule severity overrides
 - inline suppression behavior
 - the current analysis engine implementation
+- semantic options such as centralized-security and project-wide key-generator detection
+- source-derived semantic context such as annotation definitions, type-resolution summaries, and source-root composition
 
-This keeps cache reuse fast without silently reusing findings across materially different analysis configurations.
+This keeps cache reuse fast without silently reusing findings across materially different analysis configurations or project semantic contexts.
 
 ## Multi-Module and Reactor Support
 
@@ -231,12 +233,12 @@ Rule ids are normalized to uppercase. Rule domains are case-insensitive and acce
 | `spring.correctness.linter.disabledRuleDomains` | _empty_ | Same as above | Disables selected rule domains. |
 | `spring.correctness.linter.severityOverrides` | _empty_ | `RULE_ID=INFO|WARNING|ERROR` | Overrides per-rule severities. Unknown rule IDs fail the build. |
 | `spring.correctness.linter.assumeCentralizedSecurity` | `false` | `true` / `false` | Skips `SPRING_ENDPOINT_SECURITY` when security is enforced centrally. |
-| `spring.correctness.linter.autoDetectCentralizedSecurity` | `false` | `true` / `false` | Auto-skips `SPRING_ENDPOINT_SECURITY` when a `SecurityFilterChain` or `SecurityWebFilterChain` bean is detected in the source tree. |
+| `spring.correctness.linter.autoDetectCentralizedSecurity` | `false` | `true` / `false` | Auto-skips `SPRING_ENDPOINT_SECURITY` when a resolvable Spring `SecurityFilterChain` or `SecurityWebFilterChain` bean is detected in the source tree. |
 | `spring.correctness.linter.securityAnnotations` | _empty_ | Annotation names | Treats additional annotations as explicit security intent. Input values are normalized to simple annotation names (leading `@` and package prefixes are ignored), so the same simple name in different packages cannot be distinguished. |
 | `spring.correctness.linter.cacheDefaultKeyCacheNames` | _empty_ | Cache names or `*` | Allows default cache keys for specific cache names. `*` allows all caches. |
-| `spring.correctness.linter.autoDetectProjectWideKeyGenerator` | `false` | `true` / `false` | Auto-skips `SPRING_CACHEABLE_KEY` when a project-level `@Bean KeyGenerator` or `CachingConfigurer` / `CachingConfigurerSupport` key generator is detected in the source tree. |
+| `spring.correctness.linter.autoDetectProjectWideKeyGenerator` | `false` | `true` / `false` | Auto-skips `SPRING_CACHEABLE_KEY` when a resolvable Spring `@Bean KeyGenerator` or `CachingConfigurer` / `CachingConfigurerSupport` key generator is detected in the source tree. |
 | `spring.correctness.linter.cacheFile` | `${project.build.directory}/spring-correctness-linter/analysis-cache.txt` | Path | Incremental cache file path (ignored when cache is disabled or split by module). |
-| `spring.correctness.linter.useIncrementalCache` | `true` | `true` / `false` | Enables file-content-based incremental cache reuse. |
+| `spring.correctness.linter.useIncrementalCache` | `true` | `true` / `false` | Enables incremental cache reuse guarded by file content plus the effective semantic analysis fingerprint. |
 | `spring.correctness.linter.parallelFileAnalysis` | `true` | `true` / `false` | Enables per-file parallel analysis when multiple source files are present. |
 | `spring.correctness.linter.fileAnalysisParallelism` | `0` | Integer `>= 0` | Caps file-analysis worker count. `0` means auto-detect from available processors. |
 | `spring.correctness.linter.splitBaselineByModule` | `false` | `true` / `false` | Writes module-scoped baseline files under `modules/<module>/` next to the baseline file parent directory. |
@@ -458,7 +460,7 @@ lint:
 - Keep `useIncrementalCache=true` for local and CI runs.
 - Place `cacheFile` under a stable cache directory and persist it in CI, rather than committing it to git.
 - Use `splitCacheByModule=true` for reactor scans to avoid cross-module churn.
-- Cache reuse is automatically invalidated when rule configuration or implementation changes, so it is safe to keep enabled.
+- Cache reuse is automatically invalidated when rule configuration, semantic options, source-root composition, or source-derived semantic context changes, so it is safe to keep enabled.
 
 ### Rule governance suggestions
 

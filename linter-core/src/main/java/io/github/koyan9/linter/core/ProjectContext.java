@@ -5,19 +5,39 @@
 
 package io.github.koyan9.linter.core;
 
+import com.github.javaparser.ast.CompilationUnit;
+import com.github.javaparser.ast.ImportDeclaration;
+import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
+import com.github.javaparser.ast.body.MethodDeclaration;
+import com.github.javaparser.ast.body.TypeDeclaration;
+import com.github.javaparser.ast.type.ClassOrInterfaceType;
+
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public final class ProjectContext {
+
+    private static final Set<String> SECURITY_FILTER_CHAIN_TYPES = Set.of(
+            "org.springframework.security.web.SecurityFilterChain",
+            "org.springframework.security.web.server.SecurityWebFilterChain"
+    );
+    private static final Set<String> KEY_GENERATOR_TYPES = Set.of("org.springframework.cache.interceptor.KeyGenerator");
+    private static final Set<String> CACHING_CONFIGURER_TYPES = Set.of(
+            "org.springframework.cache.annotation.CachingConfigurer",
+            "org.springframework.cache.annotation.CachingConfigurerSupport"
+    );
 
     private final Path projectRoot;
     private final Path sourceDirectory;
@@ -31,6 +51,7 @@ public final class ProjectContext {
     private volatile TypeResolutionIndex typeResolutionIndex;
     private volatile Boolean securityFilterChainBeanPresent;
     private volatile Boolean keyGeneratorBeanPresent;
+    private volatile List<String> semanticFingerprintEntries;
 
     private ProjectContext(
             Path projectRoot,
@@ -198,11 +219,11 @@ public final class ProjectContext {
             for (SourceDocument sourceDocument : sourceDocuments) {
                 SourceUnit sourceUnit = sourceUnitFor(sourceDocument);
                 SpringSemanticFacts facts = springFacts(sourceUnit);
-                for (com.github.javaparser.ast.body.MethodDeclaration method : sourceUnit.structure().methods()) {
+                for (MethodDeclaration method : sourceUnit.structure().methods()) {
                     if (!facts.hasAnnotation(method, "Bean")) {
                         continue;
                     }
-                    if (isSecurityFilterChainType(method.getType().toString())) {
+                    if (isSecurityFilterChainType(method.getType().toString(), sourceUnit)) {
                         found = true;
                         break;
                     }
@@ -229,11 +250,11 @@ public final class ProjectContext {
             for (SourceDocument sourceDocument : sourceDocuments) {
                 SourceUnit sourceUnit = sourceUnitFor(sourceDocument);
                 SpringSemanticFacts facts = springFacts(sourceUnit);
-                for (com.github.javaparser.ast.body.MethodDeclaration method : sourceUnit.structure().methods()) {
+                for (MethodDeclaration method : sourceUnit.structure().methods()) {
                     if (!facts.hasAnnotation(method, "Bean")) {
                         continue;
                     }
-                    if (isKeyGeneratorType(method.getType().toString())) {
+                    if (isKeyGeneratorType(method.getType().toString(), sourceUnit)) {
                         found = true;
                         break;
                     }
@@ -251,18 +272,18 @@ public final class ProjectContext {
     }
 
     private boolean declaresProjectWideKeyGenerator(SourceUnit sourceUnit) {
-        for (com.github.javaparser.ast.body.TypeDeclaration<?> typeDeclaration : sourceUnit.structure().typeDeclarations()) {
-            if (!isCachingConfigurerType(typeDeclaration)) {
+        for (TypeDeclaration<?> typeDeclaration : sourceUnit.structure().typeDeclarations()) {
+            if (!isCachingConfigurerType(typeDeclaration, sourceUnit)) {
                 continue;
             }
-            for (com.github.javaparser.ast.body.MethodDeclaration method : sourceUnit.structure().methodsOf(typeDeclaration)) {
+            for (MethodDeclaration method : sourceUnit.structure().methodsOf(typeDeclaration)) {
                 if (!"keyGenerator".equals(method.getNameAsString())) {
                     continue;
                 }
                 if (!method.getParameters().isEmpty()) {
                     continue;
                 }
-                if (isKeyGeneratorType(method.getType().toString())) {
+                if (isKeyGeneratorType(method.getType().toString(), sourceUnit)) {
                     return true;
                 }
             }
@@ -270,50 +291,271 @@ public final class ProjectContext {
         return false;
     }
 
-    private boolean isSecurityFilterChainType(String rawType) {
-        if (rawType == null || rawType.isBlank()) {
-            return false;
+    public List<String> semanticFingerprintEntries() {
+        List<String> cached = semanticFingerprintEntries;
+        if (cached != null) {
+            return cached;
         }
-        String stripped = rawType.trim();
-        int genericStart = stripped.indexOf('<');
-        if (genericStart >= 0) {
-            stripped = stripped.substring(0, genericStart);
+        synchronized (this) {
+            if (semanticFingerprintEntries != null) {
+                return semanticFingerprintEntries;
+            }
+            List<String> built = buildSemanticFingerprintEntries();
+            semanticFingerprintEntries = built;
+            return built;
         }
-        int lastDot = stripped.lastIndexOf('.');
-        String simpleName = lastDot >= 0 ? stripped.substring(lastDot + 1) : stripped;
-        return "SecurityFilterChain".equals(simpleName) || "SecurityWebFilterChain".equals(simpleName);
     }
 
-    private boolean isKeyGeneratorType(String rawType) {
-        if (rawType == null || rawType.isBlank()) {
-            return false;
+    private List<String> buildSemanticFingerprintEntries() {
+        List<String> entries = new ArrayList<>();
+        for (SourceDocument sourceDocument : sourceDocuments) {
+            SourceUnit sourceUnit = sourceUnitFor(sourceDocument);
+            String relativePath = sourceDocument.relativePath(projectRoot);
+            if (sourceDocument.content().contains("@interface")) {
+                entries.add("annotation\t" + relativePath + '\t' + sourceDocument.contentHash());
+            }
+            entries.add(buildTypeResolutionSummary(sourceUnit, relativePath));
+            if (isAutoDetectionRelevant(sourceUnit)) {
+                entries.add("autodetect\t" + relativePath + '\t' + sourceDocument.contentHash());
+            }
         }
-        String stripped = rawType.trim();
-        int genericStart = stripped.indexOf('<');
-        if (genericStart >= 0) {
-            stripped = stripped.substring(0, genericStart);
-        }
-        int lastDot = stripped.lastIndexOf('.');
-        String simpleName = lastDot >= 0 ? stripped.substring(lastDot + 1) : stripped;
-        return "KeyGenerator".equals(simpleName);
+        return entries.stream().sorted().toList();
     }
 
-    private boolean isCachingConfigurerType(com.github.javaparser.ast.body.TypeDeclaration<?> typeDeclaration) {
-        if (!(typeDeclaration instanceof com.github.javaparser.ast.body.ClassOrInterfaceDeclaration classOrInterfaceDeclaration)) {
-            return false;
+    private String buildTypeResolutionSummary(SourceUnit sourceUnit, String relativePath) {
+        if (sourceUnit.compilationUnit().isEmpty()) {
+            return "types\t" + relativePath + "\tparse=invalid";
         }
-        for (com.github.javaparser.ast.type.ClassOrInterfaceType implementedType : classOrInterfaceDeclaration.getImplementedTypes()) {
-            String simpleName = implementedType.getName().getIdentifier();
-            if ("CachingConfigurer".equals(simpleName)) {
+
+        CompilationUnit compilationUnit = sourceUnit.compilationUnit().orElseThrow();
+        StringBuilder builder = new StringBuilder("types\t")
+                .append(relativePath)
+                .append("\tpkg=")
+                .append(packageName(sourceUnit));
+        compilationUnit.getImports().stream()
+                .filter(importDeclaration -> !importDeclaration.isStatic())
+                .map(this::importSummary)
+                .sorted()
+                .forEach(summary -> builder.append("\timport=").append(summary));
+        sourceUnit.structure().typeDeclarations().stream()
+                .map(typeDeclaration -> typeSummary(sourceUnit, typeDeclaration))
+                .sorted()
+                .forEach(summary -> builder.append("\ttype=").append(summary));
+        return builder.toString();
+    }
+
+    private String importSummary(ImportDeclaration importDeclaration) {
+        return importDeclaration.getNameAsString() + (importDeclaration.isAsterisk() ? ".*" : "");
+    }
+
+    private String typeSummary(SourceUnit sourceUnit, TypeDeclaration<?> typeDeclaration) {
+        StringBuilder builder = new StringBuilder()
+                .append(qualifiedNameOf(typeDeclaration, packageName(sourceUnit)))
+                .append("|ann=")
+                .append(String.join(",", directAnnotationNames(typeDeclaration)));
+        if (typeDeclaration instanceof ClassOrInterfaceDeclaration classOrInterfaceDeclaration) {
+            builder.append("|extends=")
+                    .append(classOrInterfaceDeclaration.getExtendedTypes().stream()
+                            .map(type -> normalizeTypeReference(type.toString()))
+                            .sorted()
+                            .collect(Collectors.joining(",")));
+            builder.append("|implements=")
+                    .append(classOrInterfaceDeclaration.getImplementedTypes().stream()
+                            .map(type -> normalizeTypeReference(type.toString()))
+                            .sorted()
+                            .collect(Collectors.joining(",")));
+        }
+        sourceUnit.structure().methodsOf(typeDeclaration).stream()
+                .map(this::methodSummary)
+                .sorted()
+                .forEach(summary -> builder.append("|method=").append(summary));
+        return builder.toString();
+    }
+
+    private String methodSummary(MethodDeclaration method) {
+        return method.getNameAsString()
+                + '#'
+                + method.getParameters().size()
+                + "#varargs="
+                + isVarArgs(method)
+                + "#return="
+                + normalizeTypeReference(method.getType().toString())
+                + "#visibility="
+                + visibility(method)
+                + "#final="
+                + method.isFinal()
+                + "#ann="
+                + String.join(",", directAnnotationNames(method));
+    }
+
+    private boolean isAutoDetectionRelevant(SourceUnit sourceUnit) {
+        SpringSemanticFacts facts = springFacts(sourceUnit);
+        for (MethodDeclaration method : sourceUnit.structure().methods()) {
+            if (!facts.hasAnnotation(method, "Bean")) {
+                continue;
+            }
+            if (isSecurityFilterChainType(method.getType().toString(), sourceUnit)
+                    || isKeyGeneratorType(method.getType().toString(), sourceUnit)) {
                 return true;
             }
         }
-        for (com.github.javaparser.ast.type.ClassOrInterfaceType extendedType : classOrInterfaceDeclaration.getExtendedTypes()) {
-            String simpleName = extendedType.getName().getIdentifier();
-            if ("CachingConfigurerSupport".equals(simpleName)) {
+        for (TypeDeclaration<?> typeDeclaration : sourceUnit.structure().typeDeclarations()) {
+            if (isCachingConfigurerType(typeDeclaration, sourceUnit)) {
                 return true;
             }
         }
         return false;
+    }
+
+    private boolean isSecurityFilterChainType(String rawType, SourceUnit sourceUnit) {
+        return matchesQualifiedType(rawType, sourceUnit, SECURITY_FILTER_CHAIN_TYPES);
+    }
+
+    private boolean isKeyGeneratorType(String rawType, SourceUnit sourceUnit) {
+        return matchesQualifiedType(rawType, sourceUnit, KEY_GENERATOR_TYPES);
+    }
+
+    private boolean isCachingConfigurerType(TypeDeclaration<?> typeDeclaration, SourceUnit sourceUnit) {
+        if (!(typeDeclaration instanceof ClassOrInterfaceDeclaration classOrInterfaceDeclaration)) {
+            return false;
+        }
+        for (ClassOrInterfaceType implementedType : classOrInterfaceDeclaration.getImplementedTypes()) {
+            if (matchesQualifiedType(implementedType.toString(), sourceUnit, CACHING_CONFIGURER_TYPES)) {
+                return true;
+            }
+        }
+        for (ClassOrInterfaceType extendedType : classOrInterfaceDeclaration.getExtendedTypes()) {
+            if (matchesQualifiedType(extendedType.toString(), sourceUnit, CACHING_CONFIGURER_TYPES)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean matchesQualifiedType(String rawType, SourceUnit sourceUnit, Set<String> expectedQualifiedNames) {
+        String normalized = normalizeTypeReference(rawType);
+        if (normalized.isBlank()) {
+            return false;
+        }
+        if (expectedQualifiedNames.contains(normalized)) {
+            return true;
+        }
+        if (normalized.contains(".")) {
+            return false;
+        }
+
+        TypeReferenceResolutionContext resolutionContext = typeReferenceResolutionContext(sourceUnit);
+        if (!resolutionContext.packageName().isBlank()
+                && expectedQualifiedNames.contains(resolutionContext.packageName() + "." + normalized)) {
+            return true;
+        }
+        String explicitImport = resolutionContext.explicitImports().get(normalized);
+        if (explicitImport != null) {
+            return expectedQualifiedNames.contains(explicitImport);
+        }
+
+        String wildcardMatch = null;
+        for (String wildcardImport : resolutionContext.wildcardImports()) {
+            String candidate = wildcardImport + "." + normalized;
+            if (!expectedQualifiedNames.contains(candidate)) {
+                continue;
+            }
+            if (wildcardMatch != null && !wildcardMatch.equals(candidate)) {
+                return false;
+            }
+            wildcardMatch = candidate;
+        }
+        return wildcardMatch != null;
+    }
+
+    private TypeReferenceResolutionContext typeReferenceResolutionContext(SourceUnit sourceUnit) {
+        Optional<CompilationUnit> compilationUnit = sourceUnit.compilationUnit();
+        if (compilationUnit.isEmpty()) {
+            return new TypeReferenceResolutionContext("", Map.of(), Set.of());
+        }
+        Map<String, String> explicitImports = new LinkedHashMap<>();
+        Set<String> wildcardImports = new LinkedHashSet<>();
+        for (ImportDeclaration importDeclaration : compilationUnit.orElseThrow().getImports()) {
+            if (importDeclaration.isStatic()) {
+                continue;
+            }
+            String name = importDeclaration.getNameAsString();
+            if (importDeclaration.isAsterisk()) {
+                wildcardImports.add(name);
+                continue;
+            }
+            int lastDot = name.lastIndexOf('.');
+            if (lastDot >= 0 && lastDot < name.length() - 1) {
+                explicitImports.putIfAbsent(name.substring(lastDot + 1), name);
+            }
+        }
+        return new TypeReferenceResolutionContext(packageName(sourceUnit), Map.copyOf(explicitImports), Set.copyOf(wildcardImports));
+    }
+
+    private String packageName(SourceUnit sourceUnit) {
+        return sourceUnit.compilationUnit()
+                .flatMap(compilationUnit -> compilationUnit.getPackageDeclaration().map(declaration -> declaration.getNameAsString()))
+                .orElse("");
+    }
+
+    private String qualifiedNameOf(TypeDeclaration<?> typeDeclaration, String packageName) {
+        List<String> segments = new ArrayList<>();
+        segments.add(typeDeclaration.getNameAsString());
+        Optional<com.github.javaparser.ast.Node> parent = typeDeclaration.getParentNode();
+        while (parent.isPresent()) {
+            com.github.javaparser.ast.Node node = parent.orElseThrow();
+            if (node instanceof TypeDeclaration<?> parentType) {
+                segments.add(parentType.getNameAsString());
+            }
+            parent = node.getParentNode();
+        }
+        java.util.Collections.reverse(segments);
+        String localName = String.join(".", segments);
+        return packageName.isBlank() ? localName : packageName + "." + localName;
+    }
+
+    private Set<String> directAnnotationNames(com.github.javaparser.ast.nodeTypes.NodeWithAnnotations<?> node) {
+        return node.getAnnotations().stream()
+                .map(JavaSourceInspector::annotationSimpleName)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private String normalizeTypeReference(String rawType) {
+        if (rawType == null || rawType.isBlank()) {
+            return "";
+        }
+        String normalized = rawType.trim();
+        int genericStart = normalized.indexOf('<');
+        if (genericStart >= 0) {
+            normalized = normalized.substring(0, genericStart);
+        }
+        while (normalized.endsWith("[]")) {
+            normalized = normalized.substring(0, normalized.length() - 2);
+        }
+        if (normalized.endsWith("...")) {
+            normalized = normalized.substring(0, normalized.length() - 3);
+        }
+        return normalized.trim();
+    }
+
+    private boolean isVarArgs(MethodDeclaration method) {
+        int parameterCount = method.getParameters().size();
+        return parameterCount > 0 && method.getParameter(parameterCount - 1).isVarArgs();
+    }
+
+    private String visibility(MethodDeclaration method) {
+        if (method.isPublic()) {
+            return "public";
+        }
+        if (method.isProtected()) {
+            return "protected";
+        }
+        if (method.isPrivate()) {
+            return "private";
+        }
+        return "package";
+    }
+
+    private record TypeReferenceResolutionContext(String packageName, Map<String, String> explicitImports, Set<String> wildcardImports) {
     }
 }

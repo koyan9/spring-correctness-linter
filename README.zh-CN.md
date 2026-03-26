@@ -234,12 +234,12 @@ JSON 和 HTML 报告现在还会包含运行期指标，便于观察：
 | `spring.correctness.linter.disabledRuleDomains` | 空 | 同上 | 禁用指定规则域。 |
 | `spring.correctness.linter.severityOverrides` | 空 | `RULE_ID=INFO|WARNING|ERROR` | 覆盖规则默认严重级别。未知规则会导致构建失败。 |
 | `spring.correctness.linter.assumeCentralizedSecurity` | `false` | `true` / `false` | 安全策略集中配置时跳过 `SPRING_ENDPOINT_SECURITY`。 |
-| `spring.correctness.linter.autoDetectCentralizedSecurity` | `false` | `true` / `false` | 当检测到 `SecurityFilterChain` 或 `SecurityWebFilterChain` Bean 时自动跳过 `SPRING_ENDPOINT_SECURITY`。 |
+| `spring.correctness.linter.autoDetectCentralizedSecurity` | `false` | `true` / `false` | 当检测到可解析为 Spring 类型的 `SecurityFilterChain` 或 `SecurityWebFilterChain` Bean 时自动跳过 `SPRING_ENDPOINT_SECURITY`。 |
 | `spring.correctness.linter.securityAnnotations` | 空 | 注解名 | 额外安全注解视为显式安全意图。配置会归一化为简单名（会去掉前缀 `@` 及包名），所以不同包但相同简单名的注解无法区分。 |
 | `spring.correctness.linter.cacheDefaultKeyCacheNames` | 空 | cache 名称或 `*` | 指定 cache 名称允许默认 key；`*` 表示全部允许。 |
-| `spring.correctness.linter.autoDetectProjectWideKeyGenerator` | `false` | `true` / `false` | 当检测到项目级 `@Bean KeyGenerator`，或 `CachingConfigurer` / `CachingConfigurerSupport` 提供的 key generator 时自动跳过 `SPRING_CACHEABLE_KEY`。 |
+| `spring.correctness.linter.autoDetectProjectWideKeyGenerator` | `false` | `true` / `false` | 当检测到可解析为 Spring 类型的项目级 `@Bean KeyGenerator`，或 `CachingConfigurer` / `CachingConfigurerSupport` 提供的 key generator 时自动跳过 `SPRING_CACHEABLE_KEY`。 |
 | `spring.correctness.linter.cacheFile` | `${project.build.directory}/spring-correctness-linter/analysis-cache.txt` | 路径 | 增量缓存文件路径（缓存关闭或按模块拆分时忽略）。 |
-| `spring.correctness.linter.useIncrementalCache` | `true` | `true` / `false` | 是否启用增量缓存复用。 |
+| `spring.correctness.linter.useIncrementalCache` | `true` | `true` / `false` | 是否启用受文件内容和语义分析指纹共同保护的增量缓存复用。 |
 | `spring.correctness.linter.parallelFileAnalysis` | `true` | `true` / `false` | 当存在多个源码文件时，是否启用按文件并行分析。 |
 | `spring.correctness.linter.fileAnalysisParallelism` | `0` | 大于等于 `0` 的整数 | 控制文件分析线程数上限。`0` 表示自动按 CPU 核数决定。 |
 | `spring.correctness.linter.splitBaselineByModule` | `false` | `true` / `false` | 按模块拆分 baseline，输出到 `modules/<module>/` 下。 |
@@ -252,7 +252,7 @@ JSON 和 HTML 报告现在还会包含运行期指标，便于观察：
 ```xml
 <configuration>
   <assumeCentralizedSecurity>true</assumeCentralizedSecurity>
-  <!-- 也可以自动检测 SecurityFilterChain / SecurityWebFilterChain -->
+  <!-- 也可以自动检测可解析为 Spring 类型的 SecurityFilterChain / SecurityWebFilterChain -->
   <!-- <autoDetectCentralizedSecurity>true</autoDetectCentralizedSecurity> -->
   <securityAnnotations>InternalEndpoint,TeamSecure</securityAnnotations>
   <!-- 配置中只需提供简单名，前缀 `@` 和包名会被剥离。 -->
@@ -270,7 +270,7 @@ JSON 和 HTML 报告现在还会包含运行期指标，便于观察：
 </configuration>
 ```
 
-如果项目统一约定了全局 `KeyGenerator` Bean，或通过 `CachingConfigurer` / `CachingConfigurerSupport` 暴露统一 key generator，也可以显式开启自动检测：
+如果项目统一约定了可解析为 Spring 类型的全局 `KeyGenerator` Bean，或通过 `CachingConfigurer` / `CachingConfigurerSupport` 暴露统一 key generator，也可以显式开启自动检测：
 
 ```xml
 <configuration>
@@ -460,7 +460,7 @@ lint:
 - 保持 `useIncrementalCache=true`，本地与 CI 都能获得更快的增量扫描。
 - `cacheFile` 放到稳定缓存目录并在 CI 中持久化，不要提交到 git。
 - reactor 扫描建议使用 `splitCacheByModule=true`，减少跨模块抖动。
-- 规则配置或实现变化会自动失效缓存，可放心长期开启。
+- 规则配置、语义选项、源码根组成或源码语义上下文变化时，缓存会自动安全失效，可放心长期开启。
 
 ### 规则治理建议
 

@@ -190,7 +190,7 @@ If endpoint security is enforced outside controllers:
 </configuration>
 ```
 
-Or enable detection of Spring Security chain beans:
+Or enable detection of resolvable Spring Security chain beans:
 
 ```xml
 <configuration>
@@ -217,7 +217,7 @@ Allow specific caches to use Spring default keys:
 </configuration>
 ```
 
-If the project standardizes on a global key generator:
+If the project standardizes on a resolvable Spring global key generator:
 
 ```xml
 <configuration>
@@ -338,7 +338,7 @@ If cache hit rate stays at zero:
 
 - verify the cache file path is stable
 - verify CI restores the cache directory
-- remember rule/config changes invalidate cache safely
+- remember rule, semantic-option, and project-context changes invalidate cache safely
 
 If too many endpoint-security findings appear:
 

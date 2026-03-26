@@ -473,6 +473,71 @@ class CorrectnessLintMojoTest {
     }
 
     @Test
+    void invalidatesIncrementalCacheWhenCentralizedSecurityContextChanges() throws Exception {
+        Path sourceDirectory = writeSource("""
+                package demo;
+
+                import org.springframework.web.bind.annotation.GetMapping;
+                import org.springframework.web.bind.annotation.RestController;
+
+                @RestController
+                class PublicController {
+
+                    @GetMapping("/open")
+                    public String open() {
+                        return "ok";
+                    }
+                }
+                """);
+        Path reportsDirectory = tempDir.resolve("target/reports-security-cache");
+        Path cacheFile = tempDir.resolve("target/security-analysis-cache.txt");
+
+        CorrectnessLintMojo firstRun = configuredMojo(
+                sourceDirectory,
+                reportsDirectory,
+                tempDir.resolve("spring-correctness-linter-baseline.txt")
+        );
+        setField(firstRun, "applyBaseline", false);
+        setField(firstRun, "useIncrementalCache", true);
+        setField(firstRun, "autoDetectCentralizedSecurity", true);
+        setField(firstRun, "cacheFile", cacheFile.toFile());
+        setField(firstRun, "formats", new LinkedHashSet<>(Set.of("json")));
+        firstRun.execute();
+
+        Path demoDirectory = tempDir.resolve("src/main/java/demo");
+        Files.writeString(demoDirectory.resolve("SecurityConfig.java"), """
+                package demo;
+
+                import org.springframework.context.annotation.Bean;
+                import org.springframework.security.web.SecurityFilterChain;
+
+                class SecurityConfig {
+
+                    @Bean
+                    SecurityFilterChain filterChain() {
+                        return null;
+                    }
+                }
+                """);
+
+        CorrectnessLintMojo secondRun = configuredMojo(
+                sourceDirectory,
+                reportsDirectory,
+                tempDir.resolve("spring-correctness-linter-baseline.txt")
+        );
+        setField(secondRun, "applyBaseline", false);
+        setField(secondRun, "useIncrementalCache", true);
+        setField(secondRun, "autoDetectCentralizedSecurity", true);
+        setField(secondRun, "cacheFile", cacheFile.toFile());
+        setField(secondRun, "formats", new LinkedHashSet<>(Set.of("json")));
+        secondRun.execute();
+
+        String json = Files.readString(reportsDirectory.resolve("lint-report.json"));
+        assertTrue(json.contains("\"issueCount\": 0"));
+        assertTrue(json.contains("\"cachedFileCount\": 0"));
+    }
+
+    @Test
     void scansReactorModulesFromExecutionRoot() throws Exception {
         Path rootSourceDirectory = writeSource("""
                 package demo;
@@ -1418,6 +1483,68 @@ class CorrectnessLintMojoTest {
     }
 
     @Test
+    void invalidatesIncrementalCacheWhenIncludeTestSourceRootsChanges() throws Exception {
+        Path mainSourceDirectory = tempDir.resolve("src/main/java/demo");
+        Path testSourceDirectory = tempDir.resolve("src/test/java/demo");
+        Files.createDirectories(mainSourceDirectory);
+        Files.createDirectories(testSourceDirectory);
+        Files.writeString(mainSourceDirectory.resolve("MainOnly.java"), """
+                package demo;
+
+                class MainOnly {
+                }
+                """);
+        Files.writeString(testSourceDirectory.resolve("TestAsyncOnly.java"), """
+                package demo;
+
+                import org.springframework.scheduling.annotation.Async;
+
+                class TestAsyncOnly {
+
+                    @Async
+                    public void runAsync() {
+                    }
+                }
+                """);
+        Path reportsDirectory = tempDir.resolve("target/reports-test-roots-cache");
+        Path cacheFile = tempDir.resolve("target/test-roots-analysis-cache.txt");
+        MavenProject project = mavenProject("empty-project", tempDir.resolve("pom.xml"), true, tempDir.resolve("src/main/java"));
+        project.getTestCompileSourceRoots().add(tempDir.resolve("src/test/java").toString());
+
+        CorrectnessLintMojo firstRun = configuredMojo(
+                tempDir.resolve("src/main/java"),
+                reportsDirectory,
+                tempDir.resolve("spring-correctness-linter-baseline.txt")
+        );
+        setField(firstRun, "project", project);
+        setField(firstRun, "reactorProjects", List.of(project));
+        setField(firstRun, "applyBaseline", false);
+        setField(firstRun, "useIncrementalCache", true);
+        setField(firstRun, "cacheFile", cacheFile.toFile());
+        setField(firstRun, "formats", new LinkedHashSet<>(Set.of("json")));
+        firstRun.execute();
+
+        CorrectnessLintMojo secondRun = configuredMojo(
+                tempDir.resolve("src/main/java"),
+                reportsDirectory,
+                tempDir.resolve("spring-correctness-linter-baseline.txt")
+        );
+        setField(secondRun, "project", project);
+        setField(secondRun, "reactorProjects", List.of(project));
+        setField(secondRun, "applyBaseline", false);
+        setField(secondRun, "useIncrementalCache", true);
+        setField(secondRun, "includeTestSourceRoots", true);
+        setField(secondRun, "cacheFile", cacheFile.toFile());
+        setField(secondRun, "formats", new LinkedHashSet<>(Set.of("json")));
+        secondRun.execute();
+
+        String json = Files.readString(reportsDirectory.resolve("lint-report.json"));
+        assertTrue(json.contains("\"issueCount\": 1"));
+        assertTrue(json.contains("\"cachedFileCount\": 0"));
+        assertTrue(json.contains("TestAsyncOnly.java"));
+    }
+
+    @Test
     void includesModuleSpecificSourceDirectories() throws Exception {
         Path sourceDirectory = writeSource("""
                 package demo;
@@ -1455,6 +1582,61 @@ class CorrectnessLintMojoTest {
         String json = Files.readString(reportsDirectory.resolve("lint-report.json"));
         assertTrue(json.contains("\"issueCount\": 1"));
         assertTrue(json.contains("\"ruleId\": \"SPRING_ASYNC_VOID\""));
+    }
+
+    @Test
+    void keepsStaleBaselineEntriesInOwningModuleWhenSplitBaselineIsEnabled() throws Exception {
+        Path sourceDirectory = writeSource("""
+                package demo;
+
+                class BaseService {
+                }
+                """);
+        Path extraRoot = tempDir.resolve("custom-src/demo");
+        Files.createDirectories(extraRoot);
+        Files.writeString(extraRoot.resolve("ExtraAsyncOnly.java"), """
+                package demo;
+
+                import org.springframework.scheduling.annotation.Async;
+
+                class ExtraAsyncOnly {
+
+                    @Async
+                    public void runAsync() {
+                    }
+                }
+                """);
+        Path reportsDirectory = tempDir.resolve("target/reports-module-stale-baseline");
+        Path baselineFile = tempDir.resolve("spring-correctness-linter-baseline.txt");
+
+        CorrectnessLintMojo firstRun = configuredMojo(
+                sourceDirectory,
+                reportsDirectory,
+                baselineFile
+        );
+        setField(firstRun, "applyBaseline", false);
+        setField(firstRun, "writeBaseline", true);
+        setField(firstRun, "splitBaselineByModule", true);
+        setField(firstRun, "moduleSourceDirectories", "empty-project=custom-src");
+        setField(firstRun, "formats", new LinkedHashSet<>(Set.of("json")));
+        firstRun.execute();
+
+        Files.delete(extraRoot.resolve("ExtraAsyncOnly.java"));
+
+        CorrectnessLintMojo secondRun = configuredMojo(
+                sourceDirectory,
+                reportsDirectory,
+                baselineFile
+        );
+        setField(secondRun, "splitBaselineByModule", true);
+        setField(secondRun, "moduleSourceDirectories", "empty-project=custom-src");
+        setField(secondRun, "formats", new LinkedHashSet<>(Set.of("json")));
+        secondRun.execute();
+
+        String baselineDiffJson = Files.readString(reportsDirectory.resolve("baseline-diff.json"));
+        assertTrue(baselineDiffJson.contains("\"moduleId\": \"empty-project\""));
+        assertTrue(baselineDiffJson.contains("\"staleBaselineCount\": 1"));
+        assertFalse(baselineDiffJson.contains("\"moduleId\": \"custom-src\""));
     }
 
     @Test

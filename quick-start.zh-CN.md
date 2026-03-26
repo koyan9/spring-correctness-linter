@@ -186,7 +186,7 @@ mvn -q io.github.koyan9:spring-correctness-linter-maven-plugin:0.1.2:lint \
 </configuration>
 ```
 
-或者开启自动检测：
+或者开启可解析 Spring Security 链 Bean 的自动检测：
 
 ```xml
 <configuration>
@@ -317,7 +317,7 @@ mvn -B -q verify \
 
 - 检查 `cacheFile` 路径是否稳定
 - 检查 CI 是否恢复了缓存目录
-- 规则或配置变化会触发安全失效
+- 规则、语义选项和项目语义上下文变化都会触发安全失效
 
 如果控制器安全告警过多：
 
@@ -328,7 +328,7 @@ mvn -B -q verify \
 如果 cache key 告警过多：
 
 - 按 cache 名称 allowlist
-- 如果确有全局 key 约定，再显式开启项目级 key generator 自动检测
+- 如果确有可解析为 Spring 类型的全局 key 约定，再显式开启项目级 key generator 自动检测
 
 ## 13. 推荐样例
 

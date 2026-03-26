@@ -4,10 +4,25 @@ All notable changes to `spring-correctness-linter` will be documented in this fi
 
 ## [Unreleased]
 
+### Added
+
+- Core regression coverage now includes incremental-cache invalidation when centralized-security detection, project-wide key-generator detection, composed annotation definitions, type-resolution context, or custom security-annotation options change
+- Plugin regression coverage now includes incremental-cache invalidation for `autoDetectCentralizedSecurity`, `includeTestSourceRoots`, and stale baseline-module ownership with split baselines
+
 ### Changed
 
 - Release workflow now waits for Sonatype Central validation instead of full published propagation before creating the GitHub release, reducing timeout risk after artifacts are already accepted
 - Release workflow reruns now detect when the tagged version is already visible in Maven Central and skip duplicate deploy attempts
+- Incremental-cache fingerprints now include semantic lint options and source-derived semantic context, so cache reuse is invalidated when project semantics change even if individual files do not
+- Auto-detection for centralized security and project-wide cache key generators now relies on resolvable Spring types instead of simple-name-only matches
+- Baseline diff now assigns stale entries to modules using module-scoped baseline ownership first and longest source-root path matching as the shared-baseline fallback
+- README and quick-start guides now document the stricter Spring-type auto-detection behavior and the broader incremental-cache invalidation semantics
+
+### Fixed
+
+- `SPRING_ENDPOINT_SECURITY` and `SPRING_CACHEABLE_KEY` no longer silently reuse stale incremental-cache findings after project-level semantic changes such as new Spring security-chain beans, project-wide key generators, or composed annotation updates
+- Centralized-security and project-wide key-generator auto-detection no longer misfire on unrelated application types that only share Spring simple names
+- Stale baseline entries from non-standard or additional source roots now remain attributed to the correct module in module-aware baseline diff output
 
 ## [0.1.2] - 2026-03-26
 
