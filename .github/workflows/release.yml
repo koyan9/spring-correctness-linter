@@ -63,7 +63,7 @@ jobs:
         run: mvn -B -q verify
 
       - name: Publish to Maven Central
-        run: mvn -B -q -Pcentral-publish -DskipTests -Dcentral.publish.auto=true -Dcentral.publish.waitUntil=published deploy
+        run: mvn -B -q -Pcentral-publish -DskipTests -Dcentral.publish.auto=true -Dcentral.publish.waitUntil=validated deploy
 
       - name: Collect artifacts
         run: |

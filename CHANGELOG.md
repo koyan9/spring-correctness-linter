@@ -4,6 +4,10 @@ All notable changes to `spring-correctness-linter` will be documented in this fi
 
 ## [Unreleased]
 
+### Changed
+
+- Release workflow now waits for Sonatype Central validation instead of full published propagation before creating the GitHub release, reducing timeout risk after artifacts are already accepted
+
 ## [0.1.2] - 2026-03-26
 
 ### Added

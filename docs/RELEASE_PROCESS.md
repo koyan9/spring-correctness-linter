@@ -47,10 +47,10 @@ The workflow currently:
 - checks out the requested Git tag instead of the branch tip
 - imports Maven Central credentials and GPG signing material from GitHub Secrets
 - runs `mvn -B -q verify`
-- runs `mvn -B -q -Pcentral-publish -DskipTests -Dcentral.publish.auto=true -Dcentral.publish.waitUntil=published deploy`
+- runs `mvn -B -q -Pcentral-publish -DskipTests -Dcentral.publish.auto=true -Dcentral.publish.waitUntil=validated deploy`
 - collects generated JARs, POMs, and ASCII-armored signatures from `linter-core` and `linter-maven-plugin`
 - uses `RELEASE_NOTES_vX.Y.Z.md` when present, otherwise falls back to `RELEASE_NOTES_TEMPLATE.md`
-- creates the GitHub release with the generated notes and collected artifacts only after Central publication is acknowledged
+- creates the GitHub release after Central upload and validation succeed, without waiting for the package to finish propagating to every public endpoint
 
 Required GitHub Secrets:
 
