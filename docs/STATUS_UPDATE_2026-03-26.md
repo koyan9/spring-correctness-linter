@@ -61,7 +61,9 @@ The following checks were run during this iteration:
 
 - The main branch has been updated and pushed.
 - The latest CI run on `main` is green for both Java 17 and Java 21.
-- Release notes for `v0.1.2` have been drafted, but no tag has been created yet.
+- The `v0.1.2` tag has been created and pushed.
+- `v0.1.2` is now available in Maven Central.
+- The GitHub Release for `v0.1.2` has been created.
 
 ## Remaining Caution
 
