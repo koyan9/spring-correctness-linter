@@ -62,8 +62,29 @@ jobs:
       - name: Verify project
         run: mvn -B -q verify
 
+      - name: Check Maven Central status
+        id: central-status
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ env.RELEASE_TAG }}
+        run: |
+          VERSION="${RELEASE_TAG#v}"
+          URL="https://repo1.maven.org/maven2/io/github/koyan9/spring-correctness-linter-maven-plugin/${VERSION}/spring-correctness-linter-maven-plugin-${VERSION}.jar"
+          if curl -fsI "$URL" >/dev/null; then
+            echo "already_published=true" >> "$GITHUB_OUTPUT"
+            echo "Artifacts for ${VERSION} are already visible in Maven Central; deploy will be skipped."
+          else
+            echo "already_published=false" >> "$GITHUB_OUTPUT"
+            echo "Artifacts for ${VERSION} are not visible in Maven Central yet; deploy will run."
+          fi
+
       - name: Publish to Maven Central
+        if: steps.central-status.outputs.already_published != 'true'
         run: mvn -B -q -Pcentral-publish -DskipTests -Dcentral.publish.auto=true -Dcentral.publish.waitUntil=validated deploy
+
+      - name: Prepare signed artifacts for rerun
+        if: steps.central-status.outputs.already_published == 'true'
+        run: mvn -B -q -Pcentral-publish -DskipTests verify
 
       - name: Collect artifacts
         run: |
