@@ -155,6 +155,7 @@ JSON and HTML reports now also include runtime metrics so users can inspect:
 - total analysis duration
 - analyzed vs cached file counts
 - cache hit rate and cache scope
+- cache miss reasons when reuse is skipped due to context or configuration changes
 - per-phase timing breakdown
 - per-module analysis timing and cache hit rate
 - per-module analyzed vs cached time (analyzedMillis/cachedMillis)
@@ -581,6 +582,7 @@ Key runtime metrics to watch:
 
 - `totalElapsedMillis`, `sourceFileCount`, `analyzedFileCount`, `cachedFileCount`
 - cache scope and hit rate
+- `cacheMissReasons` when cache reuse is skipped
 - per-module analyzed time and cache hit rate (for reactor scans)
 
 ## Rule Governance Template
@@ -726,6 +728,7 @@ A set of small consumer-style applications that demonstrate how real projects ca
 - `CHANGELOG.md`: release history
 - `RELEASE_NOTES_TEMPLATE.md`: release notes template
 - `docs/RELEASE_PROCESS.md`: release checklist and workflow guide
+- `docs/PERFORMANCE_BENCHMARKING.md`: repeatable cache and runtime benchmarking workflow
 - `docs/MAINTAINER_GUIDE.md`: branch protection, release ownership, and maintainer operations
 - `docs/RULE_DEVELOPMENT.md`: rule implementation and semantic-facts guide
 - `docs/ACCURACY_BACKLOG.md`: prioritized rule-accuracy and regression-test backlog

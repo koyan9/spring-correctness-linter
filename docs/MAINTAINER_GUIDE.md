@@ -32,6 +32,7 @@ Recommended maintainer validation before merging high-impact changes:
 - `mvnw.cmd -q verify` on Windows, or `./mvnw -q verify` on macOS / Linux
 - `mvnw.cmd -q -DskipTests install` on Windows, or `./mvnw -q -DskipTests install` on macOS / Linux
 - re-run the relevant sample project when plugin integration or report behavior changes
+- run `pwsh -File scripts/benchmark-cache.ps1 -Targets reactor,adoption-all -WarmRuns 1` when cache invalidation, runtime metrics, or source-root behavior changes
 
 ## Release Model
 
@@ -109,6 +110,7 @@ When changing release automation:
 ## References
 
 - `docs/RELEASE_PROCESS.md`
+- `docs/PERFORMANCE_BENCHMARKING.md`
 - `CONTRIBUTING.md`
 - `quick-start.md`
 - `quick-start.zh-CN.md`
