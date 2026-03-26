@@ -9,7 +9,7 @@
 
     <groupId>io.github.koyan9</groupId>
     <artifactId>spring-correctness-linter-parent</artifactId>
-    <version>0.1.1</version>
+    <version>0.1.2</version>
     <packaging>pom</packaging>
 
     <name>spring-correctness-linter</name>
@@ -38,7 +38,7 @@
         <connection>scm:git:https://github.com/koyan9/spring-correctness-linter.git</connection>
         <developerConnection>scm:git:ssh://git@github.com/koyan9/spring-correctness-linter.git</developerConnection>
         <url>https://github.com/koyan9/spring-correctness-linter</url>
-        <tag>v0.1.1</tag>
+        <tag>v0.1.2</tag>
     </scm>
     <issueManagement>
         <system>GitHub Issues</system>

@@ -4,6 +4,8 @@ All notable changes to `spring-correctness-linter` will be documented in this fi
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-03-26
+
 ### Added
 
 - CI now validates `samples/adoption-suite/` alongside the vulnerable and reactor samples

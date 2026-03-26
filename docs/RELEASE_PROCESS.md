@@ -35,7 +35,7 @@ Also confirm the following before release:
 
 The primary release path is now automatic:
 
-- push an annotated tag such as `v0.1.1`
+- push an annotated tag such as `v0.1.2`
 - GitHub Actions publishes the Maven Central bundle
 - GitHub Actions creates the GitHub Release after Central publication succeeds
 
