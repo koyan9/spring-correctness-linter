@@ -19,12 +19,14 @@
 - Follow `docs/RELEASE_PROCESS.md` for the recommended release checklist, protected-branch expectations, and release-note guidance
 - Follow `docs/RULE_DEVELOPMENT.md` when adding or refactoring rules so semantic helpers and rule structure stay consistent
 - Check `docs/ACCURACY_BACKLOG.md` when choosing the next rule-hardening or false-positive-reduction task
+- Use `.github/PULL_REQUEST_TEMPLATE.md` and include `scripts/benchmark-cache.ps1` output when changing cache invalidation, runtime metrics, or performance-sensitive report paths
 
 ## Validation Checklist
 
 - Always run `mvnw.cmd -q verify` or `./mvnw -q verify`
 - Run `samples/vulnerable-sample/` when changing report formats, suppressions, baseline behavior, or single-module scanning
 - Run `samples/reactor-sample/` when changing module grouping, reactor scanning, multi-source-root behavior, or per-module baseline/cache output
+- Run `pwsh -File scripts/benchmark-cache.ps1 -Targets reactor,adoption-all -WarmRuns 1` when changing cache invalidation, runtime metrics, or performance-sensitive paths
 - Run `mvnw.cmd -q -DskipTests install` before release-related changes or when local sample installation behavior changes
 - Review JaCoCo output in module `target/site/jacoco/` directories and `target/site/jacoco-aggregate/` when changing analysis or reporting logic
 - Keep `linter-core` JaCoCo line coverage at or above `85%` when adding or refactoring analysis logic

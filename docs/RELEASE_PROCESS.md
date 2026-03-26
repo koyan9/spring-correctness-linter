@@ -30,6 +30,7 @@ Also confirm the following before release:
 - `CHANGELOG.md` reflects the release contents
 - `README.md` and `README.zh-CN.md` are aligned if user-facing behavior changed
 - release notes mention any new Maven properties, cache invalidation semantics, or SARIF / CI integration changes
+- run `pwsh -File scripts/benchmark-cache.ps1 -Targets reactor,adoption-all -WarmRuns 1` and summarize the results in release notes when cache, runtime, or report-performance behavior changed
 
 ## Release workflow triggers
 
@@ -160,5 +161,11 @@ For non-trivial releases, prefer filling these sections explicitly:
 - `Reports and CI`
 - `Upgrade and Adoption Notes`
 - `Verification`
+
+When the release changes cache invalidation, runtime metrics, or multi-module/report performance behavior, also include:
+
+- the benchmark command used
+- a short cold vs warm summary
+- any notable `cacheMissReasons` or cache-hit changes
 
 Keep the notes focused on externally visible changes rather than internal refactors unless those refactors affect extensibility, performance, or upgrade risk.

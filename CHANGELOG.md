@@ -10,6 +10,7 @@ All notable changes to `spring-correctness-linter` will be documented in this fi
 - Plugin regression coverage now includes incremental-cache invalidation for `autoDetectCentralizedSecurity`, `includeTestSourceRoots`, and stale baseline-module ownership with split baselines
 - Runtime metrics and plugin logs now include cache miss reasons so users can distinguish missing cache files, rule/config changes, source-root changes, annotation/type-context changes, auto-detect-context changes, and file-content churn
 - Added `scripts/benchmark-cache.ps1` and `docs/PERFORMANCE_BENCHMARKING.md` to make cold/warm cache benchmarking repeatable across the reactor and adoption samples
+- Added a pull-request template and release-note guidance that require benchmark evidence when cache, runtime, or performance-sensitive behavior changes
 
 ### Changed
 
