@@ -8,10 +8,13 @@ package io.github.koyan9.linter.maven;
 import io.github.koyan9.linter.core.SourceRoot;
 import org.apache.maven.project.MavenProject;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 final class MojoSourceRootResolver {
 
@@ -55,6 +58,7 @@ final class MojoSourceRootResolver {
             }
         }
 
+        sourceRoots.entrySet().removeIf(entry -> !isSourceRootDirectory(entry.getKey()));
         return sourceRoots.values().stream().toList();
     }
 
@@ -105,6 +109,17 @@ final class MojoSourceRootResolver {
                 Path sourceRootPath = Path.of(root).toAbsolutePath().normalize();
                 sourceRoots.put(sourceRootPath, new SourceRoot(sourceRootPath, moduleId));
             }
+        }
+    }
+
+    private boolean isSourceRootDirectory(Path path) {
+        if (!Files.isDirectory(path)) {
+            return false;
+        }
+        try (Stream<Path> stream = Files.walk(path)) {
+            return stream.anyMatch(current -> Files.isRegularFile(current) && current.toString().endsWith(".java"));
+        } catch (IOException exception) {
+            return false;
         }
     }
 

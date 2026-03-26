@@ -1210,6 +1210,44 @@ class ProjectLinterTest {
     }
 
     @Test
+    void ignoresMissingOrEmptySourceRootsInModuleMetrics() throws Exception {
+        Path mainSourceDirectory = tempDir.resolve("src/main/java/demo");
+        Path emptySourceDirectory = tempDir.resolve("empty-src");
+        Files.createDirectories(mainSourceDirectory);
+        Files.createDirectories(emptySourceDirectory);
+        Files.writeString(mainSourceDirectory.resolve("AsyncOnly.java"), """
+                package demo;
+
+                import org.springframework.scheduling.annotation.Async;
+
+                class AsyncOnly {
+
+                    @Async
+                    public void runAsync() {
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintAnalysisResult result = linter.analyzeSourceRoots(
+                tempDir,
+                List.of(
+                        new SourceRoot(tempDir.resolve("src/main/java"), "main-module"),
+                        new SourceRoot(emptySourceDirectory, "empty-module"),
+                        new SourceRoot(tempDir.resolve("missing-src"), "missing-module")
+                ),
+                new LintOptions(true, false, null)
+        );
+        LintReport report = result.report();
+
+        assertEquals(1, report.sourceDirectoryCount());
+        assertEquals(1, report.moduleSummaries().size());
+        assertEquals("main-module", report.moduleSummaries().get(0).moduleId());
+        assertEquals(1, report.runtimeMetrics().moduleMetrics().size());
+        assertEquals("main-module", report.runtimeMetrics().moduleMetrics().get(0).moduleId());
+    }
+
+    @Test
     void recognizesComposedAsyncAnnotationsAcrossFiles() throws Exception {
         Path sourceDirectory = tempDir.resolve("src/main/java/demo");
         Files.createDirectories(sourceDirectory);

@@ -349,6 +349,47 @@ class CorrectnessLintMojoTest {
     }
 
     @Test
+    void skipsNonExecutionRootModuleWhenScanReactorModulesEnabled() throws Exception {
+        Path sourceDirectory = writeSource("""
+                package demo;
+
+                import org.springframework.scheduling.annotation.Async;
+
+                class AsyncOnly {
+
+                    @Async
+                    public void runAsync() {
+                    }
+                }
+                """);
+        Path reportsDirectory = tempDir.resolve("target/reports-non-root-reactor");
+        Path baselineFile = tempDir.resolve("non-root-baseline.txt");
+
+        MavenProject project = new MavenProject();
+        project.setArtifactId("module-a");
+        project.setFile(tempDir.resolve("module-a/pom.xml").toFile());
+        project.setExecutionRoot(false);
+        project.getCompileSourceRoots().add(sourceDirectory.toString());
+
+        CorrectnessLintMojo mojo = configuredMojo(
+                sourceDirectory,
+                reportsDirectory,
+                baselineFile
+        );
+        setField(mojo, "scanReactorModules", true);
+        setField(mojo, "writeBaseline", true);
+        setField(mojo, "project", project);
+        setField(mojo, "reactorProjects", List.of(project));
+
+        mojo.execute();
+
+        assertFalse(Files.exists(reportsDirectory.resolve("lint-report.json")));
+        assertFalse(Files.exists(reportsDirectory.resolve("lint-report.html")));
+        assertFalse(Files.exists(reportsDirectory.resolve("lint-report.sarif.json")));
+        assertFalse(Files.exists(baselineFile));
+    }
+
+    @Test
     void writesPerModuleBaselineAndCacheFilesWhenEnabled() throws Exception {
         Path rootSourceDirectory = writeSource("""
                 package demo;
@@ -432,6 +473,122 @@ class CorrectnessLintMojoTest {
 
         String json = Files.readString(tempDir.resolve("target/reactor-split-reports/lint-report.json"));
         assertTrue(json.contains("\"cachedFileCount\": 2"));
+    }
+
+    @Test
+    void ignoresEmptyExecutionRootSourceDirectoryDuringReactorScan() throws Exception {
+        Path emptyRootSourceDirectory = tempDir.resolve("src/main/java");
+        Files.createDirectories(emptyRootSourceDirectory);
+        Path moduleASourceDirectory = writeModuleSource("module-a", "ModuleAAsyncOnly.java", """
+                package demo;
+
+                import org.springframework.scheduling.annotation.Async;
+
+                class ModuleAAsyncOnly {
+
+                    @Async
+                    public void runAsync() {
+                    }
+                }
+                """);
+        Path moduleBSourceDirectory = writeModuleSource("module-b", "ModuleBAsyncOnly.java", """
+                package demo;
+
+                import org.springframework.scheduling.annotation.Async;
+
+                class ModuleBAsyncOnly {
+
+                    @Async
+                    private void runAsync() {
+                    }
+                }
+                """);
+
+        MavenProject rootProject = mavenProject("reactor-parent", tempDir.resolve("pom.xml"), true);
+        MavenProject moduleAProject = mavenProject("module-a", tempDir.resolve("module-a/pom.xml"), false, moduleASourceDirectory);
+        MavenProject moduleBProject = mavenProject("module-b", tempDir.resolve("module-b/pom.xml"), false, moduleBSourceDirectory);
+
+        CorrectnessLintMojo mojo = configuredMojo(
+                emptyRootSourceDirectory,
+                tempDir.resolve("target/reactor-aggregator-reports"),
+                tempDir.resolve("spring-correctness-linter-baseline.txt")
+        );
+        setField(mojo, "applyBaseline", false);
+        setField(mojo, "scanReactorModules", true);
+        setField(mojo, "project", rootProject);
+        setField(mojo, "reactorProjects", List.of(rootProject, moduleAProject, moduleBProject));
+        setField(mojo, "formats", new LinkedHashSet<>(Set.of("json")));
+
+        mojo.execute();
+
+        String json = Files.readString(tempDir.resolve("target/reactor-aggregator-reports/lint-report.json"));
+        assertTrue(json.contains("\"sourceDirectoryCount\": 2"));
+        assertTrue(json.contains("\"moduleId\": \"module-a\""));
+        assertTrue(json.contains("\"moduleId\": \"module-b\""));
+        assertFalse(json.contains("\"moduleId\": \"reactor-parent\""));
+        assertFalse(json.contains("\"module\": \"reactor-parent\""));
+    }
+
+    @Test
+    void skipsPerModuleOutputsForEmptyExecutionRootSourceDirectory() throws Exception {
+        Path emptyRootSourceDirectory = tempDir.resolve("src/main/java");
+        Files.createDirectories(emptyRootSourceDirectory);
+        Path moduleASourceDirectory = writeModuleSource("module-a", "ModuleAAsyncOnly.java", """
+                package demo;
+
+                import org.springframework.scheduling.annotation.Async;
+
+                class ModuleAAsyncOnly {
+
+                    @Async
+                    public void runAsync() {
+                    }
+                }
+                """);
+        Path moduleBSourceDirectory = writeModuleSource("module-b", "ModuleBAsyncOnly.java", """
+                package demo;
+
+                import org.springframework.scheduling.annotation.Async;
+
+                class ModuleBAsyncOnly {
+
+                    @Async
+                    private void runAsync() {
+                    }
+                }
+                """);
+
+        MavenProject rootProject = mavenProject("reactor-parent", tempDir.resolve("pom.xml"), true);
+        MavenProject moduleAProject = mavenProject("module-a", tempDir.resolve("module-a/pom.xml"), false, moduleASourceDirectory);
+        MavenProject moduleBProject = mavenProject("module-b", tempDir.resolve("module-b/pom.xml"), false, moduleBSourceDirectory);
+
+        Path baselinePath = tempDir.resolve("spring-correctness-linter-baseline.txt");
+        Path cachePath = tempDir.resolve("target/analysis-cache.txt");
+
+        CorrectnessLintMojo mojo = configuredMojo(
+                emptyRootSourceDirectory,
+                tempDir.resolve("target/reactor-aggregator-split-reports"),
+                baselinePath
+        );
+        setField(mojo, "applyBaseline", false);
+        setField(mojo, "writeBaseline", true);
+        setField(mojo, "scanReactorModules", true);
+        setField(mojo, "splitBaselineByModule", true);
+        setField(mojo, "splitCacheByModule", true);
+        setField(mojo, "useIncrementalCache", true);
+        setField(mojo, "cacheFile", cachePath.toFile());
+        setField(mojo, "project", rootProject);
+        setField(mojo, "reactorProjects", List.of(rootProject, moduleAProject, moduleBProject));
+        setField(mojo, "formats", new LinkedHashSet<>(Set.of("json")));
+
+        mojo.execute();
+
+        assertTrue(Files.exists(tempDir.resolve("modules/module-a/spring-correctness-linter-baseline.txt")));
+        assertTrue(Files.exists(tempDir.resolve("modules/module-b/spring-correctness-linter-baseline.txt")));
+        assertFalse(Files.exists(tempDir.resolve("modules/reactor-parent")));
+        assertTrue(Files.exists(tempDir.resolve("target/modules/module-a/analysis-cache.txt")));
+        assertTrue(Files.exists(tempDir.resolve("target/modules/module-b/analysis-cache.txt")));
+        assertFalse(Files.exists(tempDir.resolve("target/modules/reactor-parent")));
     }
 
 
@@ -881,6 +1038,24 @@ class CorrectnessLintMojoTest {
         Files.createDirectories(sourceDirectory);
         Files.writeString(sourceDirectory.resolve("AsyncOnly.java"), content);
         return tempDir.resolve("src/main/java");
+    }
+
+    private Path writeModuleSource(String moduleId, String fileName, String content) throws Exception {
+        Path sourceDirectory = tempDir.resolve(moduleId).resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve(fileName), content);
+        return tempDir.resolve(moduleId).resolve("src/main/java");
+    }
+
+    private MavenProject mavenProject(String artifactId, Path pomPath, boolean executionRoot, Path... compileSourceRoots) {
+        MavenProject project = new MavenProject();
+        project.setArtifactId(artifactId);
+        project.setFile(pomPath.toFile());
+        project.setExecutionRoot(executionRoot);
+        for (Path compileSourceRoot : compileSourceRoots) {
+            project.getCompileSourceRoots().add(compileSourceRoot.toString());
+        }
+        return project;
     }
 
     private CorrectnessLintMojo configuredMojo(Path sourceDirectory, Path reportsDirectory, Path baselineFile) throws Exception {

@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -65,34 +66,38 @@ public final class ProjectContext {
         Path normalizedRoot = projectRoot.toAbsolutePath().normalize();
         List<SourceRoot> normalizedSourceRoots = sourceRoots.stream()
                 .map(sourceRoot -> new SourceRoot(sourceRoot.path().toAbsolutePath().normalize(), sourceRoot.moduleId()))
+                .filter(sourceRoot -> Files.isDirectory(sourceRoot.path()))
                 .distinct()
                 .toList();
-        Path primarySourceDirectory = normalizedSourceRoots.isEmpty() ? normalizedRoot : normalizedSourceRoots.get(0).path();
-
-        if (normalizedSourceRoots.isEmpty()) {
-            return new ProjectContext(normalizedRoot, primarySourceDirectory, List.of(), List.of(), Map.of(), AnnotationMetadataIndex.empty(), options);
-        }
 
         Map<Path, SourceDocument> documentsByPath = new LinkedHashMap<>();
         Map<Path, JavaSourceInspector.ParseOutcome> parseOutcomes = new LinkedHashMap<>();
+        List<SourceRoot> effectiveSourceRoots = new ArrayList<>();
         for (SourceRoot sourceRoot : normalizedSourceRoots) {
             Path normalizedSource = sourceRoot.path();
-            if (!Files.exists(normalizedSource)) {
-                continue;
-            }
-
             try (Stream<Path> stream = Files.walk(normalizedSource)) {
-                stream.filter(Files::isRegularFile)
+                List<SourceDocument> sourceDocuments = stream.filter(Files::isRegularFile)
                         .filter(path -> path.toString().endsWith(".java"))
                         .map(path -> readDocument(path, sourceRoot.moduleId(), parseOutcomes))
-                        .forEach(document -> documentsByPath.put(document.path(), document));
+                        .toList();
+                if (sourceDocuments.isEmpty()) {
+                    continue;
+                }
+                effectiveSourceRoots.add(sourceRoot);
+                sourceDocuments.forEach(document -> documentsByPath.put(document.path(), document));
             }
+        }
+
+        Path primarySourceDirectory = effectiveSourceRoots.isEmpty() ? normalizedRoot : effectiveSourceRoots.get(0).path();
+
+        if (effectiveSourceRoots.isEmpty()) {
+            return new ProjectContext(normalizedRoot, primarySourceDirectory, List.of(), List.of(), Map.of(), AnnotationMetadataIndex.empty(), options);
         }
 
         return new ProjectContext(
                 normalizedRoot,
                 primarySourceDirectory,
-                normalizedSourceRoots,
+                effectiveSourceRoots,
                 documentsByPath.values().stream().collect(Collectors.toList()),
                 parseOutcomes,
                 AnnotationMetadataIndex.build(documentsByPath.values().stream().collect(Collectors.toList()), parseOutcomes),
