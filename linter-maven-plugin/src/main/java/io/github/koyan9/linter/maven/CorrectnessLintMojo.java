@@ -286,6 +286,31 @@ public class CorrectnessLintMojo extends AbstractMojo {
         if (report.cachedFileCount() > 0) {
             return;
         }
+        List<String> cacheMissReasons = report.runtimeMetrics().cacheMissReasons();
+        if (!cacheMissReasons.isEmpty()) {
+            getLog().info("spring-correctness-linter cache miss reasons: "
+                    + cacheMissReasons.stream()
+                    .map(this::describeCacheMissReason)
+                    .collect(Collectors.joining(", ")));
+            if (cacheMissReasons.contains(io.github.koyan9.linter.core.AnalysisCacheStore.CACHE_REASON_CACHE_NOT_CONFIGURED)) {
+                getLog().info("spring-correctness-linter cache: incremental cache is enabled but no reusable cache location was configured before analysis started.");
+                return;
+            }
+            if (cacheMissReasons.contains(io.github.koyan9.linter.core.AnalysisCacheStore.CACHE_REASON_CACHE_FILES_MISSING)) {
+                getLog().info("spring-correctness-linter cache: no reusable cache files were available before analysis started.");
+                return;
+            }
+            if (cacheMissReasons.contains(io.github.koyan9.linter.core.AnalysisCacheStore.CACHE_REASON_CACHE_METADATA_UNAVAILABLE)) {
+                getLog().info("spring-correctness-linter cache: existing cache metadata could not be compared safely, so the cache was invalidated.");
+                return;
+            }
+            if (cacheMissReasons.contains(io.github.koyan9.linter.core.AnalysisCacheStore.CACHE_REASON_MODIFIED_OR_NEW_FILES)) {
+                getLog().info("spring-correctness-linter cache: cache metadata matched, but all source files were modified or newly discovered.");
+                return;
+            }
+            getLog().info("spring-correctness-linter cache: reusable cache data was invalidated before file-level reuse because the effective analysis context changed.");
+            return;
+        }
 
         if (!options.moduleAnalysisCacheFiles().isEmpty()) {
             int total = options.moduleAnalysisCacheFiles().size();
@@ -310,5 +335,9 @@ public class CorrectnessLintMojo extends AbstractMojo {
         }
         getLog().info("spring-correctness-linter cache: cache file found at " + cacheFile
                 + ", but no entries reused. Likely a fingerprint change or all files modified.");
+    }
+
+    private String describeCacheMissReason(String reason) {
+        return io.github.koyan9.linter.core.AnalysisCacheStore.describeCacheMissReason(reason);
     }
 }

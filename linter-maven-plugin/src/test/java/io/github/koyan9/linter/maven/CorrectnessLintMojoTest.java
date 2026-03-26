@@ -535,6 +535,8 @@ class CorrectnessLintMojoTest {
         String json = Files.readString(reportsDirectory.resolve("lint-report.json"));
         assertTrue(json.contains("\"issueCount\": 0"));
         assertTrue(json.contains("\"cachedFileCount\": 0"));
+        assertTrue(json.contains("\"cacheMissReasons\""));
+        assertTrue(json.contains("\"auto-detect-context-changed\""));
     }
 
     @Test
@@ -1542,6 +1544,7 @@ class CorrectnessLintMojoTest {
         assertTrue(json.contains("\"issueCount\": 1"));
         assertTrue(json.contains("\"cachedFileCount\": 0"));
         assertTrue(json.contains("TestAsyncOnly.java"));
+        assertTrue(json.contains("\"source-roots-changed\""));
     }
 
     @Test

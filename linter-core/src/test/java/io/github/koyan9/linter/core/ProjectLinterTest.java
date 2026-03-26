@@ -1291,6 +1291,8 @@ class ProjectLinterTest {
 
         assertEquals(0, secondRun.cachedFileCount());
         assertNotEquals(firstRun.runtimeMetrics().analysisFingerprint(), secondRun.runtimeMetrics().analysisFingerprint());
+        assertTrue(secondRun.runtimeMetrics().cacheMissReasons().contains(AnalysisCacheStore.CACHE_REASON_AUTO_DETECT_CONTEXT_CHANGED));
+        assertTrue(secondRun.runtimeMetrics().cacheMissReasons().contains(AnalysisCacheStore.CACHE_REASON_ANNOTATION_OR_TYPE_CONTEXT_CHANGED));
         assertFalse(secondRun.issues().stream().anyMatch(issue -> issue.ruleId().equals("SPRING_ENDPOINT_SECURITY")));
     }
 
@@ -1339,6 +1341,7 @@ class ProjectLinterTest {
 
         assertEquals(0, secondRun.cachedFileCount());
         assertNotEquals(firstRun.runtimeMetrics().analysisFingerprint(), secondRun.runtimeMetrics().analysisFingerprint());
+        assertTrue(secondRun.runtimeMetrics().cacheMissReasons().contains(AnalysisCacheStore.CACHE_REASON_AUTO_DETECT_CONTEXT_CHANGED));
         assertFalse(secondRun.issues().stream().anyMatch(issue -> issue.ruleId().equals("SPRING_CACHEABLE_KEY")));
     }
 
@@ -1404,6 +1407,7 @@ class ProjectLinterTest {
 
         assertEquals(0, secondRun.cachedFileCount());
         assertNotEquals(firstRun.runtimeMetrics().analysisFingerprint(), secondRun.runtimeMetrics().analysisFingerprint());
+        assertTrue(secondRun.runtimeMetrics().cacheMissReasons().contains(AnalysisCacheStore.CACHE_REASON_ANNOTATION_OR_TYPE_CONTEXT_CHANGED));
         assertFalse(secondRun.issues().stream().anyMatch(issue -> issue.ruleId().equals("SPRING_ENDPOINT_SECURITY")));
     }
 
@@ -1459,6 +1463,7 @@ class ProjectLinterTest {
 
         assertEquals(0, secondRun.cachedFileCount());
         assertNotEquals(firstRun.runtimeMetrics().analysisFingerprint(), secondRun.runtimeMetrics().analysisFingerprint());
+        assertTrue(secondRun.runtimeMetrics().cacheMissReasons().contains(AnalysisCacheStore.CACHE_REASON_ANNOTATION_OR_TYPE_CONTEXT_CHANGED));
         assertTrue(secondRun.issues().stream().anyMatch(issue -> issue.ruleId().equals("SPRING_ENDPOINT_SECURITY")));
     }
 
@@ -1507,7 +1512,112 @@ class ProjectLinterTest {
 
         assertEquals(0, secondRun.cachedFileCount());
         assertNotEquals(firstRun.runtimeMetrics().analysisFingerprint(), secondRun.runtimeMetrics().analysisFingerprint());
+        assertTrue(secondRun.runtimeMetrics().cacheMissReasons().contains(AnalysisCacheStore.CACHE_REASON_RULE_OR_CONFIG_CHANGED));
         assertFalse(secondRun.issues().stream().anyMatch(issue -> issue.ruleId().equals("SPRING_ENDPOINT_SECURITY")));
+    }
+
+    @Test
+    void reusesUnchangedFilesWhenTypeResolutionContextChangesButSelectedRulesDoNotNeedIt() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("SecuredApi.java"), """
+                package demo;
+
+                interface SecuredApi {
+                    String call();
+                }
+                """);
+        Files.writeString(sourceDirectory.resolve("AsyncOnly.java"), """
+                package demo;
+
+                import org.springframework.scheduling.annotation.Async;
+
+                class AsyncOnly {
+
+                    @Async
+                    public void runAsync() {
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(RuleSelection.configure(
+                SpringBootRuleSet.defaultRules(),
+                Set.of("SPRING_ASYNC_VOID"),
+                Set.of(),
+                Map.of()
+        ));
+        Path cacheFile = tempDir.resolve("target/analysis-cache.txt");
+        LintOptions options = new LintOptions(true, false, null, cacheFile, true);
+
+        LintReport firstRun = linter.analyze(tempDir, tempDir.resolve("src/main/java"), options).report();
+        assertEquals(0, firstRun.cachedFileCount());
+
+        Files.writeString(sourceDirectory.resolve("SecuredApi.java"), """
+                package demo;
+
+                interface SecuredApi {
+                    String changed();
+                }
+                """);
+
+        LintReport secondRun = linter.analyze(tempDir, tempDir.resolve("src/main/java"), options).report();
+
+        assertEquals(1, secondRun.cachedFileCount());
+        assertEquals(1, secondRun.runtimeMetrics().analyzedFileCount());
+        assertFalse(secondRun.runtimeMetrics().cacheMissReasons().contains(AnalysisCacheStore.CACHE_REASON_ANNOTATION_OR_TYPE_CONTEXT_CHANGED));
+    }
+
+    @Test
+    void reusesUnchangedFilesWhenAutoDetectContextChangesButAutoDetectIsDisabled() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("CacheService.java"), """
+                package demo;
+
+                import org.springframework.cache.annotation.Cacheable;
+
+                class CacheService {
+
+                    @Cacheable(cacheNames = "demo")
+                    public String load(String id) {
+                        return id;
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(RuleSelection.configure(
+                SpringBootRuleSet.defaultRules(),
+                Set.of("SPRING_CACHEABLE_KEY"),
+                Set.of(),
+                Map.of()
+        ));
+        Path cacheFile = tempDir.resolve("target/analysis-cache.txt");
+        LintOptions options = new LintOptions(true, false, null, cacheFile, true);
+
+        LintReport firstRun = linter.analyze(tempDir, tempDir.resolve("src/main/java"), options).report();
+        assertEquals(0, firstRun.cachedFileCount());
+
+        Files.writeString(sourceDirectory.resolve("ProjectKeyGeneratorConfig.java"), """
+                package demo;
+
+                import org.springframework.cache.interceptor.KeyGenerator;
+                import org.springframework.context.annotation.Bean;
+
+                class ProjectKeyGeneratorConfig {
+
+                    @Bean
+                    KeyGenerator keyGenerator() {
+                        return (target, method, params) -> params.length;
+                    }
+                }
+                """);
+
+        LintReport secondRun = linter.analyze(tempDir, tempDir.resolve("src/main/java"), options).report();
+
+        assertEquals(1, secondRun.cachedFileCount());
+        assertEquals(1, secondRun.runtimeMetrics().analyzedFileCount());
+        assertFalse(secondRun.runtimeMetrics().cacheMissReasons().contains(AnalysisCacheStore.CACHE_REASON_AUTO_DETECT_CONTEXT_CHANGED));
+        assertTrue(secondRun.issues().stream().anyMatch(issue -> issue.ruleId().equals("SPRING_CACHEABLE_KEY")));
     }
 
     @Test

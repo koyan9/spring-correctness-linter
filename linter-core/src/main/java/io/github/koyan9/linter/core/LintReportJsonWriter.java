@@ -72,6 +72,8 @@ final class LintReportJsonWriter {
         builder.append("    \"cachedFileCount\": ").append(report.runtimeMetrics().cachedFileCount()).append(",\n");
         builder.append("    \"parseProblemFileCount\": ").append(report.runtimeMetrics().parseProblemFileCount()).append(",\n");
         builder.append("    \"cacheHitRatePercent\": ").append(report.runtimeMetrics().cacheHitRatePercent()).append(",\n");
+        appendStringArray(builder, "cacheMissReasons", report.runtimeMetrics().cacheMissReasons(), 4);
+        builder.append(",\n");
         builder.append("    \"phaseMetrics\": {\n");
         builder.append("      \"contextLoadMillis\": ").append(report.runtimeMetrics().phaseMetrics().contextLoadMillis()).append(",\n");
         builder.append("      \"cacheLoadMillis\": ").append(report.runtimeMetrics().phaseMetrics().cacheLoadMillis()).append(",\n");

@@ -51,7 +51,9 @@ public final class ProjectContext {
     private volatile TypeResolutionIndex typeResolutionIndex;
     private volatile Boolean securityFilterChainBeanPresent;
     private volatile Boolean keyGeneratorBeanPresent;
-    private volatile List<String> semanticFingerprintEntries;
+    private volatile List<String> annotationFingerprintEntries;
+    private volatile List<String> typeResolutionFingerprintEntries;
+    private volatile List<String> autoDetectFingerprintEntries;
 
     private ProjectContext(
             Path projectRoot,
@@ -291,35 +293,95 @@ public final class ProjectContext {
         return false;
     }
 
-    public List<String> semanticFingerprintEntries() {
-        List<String> cached = semanticFingerprintEntries;
+    public List<String> annotationFingerprintEntries() {
+        List<String> cached = annotationFingerprintEntries;
         if (cached != null) {
             return cached;
         }
         synchronized (this) {
-            if (semanticFingerprintEntries != null) {
-                return semanticFingerprintEntries;
+            if (annotationFingerprintEntries != null) {
+                return annotationFingerprintEntries;
             }
-            List<String> built = buildSemanticFingerprintEntries();
-            semanticFingerprintEntries = built;
+            List<String> built = buildAnnotationFingerprintEntries();
+            annotationFingerprintEntries = built;
             return built;
         }
     }
 
-    private List<String> buildSemanticFingerprintEntries() {
+    public List<String> sourceRootFingerprintEntries() {
+        return sourceRoots.stream()
+                .map(sourceRoot -> "source-root\t" + relativePathForFingerprint(sourceRoot.path()) + '\t' + sourceRoot.moduleId())
+                .sorted()
+                .toList();
+    }
+
+    public List<String> typeResolutionFingerprintEntries() {
+        List<String> cached = typeResolutionFingerprintEntries;
+        if (cached != null) {
+            return cached;
+        }
+        synchronized (this) {
+            if (typeResolutionFingerprintEntries != null) {
+                return typeResolutionFingerprintEntries;
+            }
+            List<String> built = buildTypeResolutionFingerprintEntries();
+            typeResolutionFingerprintEntries = built;
+            return built;
+        }
+    }
+
+    public List<String> autoDetectFingerprintEntries() {
+        List<String> cached = autoDetectFingerprintEntries;
+        if (cached != null) {
+            return cached;
+        }
+        synchronized (this) {
+            if (autoDetectFingerprintEntries != null) {
+                return autoDetectFingerprintEntries;
+            }
+            List<String> built = buildAutoDetectFingerprintEntries();
+            autoDetectFingerprintEntries = built;
+            return built;
+        }
+    }
+
+    private List<String> buildAnnotationFingerprintEntries() {
         List<String> entries = new ArrayList<>();
         for (SourceDocument sourceDocument : sourceDocuments) {
-            SourceUnit sourceUnit = sourceUnitFor(sourceDocument);
             String relativePath = sourceDocument.relativePath(projectRoot);
             if (sourceDocument.content().contains("@interface")) {
                 entries.add("annotation\t" + relativePath + '\t' + sourceDocument.contentHash());
             }
-            entries.add(buildTypeResolutionSummary(sourceUnit, relativePath));
+        }
+        return entries.stream().sorted().toList();
+    }
+
+    private List<String> buildTypeResolutionFingerprintEntries() {
+        List<String> entries = new ArrayList<>();
+        for (SourceDocument sourceDocument : sourceDocuments) {
+            SourceUnit sourceUnit = sourceUnitFor(sourceDocument);
+            entries.add(buildTypeResolutionSummary(sourceUnit, sourceDocument.relativePath(projectRoot)));
+        }
+        return entries.stream().sorted().toList();
+    }
+
+    private List<String> buildAutoDetectFingerprintEntries() {
+        List<String> entries = new ArrayList<>();
+        for (SourceDocument sourceDocument : sourceDocuments) {
+            SourceUnit sourceUnit = sourceUnitFor(sourceDocument);
             if (isAutoDetectionRelevant(sourceUnit)) {
-                entries.add("autodetect\t" + relativePath + '\t' + sourceDocument.contentHash());
+                entries.add("autodetect\t" + sourceDocument.relativePath(projectRoot) + '\t' + sourceDocument.contentHash());
             }
         }
         return entries.stream().sorted().toList();
+    }
+
+    private String relativePathForFingerprint(Path path) {
+        try {
+            return projectRoot.relativize(path.toAbsolutePath().normalize()).toString().replace('\\', '/');
+        } catch (IllegalArgumentException exception) {
+            return path.toAbsolutePath().normalize().toString().replace('\\', '/');
+        }
     }
 
     private String buildTypeResolutionSummary(SourceUnit sourceUnit, String relativePath) {

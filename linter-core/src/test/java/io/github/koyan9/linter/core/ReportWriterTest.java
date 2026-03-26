@@ -105,6 +105,7 @@ class ReportWriterTest {
                         1,
                         1,
                         1,
+                        List.of("rule-or-config-changed", "source-roots-changed"),
                         new AnalysisPhaseMetrics(1, 2, 3, 4, 5, 6, 7),
                         List.of(
                                 new ModuleRuntimeMetrics("root-app", 1, 1, 0, 1, 11, 11, 0),
@@ -133,6 +134,8 @@ class ReportWriterTest {
         assertTrue(json.contains("\"runtimeMetrics\""));
         assertTrue(json.contains("\"analysisFingerprint\": \"fingerprint-123\""));
         assertTrue(json.contains("\"cacheHitRatePercent\": 50"));
+        assertTrue(json.contains("\"cacheMissReasons\""));
+        assertTrue(json.contains("\"rule-or-config-changed\""));
         assertTrue(json.contains("\"slowModules\""));
         assertTrue(json.contains("\"cacheHitRatePercent\": 0"));
         assertTrue(json.contains("\"ruleDomainSelection\""));
@@ -174,6 +177,9 @@ class ReportWriterTest {
         assertTrue(html.contains("Add explicit security intent."));
         assertTrue(html.contains("fingerprint-123"));
         assertTrue(html.contains("Cache hit rate"));
+        assertTrue(html.contains("Cache Miss Reasons"));
+        assertTrue(html.contains("rule or semantic configuration changed"));
+        assertTrue(html.contains("source-roots-changed"));
         assertTrue(html.contains("root-app"));
         assertTrue(html.contains("Files with parse problems"));
         assertTrue(html.contains("Broken.java"));
@@ -205,6 +211,7 @@ class ReportWriterTest {
                         1,
                         1,
                         1,
+                        List.of("modified-or-new-files"),
                         new AnalysisPhaseMetrics(1, 2, 3, 4, 5, 6, 7),
                         List.of(new ModuleRuntimeMetrics("root-app", 1, 1, 0, 0, 11, 11, 0))
                 ),

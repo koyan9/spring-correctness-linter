@@ -11,6 +11,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -181,16 +182,18 @@ public final class ProjectLinter {
                 .map(ModuleAccumulator::toRuntimeMetrics)
                 .toList();
         long reportAssemblyNanos = System.nanoTime() - reportAssemblyStartNanos;
+        List<String> cacheMissReasons = determineCacheMissReasons(options, loadedCachedAnalyses, cachedFileCount);
 
         AnalysisRuntimeMetrics runtimeMetrics = new AnalysisRuntimeMetrics(
                 options.useIncrementalCache(),
                 cacheScope(options),
-                loadedCachedAnalyses.analysisFingerprint(),
+                loadedCachedAnalyses.analysisFingerprint().value(),
                 toMillis(System.nanoTime() - totalStartNanos),
                 context.sourceDocuments().size(),
                 context.sourceDocuments().size() - cachedFileCount,
                 cachedFileCount,
                 parseProblems.size(),
+                cacheMissReasons,
                 new AnalysisPhaseMetrics(
                         toMillis(contextLoadNanos),
                         toMillis(cacheLoadNanos),
@@ -247,24 +250,36 @@ public final class ProjectLinter {
     }
 
     private LoadedCachedAnalyses loadCachedAnalyses(ProjectContext context, LintOptions options) throws IOException {
-        String analysisFingerprint = cacheFingerprint(context, options);
+        AnalysisCacheStore.CacheFingerprint analysisFingerprint = cacheFingerprint(context, options);
         if (!options.useIncrementalCache() || options.analysisCacheFile() == null) {
             if (!options.useIncrementalCache() || options.moduleAnalysisCacheFiles().isEmpty()) {
-                return new LoadedCachedAnalyses(Map.of(), analysisFingerprint);
+                List<String> reasons = options.useIncrementalCache()
+                        ? List.of(AnalysisCacheStore.CACHE_REASON_CACHE_NOT_CONFIGURED)
+                        : List.of();
+                return new LoadedCachedAnalyses(Map.of(), analysisFingerprint, reasons);
             }
         }
         AnalysisCacheStore cacheStore = new AnalysisCacheStore();
         Map<String, CachedFileAnalysis> cachedAnalyses = new HashMap<>();
+        LinkedHashSet<String> cacheMissReasons = new LinkedHashSet<>();
         if (options.analysisCacheFile() != null) {
-            cachedAnalyses.putAll(cacheStore.load(options.analysisCacheFile(), analysisFingerprint).analyses());
+            AnalysisCacheStore.CacheState cacheState = cacheStore.load(options.analysisCacheFile(), analysisFingerprint);
+            cachedAnalyses.putAll(cacheState.analyses());
+            cacheMissReasons.addAll(cacheState.missReasons());
         }
         for (Path moduleCacheFile : options.moduleAnalysisCacheFiles().values()) {
-            cachedAnalyses.putAll(cacheStore.load(moduleCacheFile, analysisFingerprint).analyses());
+            AnalysisCacheStore.CacheState cacheState = cacheStore.load(moduleCacheFile, analysisFingerprint);
+            cachedAnalyses.putAll(cacheState.analyses());
+            cacheMissReasons.addAll(cacheState.missReasons());
         }
-        return new LoadedCachedAnalyses(cachedAnalyses, analysisFingerprint);
+        return new LoadedCachedAnalyses(cachedAnalyses, analysisFingerprint, List.copyOf(cacheMissReasons));
     }
 
-    private void writeCachedAnalyses(LintOptions options, String analysisFingerprint, List<CachedFileAnalysis> analyses) throws IOException {
+    private void writeCachedAnalyses(
+            LintOptions options,
+            AnalysisCacheStore.CacheFingerprint analysisFingerprint,
+            List<CachedFileAnalysis> analyses
+    ) throws IOException {
         if (!options.useIncrementalCache()) {
             return;
         }
@@ -283,12 +298,30 @@ public final class ProjectLinter {
         }
     }
 
-    private String cacheFingerprint(ProjectContext context, LintOptions options) {
+    private AnalysisCacheStore.CacheFingerprint cacheFingerprint(ProjectContext context, LintOptions options) {
         if (!options.useIncrementalCache()) {
-            return "";
+            return new AnalysisCacheStore.CacheFingerprint("", Map.of());
         }
         AnalysisCacheStore cacheStore = new AnalysisCacheStore();
-        return cacheStore.fingerprint(rules, options, context.semanticFingerprintEntries());
+        boolean includeAutoDetectContext = options.autoDetectCentralizedSecurity() || options.autoDetectProjectWideKeyGenerator();
+        return cacheStore.fingerprint(rules, options, context, requiresTypeResolution(), includeAutoDetectContext);
+    }
+
+    private List<String> determineCacheMissReasons(
+            LintOptions options,
+            LoadedCachedAnalyses loadedCachedAnalyses,
+            long cachedFileCount
+    ) {
+        if (!options.useIncrementalCache() || cachedFileCount > 0) {
+            return List.of();
+        }
+        if (!loadedCachedAnalyses.missReasons().isEmpty()) {
+            return loadedCachedAnalyses.missReasons();
+        }
+        if (!loadedCachedAnalyses.analyses().isEmpty()) {
+            return List.of(AnalysisCacheStore.CACHE_REASON_MODIFIED_OR_NEW_FILES);
+        }
+        return List.of();
     }
 
     private String cacheScope(LintOptions options) {
@@ -531,11 +564,18 @@ public final class ProjectLinter {
         }
     }
 
-    private record LoadedCachedAnalyses(Map<String, CachedFileAnalysis> analyses, String analysisFingerprint) {
+    private record LoadedCachedAnalyses(
+            Map<String, CachedFileAnalysis> analyses,
+            AnalysisCacheStore.CacheFingerprint analysisFingerprint,
+            List<String> missReasons
+    ) {
 
         private LoadedCachedAnalyses {
             analyses = Map.copyOf(analyses);
-            analysisFingerprint = analysisFingerprint == null ? "" : analysisFingerprint;
+            analysisFingerprint = analysisFingerprint == null
+                    ? new AnalysisCacheStore.CacheFingerprint("", Map.of())
+                    : analysisFingerprint;
+            missReasons = List.copyOf(missReasons);
         }
     }
 

@@ -17,6 +17,7 @@ public record AnalysisRuntimeMetrics(
         long analyzedFileCount,
         long cachedFileCount,
         long parseProblemFileCount,
+        List<String> cacheMissReasons,
         AnalysisPhaseMetrics phaseMetrics,
         List<ModuleRuntimeMetrics> moduleMetrics
 ) {
@@ -24,6 +25,7 @@ public record AnalysisRuntimeMetrics(
     public AnalysisRuntimeMetrics {
         cacheScope = cacheScope == null ? "disabled" : cacheScope;
         analysisFingerprint = analysisFingerprint == null ? "" : analysisFingerprint;
+        cacheMissReasons = cacheMissReasons == null ? List.of() : List.copyOf(cacheMissReasons);
         phaseMetrics = phaseMetrics == null ? AnalysisPhaseMetrics.empty() : phaseMetrics;
         moduleMetrics = moduleMetrics == null
                 ? List.of()
@@ -58,6 +60,6 @@ public record AnalysisRuntimeMetrics(
     }
 
     public static AnalysisRuntimeMetrics empty() {
-        return new AnalysisRuntimeMetrics(false, "disabled", "", 0, 0, 0, 0, 0, AnalysisPhaseMetrics.empty(), List.of());
+        return new AnalysisRuntimeMetrics(false, "disabled", "", 0, 0, 0, 0, 0, List.of(), AnalysisPhaseMetrics.empty(), List.of());
     }
 }

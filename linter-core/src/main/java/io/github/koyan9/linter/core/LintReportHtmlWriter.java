@@ -47,6 +47,7 @@ final class LintReportHtmlWriter {
                     .append(ReportWriterSupport.escapeHtml(report.runtimeMetrics().analysisFingerprint()))
                     .append("</code></p>\n");
         }
+        appendCacheMissReasons(builder, report.runtimeMetrics().cacheMissReasons());
         builder.append("  <table>\n");
         builder.append("    <thead><tr><th>Phase</th><th>Milliseconds</th></tr></thead>\n");
         builder.append("    <tbody>\n");
@@ -170,6 +171,22 @@ final class LintReportHtmlWriter {
                 .append("</td><td>")
                 .append(millis)
                 .append("</td></tr>\n");
+    }
+
+    private void appendCacheMissReasons(StringBuilder builder, java.util.List<String> reasons) {
+        if (reasons.isEmpty()) {
+            return;
+        }
+        builder.append("  <h3>Cache Miss Reasons</h3>\n");
+        builder.append("  <ul>\n");
+        for (String reason : reasons) {
+            builder.append("    <li>")
+                    .append(ReportWriterSupport.escapeHtml(AnalysisCacheStore.describeCacheMissReason(reason)))
+                    .append(" (<code>")
+                    .append(ReportWriterSupport.escapeHtml(reason))
+                    .append("</code>)</li>\n");
+        }
+        builder.append("  </ul>\n");
     }
 
     private void appendRuleLink(StringBuilder builder, LintReport report, String ruleId) {
