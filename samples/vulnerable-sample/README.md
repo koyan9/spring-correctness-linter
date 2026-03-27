@@ -34,6 +34,7 @@ Typical findings include:
 - `SPRING_CACHEABLE_PRIVATE_METHOD` from `DemoService.privateCachedValue()`
 - `SPRING_CACHEABLE_FINAL_METHOD` from `DemoService.finalCachedValue()`
 - `SPRING_CACHEABLE_SELF_INVOCATION` from `DemoService.warmCache()`
+- `SPRING_CACHEABLE_FINAL_CLASS` from `FinalCacheableService`
 - `SPRING_ASYNC_FINAL_CLASS` from `FinalAsyncService`
 - `SPRING_TX_SELF_INVOCATION`, `SPRING_TX_PRIVATE_METHOD`, `SPRING_TX_FINAL_METHOD`, and `SPRING_TX_HIGH_RISK_PROPAGATION` from transactional patterns in `DemoService`
 - `SPRING_TX_FINAL_CLASS` from `FinalTransactionalService`
