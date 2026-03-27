@@ -757,8 +757,13 @@ SARIF 结果中还包含 `moduleId` 字段，方便按模块定位问题。
 - CI 质量门禁
 - 老项目 baseline 治理
 - 多模块仓库按模块治理和持续改进
+- 默认内置规则已扩展到 35 条，覆盖 `ASYNC`、`LIFECYCLE`、`SCHEDULED`、`CACHE`、`WEB`、`TRANSACTION`、`EVENTS`、`CONFIGURATION`
+- 已支持通过 `ServiceLoader` 做轻量级外部规则扩展
+- 代理边界类规则目前在 `ASYNC`、`CACHE`、`TRANSACTION` 三个域最完整
+- 中英文 README 都已补充规则覆盖矩阵，便于快速了解当前内置规则面
 
 ## 里程碑与路线图
 
 - 历史里程碑可参考 `docs/MILESTONES.md`
 - 当前 1–2 个迭代的方向可参考 `docs/ROADMAP.md`
+- 最近一轮规则扩展与可扩展性跟进可参考 `docs/STATUS_UPDATE_2026-03-27_proxy-boundary-expansion.md`

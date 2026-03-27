@@ -68,8 +68,17 @@
 - Hardened self-invocation detection with direct method-reference coverage and aligned async/transaction behavior.
 - Added explicit file-analysis concurrency controls and strengthened regression coverage around new plugin and core options.
 
+## Milestone 11: Extensibility and Proxy-Boundary Expansion
+
+- Added lightweight external rule discovery through `ServiceLoader`, along with an adoption-suite sample and plugin-level validation coverage.
+- Added repeatable release-status checks plus copy-paste CI and post-release verification guidance for maintainers.
+- Expanded low-noise built-in proxy-boundary coverage across async, cache, and transactional event-listener scenarios.
+- Added English and Chinese rule coverage matrices so the current built-in rule surface is easier to inspect during rollout planning.
+
 ## Current Status
 
 - The project now provides a practical Spring correctness linting workflow suitable for local development, CI enforcement, legacy baseline adoption, multi-module repository governance, and policy-oriented rollout workflows.
+- The built-in rule surface is now materially broader, but recent growth stayed concentrated on low-noise, testable Spring proxy-boundary semantics rather than speculative framework heuristics.
 - Future work should continue focusing on incremental polish, rule-accuracy discipline, and real-user adoption feedback rather than large new feature batches.
+- For a detailed summary of the latest proxy-boundary and extensibility batch, see `docs/STATUS_UPDATE_2026-03-27_proxy-boundary-expansion.md`.
 - For the current near-term direction, see `docs/ROADMAP.md`.

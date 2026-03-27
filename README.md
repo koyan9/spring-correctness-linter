@@ -790,9 +790,14 @@ The project currently provides a practical Spring correctness linting workflow s
 - CI quality gates
 - legacy codebase onboarding with baselines
 - multi-module repository governance with module-aware reporting
+- 35 built-in rules across `ASYNC`, `LIFECYCLE`, `SCHEDULED`, `CACHE`, `WEB`, `TRANSACTION`, `EVENTS`, and `CONFIGURATION`
+- lightweight external rule extension through `ServiceLoader`
+- proxy-boundary coverage that is now strongest in `ASYNC`, `CACHE`, and `TRANSACTION`
+- English and Chinese rule coverage matrices that make the current built-in rule surface easier to inspect
 
 ## Milestones
 
 - For a compact history of the major improvements and project evolution, see `docs/MILESTONES.md`.
 - For the current near-term direction, see `docs/ROADMAP.md`.
 - For the current rule-accuracy follow-ups, see `docs/ACCURACY_BACKLOG.md`.
+- For the latest staged summary of rule-growth and extensibility work, see `docs/STATUS_UPDATE_2026-03-27_proxy-boundary-expansion.md`.
