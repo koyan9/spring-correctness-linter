@@ -7,6 +7,7 @@ Each app is intentionally small and focused:
 - `basic-app`: plain single-module Spring app with a minimal plugin setup
 - `centralized-security-app`: demonstrates `autoDetectCentralizedSecurity`
 - `cache-convention-app`: demonstrates `autoDetectProjectWideKeyGenerator`
+- `external-rules-app`: demonstrates service-loaded external rule providers added through plugin dependencies
 
 ## Usage
 
@@ -17,6 +18,7 @@ Each app is intentionally small and focused:
    - `mvn -q -f samples/adoption-suite/basic-app/pom.xml -DskipTests verify`
    - `mvn -q -f samples/adoption-suite/centralized-security-app/pom.xml -DskipTests verify`
    - `mvn -q -f samples/adoption-suite/cache-convention-app/pom.xml -DskipTests verify`
+   - `mvn -q -f samples/adoption-suite/external-rules-app/pom.xml -DskipTests verify`
 3. Or build the whole suite:
    - `mvn -q -f samples/adoption-suite/pom.xml -DskipTests verify`
 
@@ -43,6 +45,13 @@ Each app is intentionally small and focused:
 - `autoDetectProjectWideKeyGenerator=true` suppressing cache-key noise
 - expected result: `0` visible issues
 
+### `external-rules-app`
+
+- a custom rule provider packaged as a normal Maven module
+- `META-INF/services` based discovery through `LintRuleProvider`
+- plugin dependency wiring from the consumer app to the provider module
+- expected result: the consumer app reports `EXTERNAL_CONTROLLER_NAME_RULE` in JSON output
+
 ## Expected Findings
 
 - `basic-app`
@@ -52,6 +61,10 @@ Each app is intentionally small and focused:
   - expected to report `0` visible issues because centralized-security auto-detection is enabled
 - `cache-convention-app`
   - expected to report `0` visible issues because project-wide key-generator auto-detection is enabled
+- `external-rules-app`
+  - expected to report `EXTERNAL_CONTROLLER_NAME_RULE`
+  - demonstrates that service-loaded rules can be enabled by id through normal plugin configuration
+  - the provider module contributes the rule via `META-INF/services/io.github.koyan9.linter.core.spi.LintRuleProvider`
 
 ## Suggested Validation Commands
 

@@ -16,6 +16,7 @@
         <module>basic-app</module>
         <module>centralized-security-app</module>
         <module>cache-convention-app</module>
+        <module>external-rules-app</module>
     </modules>
 
     <properties>

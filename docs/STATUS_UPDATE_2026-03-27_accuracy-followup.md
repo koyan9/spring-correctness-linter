@@ -42,6 +42,7 @@ The following checks were run during this iteration:
 
 - The highest-value low-noise follow-ups for `SPRING_ENDPOINT_SECURITY` and `SPRING_CACHEABLE_KEY` have been tightened again without broadening speculative project-convention modeling.
 - The semantic layer remains the primary place where cache and security matching behavior is centralized.
+- The repository now also supports lightweight external rule providers through `ServiceLoader`, and the adoption suite includes an end-to-end validation sample for that integration path.
 
 ## Remaining Caution
 
