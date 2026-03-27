@@ -370,3 +370,4 @@ Use `samples/adoption-suite/` when you want to validate consumer-style rollout p
 - [docs/RULE_DEVELOPMENT.md](docs/RULE_DEVELOPMENT.md)
 - [docs/ACCURACY_BACKLOG.md](docs/ACCURACY_BACKLOG.md)
 - [docs/RELEASE_PROCESS.md](docs/RELEASE_PROCESS.md)
+- [docs/CI_EXAMPLES.md](docs/CI_EXAMPLES.md)

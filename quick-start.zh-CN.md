@@ -348,3 +348,4 @@ mvn -B -q verify \
 - [docs/RULE_DEVELOPMENT.md](docs/RULE_DEVELOPMENT.md)
 - [docs/ACCURACY_BACKLOG.md](docs/ACCURACY_BACKLOG.md)
 - [docs/RELEASE_PROCESS.md](docs/RELEASE_PROCESS.md)
+- [docs/CI_EXAMPLES.zh-CN.md](docs/CI_EXAMPLES.zh-CN.md)

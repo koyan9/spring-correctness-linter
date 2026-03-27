@@ -728,6 +728,7 @@ A set of small consumer-style applications that demonstrate how real projects ca
 - `CHANGELOG.md`: release history
 - `RELEASE_NOTES_TEMPLATE.md`: release notes template
 - `docs/RELEASE_PROCESS.md`: release checklist and workflow guide
+- `docs/CI_EXAMPLES.md`: copy-paste-ready CI quality-gate, baseline-rollout, and SARIF upload examples
 - `docs/PERFORMANCE_BENCHMARKING.md`: repeatable cache and runtime benchmarking workflow
 - `docs/MAINTAINER_GUIDE.md`: branch protection, release ownership, and maintainer operations
 - `docs/RULE_DEVELOPMENT.md`: rule implementation and semantic-facts guide

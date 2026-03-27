@@ -8,6 +8,7 @@ All notable changes to `spring-correctness-linter` will be documented in this fi
 
 ### Added
 
+- Added `docs/CI_EXAMPLES.md` and `docs/CI_EXAMPLES.zh-CN.md` with copy-paste-ready CI quality-gate, baseline-rollout, and SARIF upload workflows
 - Core regression coverage now includes incremental-cache invalidation when centralized-security detection, project-wide key-generator detection, composed annotation definitions, type-resolution context, or custom security-annotation options change
 - Plugin regression coverage now includes incremental-cache invalidation for `autoDetectCentralizedSecurity`, `includeTestSourceRoots`, and stale baseline-module ownership with split baselines
 - Runtime metrics and plugin logs now include cache miss reasons so users can distinguish missing cache files, rule/config changes, source-root changes, annotation/type-context changes, auto-detect-context changes, and file-content churn
