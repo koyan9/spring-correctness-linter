@@ -1725,6 +1725,70 @@ class ProjectLinterTest {
     }
 
     @Test
+    void invalidatesIncrementalCacheWhenConcreteSecurityFilterChainImplementationChanges() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("PublicController.java"), """
+                package demo;
+
+                import org.springframework.web.bind.annotation.GetMapping;
+                import org.springframework.web.bind.annotation.RestController;
+
+                @RestController
+                class PublicController {
+
+                    @GetMapping("/open")
+                    public String open() {
+                        return "ok";
+                    }
+                }
+                """);
+        Files.writeString(sourceDirectory.resolve("SecurityConfig.java"), """
+                package demo;
+
+                import org.springframework.context.annotation.Bean;
+
+                class SecurityConfig {
+
+                    @Bean
+                    DemoSecurityFilterChain filterChain() {
+                        return null;
+                    }
+                }
+                """);
+        Files.writeString(sourceDirectory.resolve("DemoSecurityFilterChain.java"), """
+                package demo;
+
+                import org.springframework.security.web.SecurityFilterChain;
+
+                class DemoSecurityFilterChain implements SecurityFilterChain {
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        Path cacheFile = tempDir.resolve("target/analysis-cache.txt");
+        LintOptions options = new LintOptions(true, false, null, cacheFile, true)
+                .withAutoDetectCentralizedSecurity(true);
+
+        LintReport firstRun = linter.analyze(tempDir, tempDir.resolve("src/main/java"), options).report();
+        assertFalse(firstRun.issues().stream().anyMatch(issue -> issue.ruleId().equals("SPRING_ENDPOINT_SECURITY")));
+
+        Files.writeString(sourceDirectory.resolve("DemoSecurityFilterChain.java"), """
+                package demo;
+
+                class DemoSecurityFilterChain {
+                }
+                """);
+
+        LintReport secondRun = linter.analyze(tempDir, tempDir.resolve("src/main/java"), options).report();
+
+        assertEquals(0, secondRun.cachedFileCount());
+        assertNotEquals(firstRun.runtimeMetrics().analysisFingerprint(), secondRun.runtimeMetrics().analysisFingerprint());
+        assertTrue(secondRun.runtimeMetrics().cacheMissReasons().contains(AnalysisCacheStore.CACHE_REASON_AUTO_DETECT_CONTEXT_CHANGED));
+        assertTrue(secondRun.issues().stream().anyMatch(issue -> issue.ruleId().equals("SPRING_ENDPOINT_SECURITY")));
+    }
+
+    @Test
     void invalidatesIncrementalCacheWhenProjectWideKeyGeneratorContextChanges() throws Exception {
         Path sourceDirectory = tempDir.resolve("src/main/java/demo");
         Files.createDirectories(sourceDirectory);
@@ -3587,6 +3651,47 @@ class ProjectLinterTest {
                     @Bean
                     SecurityFilterChain filterChain() {
                         return null;
+                    }
+                }
+
+                @RestController
+                class PublicController {
+
+                    @GetMapping("/open")
+                    public String open() {
+                        return "ok";
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport defaultReport = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
+        assertTrue(defaultReport.issues().stream().anyMatch(issue -> issue.ruleId().equals("SPRING_ENDPOINT_SECURITY")));
+
+        LintOptions options = LintOptions.defaults().withAutoDetectCentralizedSecurity(true);
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"), options).report();
+        assertFalse(report.issues().stream().anyMatch(issue -> issue.ruleId().equals("SPRING_ENDPOINT_SECURITY")));
+    }
+
+    void autoDetectsConcreteSecurityFilterChainImplementationForCentralizedSecurity() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("SecurityConfig.java"), """
+                package demo;
+
+                import org.springframework.context.annotation.Bean;
+                import org.springframework.security.web.SecurityFilterChain;
+                import org.springframework.web.bind.annotation.GetMapping;
+                import org.springframework.web.bind.annotation.RestController;
+
+                class DemoSecurityFilterChain implements SecurityFilterChain {
+                }
+
+                class SecurityConfig {
+
+                    @Bean
+                    DemoSecurityFilterChain filterChain() {
+                        return new DemoSecurityFilterChain();
                     }
                 }
 

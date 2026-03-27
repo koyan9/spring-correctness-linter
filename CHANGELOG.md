@@ -19,6 +19,7 @@ All notable changes to `spring-correctness-linter` will be documented in this fi
 ### Changed
 
 - `SPRING_CACHEABLE_KEY` project-wide key-generator auto-detection now also recognizes `@Bean` methods that return source-local `KeyGenerator` implementation classes
+- `SPRING_ENDPOINT_SECURITY` centralized-security auto-detection now also recognizes `@Bean` methods that return source-local `SecurityFilterChain` implementation classes
 
 ## [0.1.3] - 2026-03-27
 

@@ -596,6 +596,54 @@ class CorrectnessLintMojoTest {
     }
 
     @Test
+    void autoDetectsConcreteSecurityFilterChainImplementation() throws Exception {
+        Path sourceDirectory = writeSource("""
+                package demo;
+
+                import org.springframework.context.annotation.Bean;
+                import org.springframework.security.web.SecurityFilterChain;
+                import org.springframework.web.bind.annotation.GetMapping;
+                import org.springframework.web.bind.annotation.RestController;
+
+                class DemoSecurityFilterChain implements SecurityFilterChain {
+                }
+
+                class SecurityConfig {
+
+                    @Bean
+                    DemoSecurityFilterChain filterChain() {
+                        return null;
+                    }
+                }
+
+                @RestController
+                class PublicController {
+
+                    @GetMapping("/open")
+                    public String open() {
+                        return "ok";
+                    }
+                }
+                """);
+        Path reportsDirectory = tempDir.resolve("target/reports-security-concrete-chain");
+
+        CorrectnessLintMojo mojo = configuredMojo(
+                sourceDirectory,
+                reportsDirectory,
+                tempDir.resolve("spring-correctness-linter-baseline.txt")
+        );
+        setField(mojo, "applyBaseline", false);
+        setField(mojo, "autoDetectCentralizedSecurity", true);
+        setField(mojo, "formats", new LinkedHashSet<>(Set.of("json")));
+
+        mojo.execute();
+
+        String json = Files.readString(reportsDirectory.resolve("lint-report.json"));
+        assertTrue(json.contains("\"issueCount\": 0"));
+        assertFalse(json.contains("\"ruleId\": \"SPRING_ENDPOINT_SECURITY\""));
+    }
+
+    @Test
     void scansReactorModulesFromExecutionRoot() throws Exception {
         Path rootSourceDirectory = writeSource("""
                 package demo;
@@ -929,6 +977,54 @@ class CorrectnessLintMojoTest {
         );
         setField(mojo, "applyBaseline", false);
         setField(mojo, "assumeCentralizedSecurity", true);
+        setField(mojo, "formats", new LinkedHashSet<>(Set.of("json")));
+
+        mojo.execute();
+
+        String json = Files.readString(reportsDirectory.resolve("lint-report.json"));
+        assertTrue(json.contains("\"issueCount\": 0"));
+        assertFalse(json.contains("\"ruleId\": \"SPRING_ENDPOINT_SECURITY\""));
+    }
+
+    @Test
+    void autoDetectsConcreteSecurityFilterChainImplementationForCentralizedSecurity() throws Exception {
+        Path sourceDirectory = writeSource("""
+                package demo;
+
+                import org.springframework.context.annotation.Bean;
+                import org.springframework.security.web.SecurityFilterChain;
+                import org.springframework.web.bind.annotation.GetMapping;
+                import org.springframework.web.bind.annotation.RestController;
+
+                class DemoSecurityFilterChain implements SecurityFilterChain {
+                }
+
+                class SecurityConfig {
+
+                    @Bean
+                    DemoSecurityFilterChain filterChain() {
+                        return new DemoSecurityFilterChain();
+                    }
+                }
+
+                @RestController
+                class PublicController {
+
+                    @GetMapping("/open")
+                    public String open() {
+                        return "ok";
+                    }
+                }
+                """);
+        Path reportsDirectory = tempDir.resolve("target/reports-centralized-security-concrete");
+
+        CorrectnessLintMojo mojo = configuredMojo(
+                sourceDirectory,
+                reportsDirectory,
+                tempDir.resolve("spring-correctness-linter-baseline.txt")
+        );
+        setField(mojo, "applyBaseline", false);
+        setField(mojo, "autoDetectCentralizedSecurity", true);
         setField(mojo, "formats", new LinkedHashSet<>(Set.of("json")));
 
         mojo.execute();
