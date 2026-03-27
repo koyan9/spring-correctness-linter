@@ -14,6 +14,7 @@ All notable changes to `spring-correctness-linter` will be documented in this fi
 - Runtime metrics and plugin logs now include cache miss reasons so users can distinguish missing cache files, rule/config changes, source-root changes, annotation/type-context changes, auto-detect-context changes, and file-content churn
 - Added `scripts/benchmark-cache.ps1` and `docs/PERFORMANCE_BENCHMARKING.md` to make cold/warm cache benchmarking repeatable across the reactor and adoption samples
 - Added a pull-request template and release-note guidance that require benchmark evidence when cache, runtime, or performance-sensitive behavior changes
+- Added `scripts/check-release-status.ps1` to verify GitHub Release, workflow, and Maven Central post-release status in one step
 
 ### Changed
 

@@ -178,6 +178,11 @@ Practical release rule:
 - if the direct Maven Central URL returns `200 OK` but `search.maven.org` still shows no result, the artifact is usually published and the search index is simply behind
 - do not republish the same version just because the search index has not caught up yet
 
+Recommended helper:
+
+- `powershell -ExecutionPolicy Bypass -File scripts\\check-release-status.ps1 -Version X.Y.Z`
+- the script writes machine-readable and markdown summaries under `target/release-status/`
+
 ## Suggested release-note content
 
 For non-trivial releases, prefer filling these sections explicitly:
