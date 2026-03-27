@@ -10,7 +10,7 @@
     <parent>
         <groupId>io.github.koyan9</groupId>
         <artifactId>spring-correctness-linter-parent</artifactId>
-        <version>0.1.2</version>
+        <version>0.1.3</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 

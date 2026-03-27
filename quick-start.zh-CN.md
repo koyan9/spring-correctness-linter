@@ -30,7 +30,7 @@
 <plugin>
   <groupId>io.github.koyan9</groupId>
   <artifactId>spring-correctness-linter-maven-plugin</artifactId>
-  <version>0.1.2</version>
+  <version>0.1.3</version>
   <configuration>
     <formats>
       <format>json</format>
@@ -111,7 +111,7 @@ mvn -q verify
 如果项目里已经有历史问题，先生成 baseline：
 
 ```bash
-mvn -q io.github.koyan9:spring-correctness-linter-maven-plugin:0.1.2:lint \
+mvn -q io.github.koyan9:spring-correctness-linter-maven-plugin:0.1.3:lint \
   "-Dspring.correctness.linter.writeBaseline=true"
 ```
 

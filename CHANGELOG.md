@@ -4,6 +4,8 @@ All notable changes to `spring-correctness-linter` will be documented in this fi
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-03-27
+
 ### Added
 
 - Core regression coverage now includes incremental-cache invalidation when centralized-security detection, project-wide key-generator detection, composed annotation definitions, type-resolution context, or custom security-annotation options change
