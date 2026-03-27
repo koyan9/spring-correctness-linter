@@ -37,6 +37,7 @@ final class BuiltInRuleRegistry {
             new RuleRegistration("SPRING_SCHEDULED_ASYNC_BOUNDARY", RuleDomain.SCHEDULED, ScheduledAsyncBoundaryRule::new),
             new RuleRegistration("SPRING_SCHEDULED_TRANSACTIONAL_BOUNDARY", RuleDomain.SCHEDULED, ScheduledTransactionalBoundaryRule::new),
             new RuleRegistration("SPRING_CACHEABLE_KEY", RuleDomain.CACHE, CacheableWithoutKeyRule::new),
+            new RuleRegistration("SPRING_CACHEABLE_PRIVATE_METHOD", RuleDomain.CACHE, CacheablePrivateMethodRule::new),
             new RuleRegistration("SPRING_CACHEABLE_SELF_INVOCATION", RuleDomain.CACHE, CacheableSelfInvocationRule::new),
             new RuleRegistration("SPRING_CACHE_COMBINATION_RISK", RuleDomain.CACHE, CacheAnnotationCombinationRiskRule::new),
             new RuleRegistration("SPRING_PROFILE_CONTROLLER", RuleDomain.WEB, ProfileOnControllerRule::new),

@@ -39,6 +39,11 @@ class DemoService implements InitializingBean, ApplicationRunner, SmartInitializ
     public final void asyncFinalRefresh() {
     }
 
+    @Cacheable(cacheNames = "demo", key = "#id")
+    private String privateCachedValue(String id) {
+        return id;
+    }
+
     public String warmCache(String id) {
         return loadCachedValue(id);
     }

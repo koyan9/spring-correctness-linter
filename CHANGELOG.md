@@ -9,6 +9,7 @@ All notable changes to `spring-correctness-linter` will be documented in this fi
 - Added lightweight external rule discovery through `ServiceLoader` via `io.github.koyan9.linter.core.spi.LintRuleProvider`
 - Added `SPRING_ASYNC_UNSUPPORTED_RETURN_TYPE` to flag `@Async` methods that do not return `void` or a recognized Future-compatible type
 - Added `SPRING_ASYNC_FINAL_CLASS` to flag final classes that declare `@Async` boundaries without interfaces
+- Added `SPRING_CACHEABLE_PRIVATE_METHOD` to flag private methods that rely on `@Cacheable` interception
 - Added `SPRING_CACHEABLE_SELF_INVOCATION` to flag same-bean calls and method references that bypass `@Cacheable` interception
 - Added `samples/adoption-suite/external-rules-app/` to validate end-to-end external rule discovery through normal Maven plugin dependencies
 
