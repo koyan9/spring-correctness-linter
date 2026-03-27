@@ -52,6 +52,9 @@ class ReportWriterTest {
         assertTrue(markdown.contains("### `Web/API Focus`"));
         assertTrue(markdown.contains("## Rule Domains"));
         assertTrue(markdown.contains("### Web"));
+        assertTrue(markdown.contains("## Domain Coverage Snapshot"));
+        assertTrue(markdown.contains("| `WEB` | 1 |"));
+        assertTrue(markdown.contains("Domains with the most complete proxy-boundary coverage today are `ASYNC`, `CACHE`, and `TRANSACTION`."));
         assertTrue(markdown.contains("## Rule Index"));
         assertTrue(markdown.contains("| `RULE_A` | `WARNING` | Rule A |"));
         assertTrue(markdown.contains("### `RULE_B`"));

@@ -1131,6 +1131,38 @@ class CorrectnessLintMojoTest {
     }
 
     @Test
+    void writesRuleReferenceWithDomainCoverageSnapshot() throws Exception {
+        Path sourceDirectory = writeSource("""
+                package demo;
+
+                import org.springframework.scheduling.annotation.Async;
+
+                class AsyncOnly {
+
+                    @Async
+                    public void runAsync() {
+                    }
+                }
+                """);
+        Path reportsDirectory = tempDir.resolve("target/reports-rule-reference-snapshot");
+
+        CorrectnessLintMojo mojo = configuredMojo(
+                sourceDirectory,
+                reportsDirectory,
+                tempDir.resolve("spring-correctness-linter-baseline.txt")
+        );
+        setField(mojo, "applyBaseline", false);
+        setField(mojo, "formats", new LinkedHashSet<>(Set.of("json")));
+
+        mojo.execute();
+
+        String markdown = Files.readString(reportsDirectory.resolve("rules-reference.md"));
+        assertTrue(markdown.contains("## Domain Coverage Snapshot"));
+        assertTrue(markdown.contains("| `ASYNC` |"));
+        assertTrue(markdown.contains("Domains with the most complete proxy-boundary coverage today are `ASYNC`, `CACHE`, and `TRANSACTION`."));
+    }
+
+    @Test
     void skipsBaselineDiffWhenDisabled() throws Exception {
         Path sourceDirectory = writeSource("""
                 package demo;

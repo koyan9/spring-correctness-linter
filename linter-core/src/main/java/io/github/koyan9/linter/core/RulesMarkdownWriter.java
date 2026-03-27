@@ -13,6 +13,54 @@ import java.util.stream.Collectors;
 
 final class RulesMarkdownWriter {
 
+    private static final Map<RuleDomain, DomainCoverage> DOMAIN_COVERAGE = Map.of(
+            RuleDomain.ASYNC, new DomainCoverage(
+                    "Strongest low-noise proxy-boundary coverage.",
+                    "private method, final method, final class without interfaces, self-invocation, unsupported return type",
+                    "void return style, async + transaction overlap"
+            ),
+            RuleDomain.LIFECYCLE, new DomainCoverage(
+                    "Lifecycle and startup boundary review.",
+                    "-",
+                    "initialization and startup callbacks combined with @Async or @Transactional"
+            ),
+            RuleDomain.SCHEDULED, new DomainCoverage(
+                    "Scheduler configuration and background-thread boundary review.",
+                    "missing/conflicting trigger config, repeated schedules, non-positive intervals, invalid method parameters",
+                    "non-void return values, @Scheduled + @Async, @Scheduled + @Transactional"
+            ),
+            RuleDomain.CACHE, new DomainCoverage(
+                    "Strongest low-noise proxy-boundary coverage.",
+                    "private method, final method, final class without interfaces, self-invocation",
+                    "explicit key strategy, multi-annotation cache combination risk"
+            ),
+            RuleDomain.WEB, new DomainCoverage(
+                    "HTTP entrypoint and explicit security-intent review.",
+                    "-",
+                    "public endpoint security intent, controller-level @Profile usage"
+            ),
+            RuleDomain.TRANSACTION, new DomainCoverage(
+                    "Strongest low-noise proxy-boundary coverage.",
+                    "private method, final method, final class without interfaces, self-invocation",
+                    "high-risk propagation review"
+            ),
+            RuleDomain.EVENTS, new DomainCoverage(
+                    "Transaction-phase and listener-timing review.",
+                    "-",
+                    "@EventListener + @Transactional, @TransactionalEventListener + @Transactional, @TransactionalEventListener + @Async"
+            ),
+            RuleDomain.CONFIGURATION, new DomainCoverage(
+                    "Conditional bean-definition consistency checks.",
+                    "contradictory conditional bean definitions",
+                    "-"
+            ),
+            RuleDomain.GENERAL, new DomainCoverage(
+                    "General-purpose or externally supplied rules.",
+                    "-",
+                    "varies by provider"
+            )
+    );
+
     private static final List<RecommendedBundle> RECOMMENDED_BUNDLES = List.of(
             new RecommendedBundle(
                     "CI Starter",
@@ -57,6 +105,7 @@ final class RulesMarkdownWriter {
         builder.append("- Suppress one finding: `// spring-correctness-linter:disable-next-line RULE_ID reason: explanation`\n\n");
         appendRecommendedBundles(builder, descriptors);
         appendRuleDomains(builder, descriptors);
+        appendDomainCoverageSnapshot(builder, descriptors);
         builder.append("## Rule Index\n\n");
         builder.append("| Rule ID | Default Severity | Title |\n");
         builder.append("| --- | --- | --- |\n");
@@ -77,11 +126,6 @@ final class RulesMarkdownWriter {
             builder.append("- Override severity: `-Dspring.correctness.linter.severityOverrides=").append(rule.id()).append("=ERROR`\n");
             builder.append("- Suppress next line: `// spring-correctness-linter:disable-next-line ").append(rule.id()).append(" reason: explain why`\n");
             builder.append("- Suppress next method: `// spring-correctness-linter:disable-next-method ").append(rule.id()).append(" reason: explain why`\n");
-            
-            if ("SPRING_ENDPOINT_SECURITY".equals(rule.id())) {
-                                            }
-            if ("SPRING_CACHEABLE_KEY".equals(rule.id())) {
-                            }
 
             if ("SPRING_ENDPOINT_SECURITY".equals(rule.id())) {
                 builder.append("- Config: `-Dspring.correctness.linter.assumeCentralizedSecurity=true` to skip when security is centralized.\n");
@@ -90,7 +134,7 @@ final class RulesMarkdownWriter {
             if ("SPRING_CACHEABLE_KEY".equals(rule.id())) {
                 builder.append("- Config: `-Dspring.correctness.linter.cacheDefaultKeyCacheNames=users,orders` to allow default keys for selected caches.\n");
             }
-                        appendSection(builder, "Applies when", rule.appliesWhen(), "- No additional applicability notes.");
+            appendSection(builder, "Applies when", rule.appliesWhen(), "- No additional applicability notes.");
             appendSection(builder, "Common false-positive boundaries", rule.commonFalsePositiveBoundaries(), "- No common false-positive boundary notes are currently documented.");
             appendSection(builder, "Recommended fixes", rule.recommendedFixes(), "- No rule-specific remediation guidance is currently documented.");
             builder.append('\n');
@@ -151,6 +195,31 @@ final class RulesMarkdownWriter {
         }
     }
 
+    private void appendDomainCoverageSnapshot(StringBuilder builder, List<RuleDescriptor> descriptors) {
+        Map<RuleDomain, List<RuleDescriptor>> byDomain = new LinkedHashMap<>();
+        for (RuleDescriptor descriptor : descriptors) {
+            byDomain.computeIfAbsent(descriptor.domain(), ignored -> new java.util.ArrayList<>()).add(descriptor);
+        }
+
+        builder.append("## Domain Coverage Snapshot\n\n");
+        builder.append("Use this section as a compact guide to what the current built-in rule set emphasizes in each domain.\n\n");
+        builder.append("| Domain | Rule Count | Primary Focus | Deterministic / proxy-boundary checks | Advisory / semantic review checks |\n");
+        builder.append("| --- | --- | --- | --- | --- |\n");
+        for (Map.Entry<RuleDomain, List<RuleDescriptor>> entry : byDomain.entrySet()) {
+            DomainCoverage coverage = DOMAIN_COVERAGE.getOrDefault(
+                    entry.getKey(),
+                    new DomainCoverage("Current built-in rules in this domain.", "-", "-")
+            );
+            builder.append("| `").append(entry.getKey().name()).append("` | ")
+                    .append(entry.getValue().size()).append(" | ")
+                    .append(coverage.primaryFocus()).append(" | ")
+                    .append(coverage.deterministicChecks()).append(" | ")
+                    .append(coverage.advisoryChecks()).append(" |\n");
+        }
+        builder.append('\n');
+        builder.append("Domains with the most complete proxy-boundary coverage today are `ASYNC`, `CACHE`, and `TRANSACTION`.\n\n");
+    }
+
     private void appendSection(StringBuilder builder, String title, java.util.List<String> items, String emptyMessage) {
         builder.append("\n#### ").append(title).append("\n");
         if (items.isEmpty()) {
@@ -167,5 +236,8 @@ final class RulesMarkdownWriter {
         private RecommendedBundle {
             domains = List.copyOf(domains);
         }
+    }
+
+    private record DomainCoverage(String primaryFocus, String deterministicChecks, String advisoryChecks) {
     }
 }
