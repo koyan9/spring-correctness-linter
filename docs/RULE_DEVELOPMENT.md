@@ -106,6 +106,21 @@ For a new built-in rule, complete the following steps:
 8. Update contributor-facing docs when the rule changes adoption guidance or recommended bundles
 9. Update `CHANGELOG.md`
 
+## External rule providers
+
+If you want to ship rules outside the built-in registry, prefer the lightweight provider path:
+
+1. Implement `io.github.koyan9.linter.core.spi.LintRuleProvider`
+2. Return one or more `LintRule` instances from `rules()`
+3. Add `META-INF/services/io.github.koyan9.linter.core.spi.LintRuleProvider`
+4. Publish that JAR and add it as a dependency of the Maven plugin declaration
+
+Provider guidance:
+
+- keep rule ids globally unique, including against built-in rules
+- prefer stable provider jars with explicit versions
+- treat provider loading failures as startup-time misconfiguration, not as soft warnings
+
 ## Testing guidance
 
 Use the narrowest useful test first, then broader verification:

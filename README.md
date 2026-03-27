@@ -706,6 +706,36 @@ A multi-module Maven reactor sample that demonstrates:
 - reactor-wide scanning
 - module summaries in reports
 - per-module baseline output
+
+## External Rule Providers
+
+`spring-correctness-linter` now supports lightweight external rule discovery through Java `ServiceLoader`.
+
+To contribute extra rules without modifying the built-in registry:
+
+1. Implement `io.github.koyan9.linter.core.spi.LintRuleProvider`
+2. Return one or more `LintRule` instances from `rules()`
+3. Publish `META-INF/services/io.github.koyan9.linter.core.spi.LintRuleProvider`
+4. Add the provider JAR as a dependency of the Maven plugin declaration
+
+Example plugin wiring:
+
+```xml
+<plugin>
+  <groupId>io.github.koyan9</groupId>
+  <artifactId>spring-correctness-linter-maven-plugin</artifactId>
+  <version>0.1.3</version>
+  <dependencies>
+    <dependency>
+      <groupId>com.example</groupId>
+      <artifactId>custom-lint-rules</artifactId>
+      <version>1.0.0</version>
+    </dependency>
+  </dependencies>
+</plugin>
+```
+
+Duplicate rule ids are rejected at startup, including conflicts with built-in rules.
 - per-module incremental cache output
 - filtering out aggregator-only modules that do not contribute Java source files
 
