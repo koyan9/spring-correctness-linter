@@ -86,6 +86,11 @@ class ProjectLinterTest {
                         return id;
                     }
 
+                    @Cacheable(cacheNames = \"demo\", key = \"#id\")
+                    public final String finalCachedById(String id) {
+                        return id;
+                    }
+
                     public String warmCache(String id) {
                         return cachedById(id);
                     }
@@ -147,12 +152,13 @@ class ProjectLinterTest {
         LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
         Set<String> issueIds = report.issues().stream().map(LintIssue::ruleId).collect(Collectors.toSet());
 
-        assertEquals(32, report.rules().size());
+        assertEquals(33, report.rules().size());
         assertTrue(issueIds.contains("SPRING_ASYNC_VOID"));
         assertTrue(issueIds.contains("SPRING_ASYNC_UNSUPPORTED_RETURN_TYPE"));
         assertTrue(issueIds.contains("SPRING_ASYNC_PRIVATE_METHOD"));
         assertTrue(issueIds.contains("SPRING_CACHEABLE_KEY"));
         assertTrue(issueIds.contains("SPRING_CACHEABLE_PRIVATE_METHOD"));
+        assertTrue(issueIds.contains("SPRING_CACHEABLE_FINAL_METHOD"));
         assertTrue(issueIds.contains("SPRING_CACHEABLE_SELF_INVOCATION"));
         assertTrue(issueIds.contains("SPRING_CACHE_COMBINATION_RISK"));
         assertTrue(issueIds.contains("SPRING_PROFILE_CONTROLLER"));
@@ -285,6 +291,34 @@ class ProjectLinterTest {
         LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
         List<LintIssue> issues = report.issues().stream()
                 .filter(issue -> issue.ruleId().equals("SPRING_CACHEABLE_PRIVATE_METHOD"))
+                .toList();
+
+        assertEquals(1, issues.size());
+        assertTrue(issues.get(0).message().contains("load"));
+    }
+
+    @Test
+    void detectsFinalCacheableMethod() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("CacheableFinalMethod.java"), """
+                package demo;
+
+                import org.springframework.cache.annotation.Cacheable;
+
+                class CacheableFinalMethod {
+
+                    @Cacheable(cacheNames = "demo", key = "#id")
+                    public final String load(String id) {
+                        return id;
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
+        List<LintIssue> issues = report.issues().stream()
+                .filter(issue -> issue.ruleId().equals("SPRING_CACHEABLE_FINAL_METHOD"))
                 .toList();
 
         assertEquals(1, issues.size());
@@ -1255,7 +1289,7 @@ class ProjectLinterTest {
         LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
 
         assertEquals(0, report.issueCount());
-        assertEquals(32, report.rules().size());
+        assertEquals(33, report.rules().size());
         assertEquals(1, report.parseProblemFileCount());
         assertTrue(report.parseProblems().get(0).file().endsWith(Path.of("src/main/java/demo/Broken.java")));
     }

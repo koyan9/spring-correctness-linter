@@ -44,6 +44,11 @@ class DemoService implements InitializingBean, ApplicationRunner, SmartInitializ
         return id;
     }
 
+    @Cacheable(cacheNames = "demo", key = "#id")
+    public final String finalCachedValue(String id) {
+        return id;
+    }
+
     public String warmCache(String id) {
         return loadCachedValue(id);
     }
