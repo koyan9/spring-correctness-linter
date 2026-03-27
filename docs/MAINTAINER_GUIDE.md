@@ -108,6 +108,7 @@ When changing release automation:
 - if a Central publication succeeds but GitHub Release creation fails, do not republish the same version; fix the workflow and create the GitHub Release separately
 - after each release, verify GitHub Actions, the GitHub Release page, and the direct Maven Central artifact URL before treating the release as complete
 - use `powershell -ExecutionPolicy Bypass -File scripts\\check-release-status.ps1 -Version X.Y.Z` to capture the post-release status in a repeatable way
+- if the release tag exists but GitHub Release or Maven Central is still missing, work through the `If the tagged release fails` section in `docs/RELEASE_PROCESS.md` before retagging or changing versions
 
 ## References
 

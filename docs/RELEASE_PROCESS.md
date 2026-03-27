@@ -183,6 +183,24 @@ Recommended helper:
 - `powershell -ExecutionPolicy Bypass -File scripts\\check-release-status.ps1 -Version X.Y.Z`
 - the script writes machine-readable and markdown summaries under `target/release-status/`
 
+## If the tagged release fails
+
+Use this checklist when the tag exists, but the GitHub Release page is missing or Maven Central still returns `404`:
+
+1. Run `powershell -ExecutionPolicy Bypass -File scripts\\check-release-status.ps1 -Version X.Y.Z`
+2. Confirm whether the `Release` workflow failed, whether the matching `CI` workflow on the release commit failed, or both
+3. If the `Release` workflow failed before Central publication, fix the underlying problem first and rerun `.github/workflows/release.yml` with the existing tag
+4. If the direct Maven Central URL returns `200` but the GitHub Release page is still missing, do not republish the same version; fix the release step and create the GitHub Release separately
+5. If the release-preparation build fails only on Windows around stale Javadoc output, prefer `mvnw.cmd -q -Prelease-artifacts clean verify` over a non-clean rerun before assuming the workflow is broken
+6. If local release-prep commands succeed but GitHub Actions still fail, inspect the failing workflow logs before changing project code:
+   - `Verify project` failure on `CI` usually means the tagged or pushed commit is not actually reproducible on GitHub runners yet
+   - `build-and-release` failure on `Release` usually means either the publish step or a release-only packaging step failed
+7. Re-check GitHub Secrets when `Release` fails early:
+   - `MAVEN_CENTRAL_USERNAME`
+   - `MAVEN_CENTRAL_PASSWORD`
+   - `MAVEN_GPG_PRIVATE_KEY`
+   - `MAVEN_GPG_PASSPHRASE`
+
 ## Suggested release-note content
 
 For non-trivial releases, prefer filling these sections explicitly:
