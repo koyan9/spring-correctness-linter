@@ -81,6 +81,15 @@ class ProjectLinterTest {
                         return id;
                     }
 
+                    public String warmCache(String id) {
+                        return cachedById(id);
+                    }
+
+                    @Cacheable(cacheNames = \"demo\", key = \"#id\")
+                    public String cachedById(String id) {
+                        return id;
+                    }
+
                     @Cacheable(cacheNames = \"demo\")
                     @CachePut(cacheNames = \"demo\")
                     public String refresh(String id) {
@@ -133,11 +142,12 @@ class ProjectLinterTest {
         LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
         Set<String> issueIds = report.issues().stream().map(LintIssue::ruleId).collect(Collectors.toSet());
 
-        assertEquals(30, report.rules().size());
+        assertEquals(31, report.rules().size());
         assertTrue(issueIds.contains("SPRING_ASYNC_VOID"));
         assertTrue(issueIds.contains("SPRING_ASYNC_UNSUPPORTED_RETURN_TYPE"));
         assertTrue(issueIds.contains("SPRING_ASYNC_PRIVATE_METHOD"));
         assertTrue(issueIds.contains("SPRING_CACHEABLE_KEY"));
+        assertTrue(issueIds.contains("SPRING_CACHEABLE_SELF_INVOCATION"));
         assertTrue(issueIds.contains("SPRING_CACHE_COMBINATION_RISK"));
         assertTrue(issueIds.contains("SPRING_PROFILE_CONTROLLER"));
         assertTrue(issueIds.contains("SPRING_TX_SELF_INVOCATION"));
@@ -213,6 +223,71 @@ class ProjectLinterTest {
 
         assertEquals(1, issues.size());
         assertTrue(issues.get(0).message().contains("asyncWork"));
+    }
+
+    @Test
+    void detectsCacheableSelfInvocation() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("CacheableSelfInvocation.java"), """
+                package demo;
+
+                import org.springframework.cache.annotation.Cacheable;
+
+                class CacheableSelfInvocation {
+
+                    public String outer(String id) {
+                        return load(id);
+                    }
+
+                    @Cacheable(cacheNames = "demo", key = "#id")
+                    public String load(String id) {
+                        return id;
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
+        List<LintIssue> issues = report.issues().stream()
+                .filter(issue -> issue.ruleId().equals("SPRING_CACHEABLE_SELF_INVOCATION"))
+                .toList();
+
+        assertEquals(1, issues.size());
+        assertTrue(issues.get(0).message().contains("load"));
+    }
+
+    @Test
+    void flagsMethodReferencesForCacheableSelfInvocation() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("CacheableSelfInvocationMethodRef.java"), """
+                package demo;
+
+                import org.springframework.cache.annotation.Cacheable;
+
+                class CacheableSelfInvocationMethodRef {
+
+                    public void outer() {
+                        java.util.function.Function<String, String> loader = this::load;
+                        loader.apply("demo");
+                    }
+
+                    @Cacheable(cacheNames = "demo", key = "#id")
+                    public String load(String id) {
+                        return id;
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
+        List<LintIssue> issues = report.issues().stream()
+                .filter(issue -> issue.ruleId().equals("SPRING_CACHEABLE_SELF_INVOCATION"))
+                .toList();
+
+        assertEquals(1, issues.size());
+        assertTrue(issues.get(0).message().contains("load"));
     }
 
 
@@ -1146,7 +1221,7 @@ class ProjectLinterTest {
         LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
 
         assertEquals(0, report.issueCount());
-        assertEquals(30, report.rules().size());
+        assertEquals(31, report.rules().size());
         assertEquals(1, report.parseProblemFileCount());
         assertTrue(report.parseProblems().get(0).file().endsWith(Path.of("src/main/java/demo/Broken.java")));
     }

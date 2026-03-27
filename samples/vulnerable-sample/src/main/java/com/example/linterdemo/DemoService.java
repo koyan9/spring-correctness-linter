@@ -10,6 +10,7 @@ import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -36,6 +37,15 @@ class DemoService implements InitializingBean, ApplicationRunner, SmartInitializ
 
     @Async
     public final void asyncFinalRefresh() {
+    }
+
+    public String warmCache(String id) {
+        return loadCachedValue(id);
+    }
+
+    @Cacheable(cacheNames = "demo", key = "#id")
+    public String loadCachedValue(String id) {
+        return id;
     }
 
     public void outer() {
