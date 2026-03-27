@@ -19,6 +19,8 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionalEventListener;
 
+import java.util.concurrent.CompletableFuture;
+
 @Service
 class DemoService implements InitializingBean, ApplicationRunner, SmartInitializingSingleton {
 
@@ -82,6 +84,12 @@ class DemoService implements InitializingBean, ApplicationRunner, SmartInitializ
     @TransactionalEventListener
     @Transactional
     public void handleCommittedPatientEvent(Object event) {
+    }
+
+    @TransactionalEventListener
+    @Async
+    public CompletableFuture<Void> handleAsyncCommittedPatientEvent(Object event) {
+        return CompletableFuture.completedFuture(null);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)

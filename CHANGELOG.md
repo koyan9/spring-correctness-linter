@@ -13,6 +13,7 @@ All notable changes to `spring-correctness-linter` will be documented in this fi
 - Added `SPRING_CACHEABLE_FINAL_METHOD` to flag final methods that rely on `@Cacheable` interception
 - Added `SPRING_CACHEABLE_FINAL_CLASS` to flag final classes without interfaces that rely on `@Cacheable` interception
 - Added `SPRING_CACHEABLE_SELF_INVOCATION` to flag same-bean calls and method references that bypass `@Cacheable` interception
+- Added `SPRING_TRANSACTIONAL_EVENT_LISTENER_ASYNC` to flag `@TransactionalEventListener` methods that also cross an async boundary
 - Added `samples/adoption-suite/external-rules-app/` to validate end-to-end external rule discovery through normal Maven plugin dependencies
 
 ## [0.1.3] - 2026-03-27

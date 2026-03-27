@@ -38,7 +38,7 @@ Typical findings include:
 - `SPRING_ASYNC_FINAL_CLASS` from `FinalAsyncService`
 - `SPRING_TX_SELF_INVOCATION`, `SPRING_TX_PRIVATE_METHOD`, `SPRING_TX_FINAL_METHOD`, and `SPRING_TX_HIGH_RISK_PROPAGATION` from transactional patterns in `DemoService`
 - `SPRING_TX_FINAL_CLASS` from `FinalTransactionalService`
-- `SPRING_EVENT_LISTENER_TRANSACTIONAL` and `SPRING_TRANSACTIONAL_EVENT_LISTENER` from event listener boundaries
+- `SPRING_EVENT_LISTENER_TRANSACTIONAL`, `SPRING_TRANSACTIONAL_EVENT_LISTENER`, and `SPRING_TRANSACTIONAL_EVENT_LISTENER_ASYNC` from event listener boundaries
 - `SPRING_SCHEDULED_*` findings from intentionally conflicting or unsafe scheduling definitions
 - `SPRING_LIFECYCLE_*` and `SPRING_STARTUP_*` findings from lifecycle / startup callbacks
 - `SPRING_CONDITIONAL_BEAN_CONFLICT` from `ConditionalConfig`

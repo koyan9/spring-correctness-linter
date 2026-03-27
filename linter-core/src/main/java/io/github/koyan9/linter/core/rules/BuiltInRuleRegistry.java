@@ -49,6 +49,7 @@ final class BuiltInRuleRegistry {
             new RuleRegistration("SPRING_TX_FINAL_CLASS", RuleDomain.TRANSACTION, TransactionalFinalClassRule::new),
             new RuleRegistration("SPRING_EVENT_LISTENER_TRANSACTIONAL", RuleDomain.EVENTS, EventListenerTransactionalRule::new),
             new RuleRegistration("SPRING_TRANSACTIONAL_EVENT_LISTENER", RuleDomain.EVENTS, TransactionalEventListenerRule::new),
+            new RuleRegistration("SPRING_TRANSACTIONAL_EVENT_LISTENER_ASYNC", RuleDomain.EVENTS, TransactionalEventListenerAsyncRule::new),
             new RuleRegistration("SPRING_TX_HIGH_RISK_PROPAGATION", RuleDomain.TRANSACTION, TransactionalHighRiskPropagationRule::new),
             new RuleRegistration("SPRING_CONDITIONAL_BEAN_CONFLICT", RuleDomain.CONFIGURATION, ConditionalOnBeanConflictRule::new),
             new RuleRegistration("SPRING_ENDPOINT_SECURITY", RuleDomain.WEB, PublicEndpointWithoutSecurityRule::new)

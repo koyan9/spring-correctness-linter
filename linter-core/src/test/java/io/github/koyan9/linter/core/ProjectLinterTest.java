@@ -39,6 +39,7 @@ class ProjectLinterTest {
                 import org.springframework.cache.annotation.CacheEvict;
                 import org.springframework.cache.annotation.CachePut;
                 import org.springframework.cache.annotation.Cacheable;
+                import java.util.concurrent.CompletableFuture;
                 import org.springframework.context.annotation.Bean;
                 import org.springframework.context.annotation.Profile;
                 import org.springframework.context.event.EventListener;
@@ -132,6 +133,12 @@ class ProjectLinterTest {
                     public void onTransactionalEvent(Object event) {
                     }
 
+                    @TransactionalEventListener
+                    @Async
+                    public CompletableFuture<Void> onAsyncTransactionalEvent(Object event) {
+                        return CompletableFuture.completedFuture(null);
+                    }
+
                     @Transactional(propagation = Propagation.REQUIRES_NEW)
                     public void requiresNewWork() {
                     }
@@ -160,7 +167,7 @@ class ProjectLinterTest {
         LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
         Set<String> issueIds = report.issues().stream().map(LintIssue::ruleId).collect(Collectors.toSet());
 
-        assertEquals(34, report.rules().size());
+        assertEquals(35, report.rules().size());
         assertTrue(issueIds.contains("SPRING_ASYNC_VOID"));
         assertTrue(issueIds.contains("SPRING_ASYNC_UNSUPPORTED_RETURN_TYPE"));
         assertTrue(issueIds.contains("SPRING_ASYNC_PRIVATE_METHOD"));
@@ -176,6 +183,7 @@ class ProjectLinterTest {
         assertTrue(issueIds.contains("SPRING_TX_FINAL_METHOD"));
         assertTrue(issueIds.contains("SPRING_EVENT_LISTENER_TRANSACTIONAL"));
         assertTrue(issueIds.contains("SPRING_TRANSACTIONAL_EVENT_LISTENER"));
+        assertTrue(issueIds.contains("SPRING_TRANSACTIONAL_EVENT_LISTENER_ASYNC"));
         assertTrue(issueIds.contains("SPRING_TX_HIGH_RISK_PROPAGATION"));
         assertTrue(issueIds.contains("SPRING_CONDITIONAL_BEAN_CONFLICT"));
         assertTrue(issueIds.contains("SPRING_ENDPOINT_SECURITY"));
@@ -540,6 +548,39 @@ class ProjectLinterTest {
 
         assertEquals(1, issues.size());
         assertTrue(issues.get(0).message().contains("FinalCacheableService"));
+    }
+
+    @Test
+    void detectsTransactionalEventListenerWithClassLevelAsync() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("AsyncTransactionalEventListener.java"), """
+                package demo;
+
+                import org.springframework.scheduling.annotation.Async;
+                import org.springframework.transaction.event.TransactionalEventListener;
+
+                @Async
+                class AsyncTransactionalEventListener {
+
+                    @TransactionalEventListener
+                    public void handleCommitted(Object event) {
+                    }
+
+                    @TransactionalEventListener
+                    void handlePackagePrivate(Object event) {
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
+        List<LintIssue> issues = report.issues().stream()
+                .filter(issue -> issue.ruleId().equals("SPRING_TRANSACTIONAL_EVENT_LISTENER_ASYNC"))
+                .toList();
+
+        assertEquals(1, issues.size());
+        assertTrue(issues.get(0).message().contains("handleCommitted"));
     }
 
     @Test
@@ -1340,7 +1381,7 @@ class ProjectLinterTest {
         LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
 
         assertEquals(0, report.issueCount());
-        assertEquals(34, report.rules().size());
+        assertEquals(35, report.rules().size());
         assertEquals(1, report.parseProblemFileCount());
         assertTrue(report.parseProblems().get(0).file().endsWith(Path.of("src/main/java/demo/Broken.java")));
     }
