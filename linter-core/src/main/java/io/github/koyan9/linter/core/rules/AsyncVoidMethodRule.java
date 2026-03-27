@@ -30,7 +30,7 @@ public final class AsyncVoidMethodRule extends AbstractSpringRule {
 
     @Override
     public String description() {
-        return "Asynchronous methods should return CompletableFuture or another handle so callers can observe failures.";
+        return "Asynchronous methods should return Future-compatible handles or another observable result so callers can observe failures.";
     }
 
     @Override
@@ -57,7 +57,7 @@ public final class AsyncVoidMethodRule extends AbstractSpringRule {
     @Override
     public List<String> recommendedFixes() {
         return List.of(
-                "Return `CompletableFuture`, `CompletionStage`, or another observable async type instead of `void`.",
+                "Return `Future`, `CompletableFuture`, `ListenableFuture`, or another observable async type instead of `void`.",
                 "If fire-and-forget behavior is intentional, document that choice and suppress the finding locally."
         );
     }
@@ -68,7 +68,7 @@ public final class AsyncVoidMethodRule extends AbstractSpringRule {
         SpringSemanticFacts facts = context.springFacts(sourceUnit);
         for (MethodDeclaration method : sourceUnit.structure().methods()) {
             if (facts.methodFacts(null, method).isAsyncVoidMethod()) {
-                issues.add(issue(sourceUnit, JavaSourceInspector.lineOf(method), "@Async method '" + method.getNameAsString() + "' returns void; prefer CompletableFuture or another observable type."));
+                issues.add(issue(sourceUnit, JavaSourceInspector.lineOf(method), "@Async method '" + method.getNameAsString() + "' returns void; prefer a Future-compatible handle or another observable type."));
             }
         }
         return issues;

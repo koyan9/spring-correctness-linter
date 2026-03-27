@@ -19,6 +19,7 @@ final class BuiltInRuleRegistry {
 
     private static final List<RuleRegistration> DEFAULT_RULES = List.of(
             new RuleRegistration("SPRING_ASYNC_VOID", RuleDomain.ASYNC, AsyncVoidMethodRule::new),
+            new RuleRegistration("SPRING_ASYNC_UNSUPPORTED_RETURN_TYPE", RuleDomain.ASYNC, AsyncUnsupportedReturnTypeRule::new),
             new RuleRegistration("SPRING_ASYNC_PRIVATE_METHOD", RuleDomain.ASYNC, AsyncPrivateMethodRule::new),
             new RuleRegistration("SPRING_ASYNC_FINAL_METHOD", RuleDomain.ASYNC, AsyncFinalMethodRule::new),
             new RuleRegistration("SPRING_ASYNC_SELF_INVOCATION", RuleDomain.ASYNC, AsyncSelfInvocationRule::new),

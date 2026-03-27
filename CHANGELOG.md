@@ -7,6 +7,7 @@ All notable changes to `spring-correctness-linter` will be documented in this fi
 ### Added
 
 - Added lightweight external rule discovery through `ServiceLoader` via `io.github.koyan9.linter.core.spi.LintRuleProvider`
+- Added `SPRING_ASYNC_UNSUPPORTED_RETURN_TYPE` to flag `@Async` methods that do not return `void` or a recognized Future-compatible type
 - Added `samples/adoption-suite/external-rules-app/` to validate end-to-end external rule discovery through normal Maven plugin dependencies
 
 ## [0.1.3] - 2026-03-27

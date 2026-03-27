@@ -68,6 +68,11 @@ class ProjectLinterTest {
                     }
 
                     @Async
+                    public String asyncStringWork() {
+                        return "ok";
+                    }
+
+                    @Async
                     private void asyncPrivateWork() {
                     }
 
@@ -128,8 +133,9 @@ class ProjectLinterTest {
         LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
         Set<String> issueIds = report.issues().stream().map(LintIssue::ruleId).collect(Collectors.toSet());
 
-        assertEquals(28, report.rules().size());
+        assertEquals(29, report.rules().size());
         assertTrue(issueIds.contains("SPRING_ASYNC_VOID"));
+        assertTrue(issueIds.contains("SPRING_ASYNC_UNSUPPORTED_RETURN_TYPE"));
         assertTrue(issueIds.contains("SPRING_ASYNC_PRIVATE_METHOD"));
         assertTrue(issueIds.contains("SPRING_CACHEABLE_KEY"));
         assertTrue(issueIds.contains("SPRING_CACHE_COMBINATION_RISK"));
@@ -1102,9 +1108,113 @@ class ProjectLinterTest {
         LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
 
         assertEquals(0, report.issueCount());
-        assertEquals(28, report.rules().size());
+        assertEquals(29, report.rules().size());
         assertEquals(1, report.parseProblemFileCount());
         assertTrue(report.parseProblems().get(0).file().endsWith(Path.of("src/main/java/demo/Broken.java")));
+    }
+
+    @Test
+    void flagsAsyncMethodsWithUnsupportedReturnType() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("AsyncReturnTypes.java"), """
+                package demo;
+
+                import org.springframework.scheduling.annotation.Async;
+
+                class AsyncReturnTypes {
+
+                    @Async
+                    public String asyncString() {
+                        return "ok";
+                    }
+
+                    @Async
+                    public int asyncInt() {
+                        return 1;
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        List<LintIssue> issues = linter.analyze(tempDir, tempDir.resolve("src/main/java")).issues().stream()
+                .filter(issue -> issue.ruleId().equals("SPRING_ASYNC_UNSUPPORTED_RETURN_TYPE"))
+                .toList();
+
+        assertEquals(2, issues.size());
+        assertTrue(issues.stream().anyMatch(issue -> issue.message().contains("asyncString")));
+        assertTrue(issues.stream().anyMatch(issue -> issue.message().contains("asyncInt")));
+    }
+
+    @Test
+    void allowsFutureCompatibleAsyncReturnTypes() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("AsyncSupportedReturnTypes.java"), """
+                package demo;
+
+                import org.springframework.scheduling.annotation.Async;
+                import org.springframework.util.concurrent.ListenableFuture;
+
+                import java.util.concurrent.CompletableFuture;
+                import java.util.concurrent.Future;
+
+                class AsyncSupportedReturnTypes {
+
+                    @Async
+                    public void asyncVoid() {
+                    }
+
+                    @Async
+                    public Future<String> asyncFuture() {
+                        return CompletableFuture.completedFuture("ok");
+                    }
+
+                    @Async
+                    public CompletableFuture<String> asyncCompletableFuture() {
+                        return CompletableFuture.completedFuture("ok");
+                    }
+
+                    @Async
+                    public ListenableFuture<String> asyncListenableFuture() {
+                        return new org.springframework.scheduling.annotation.AsyncResult<>("ok");
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        Set<String> issueIds = linter.analyze(tempDir, tempDir.resolve("src/main/java")).issues().stream()
+                .map(LintIssue::ruleId)
+                .collect(Collectors.toSet());
+
+        assertFalse(issueIds.contains("SPRING_ASYNC_UNSUPPORTED_RETURN_TYPE"));
+    }
+
+    @Test
+    void flagsClassLevelAsyncMethodsWithUnsupportedReturnType() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("ClassLevelAsyncReturnType.java"), """
+                package demo;
+
+                import org.springframework.scheduling.annotation.Async;
+
+                @Async
+                class ClassLevelAsyncReturnType {
+
+                    public String asyncString() {
+                        return "ok";
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        List<LintIssue> issues = linter.analyze(tempDir, tempDir.resolve("src/main/java")).issues().stream()
+                .filter(issue -> issue.ruleId().equals("SPRING_ASYNC_UNSUPPORTED_RETURN_TYPE"))
+                .toList();
+
+        assertEquals(1, issues.size());
+        assertTrue(issues.get(0).message().contains("asyncString"));
     }
 
     @Test

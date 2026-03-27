@@ -23,6 +23,7 @@ public final class SpringSemanticFacts {
     private final Map<Object, Set<String>> annotationNamesCache = new IdentityHashMap<>();
     private final Map<TypeDeclaration<?>, Boolean> controllerCache = new IdentityHashMap<>();
     private final Map<MethodDeclaration, Boolean> requestMappingCache = new IdentityHashMap<>();
+    private final Map<MethodDeclaration, Boolean> supportedAsyncReturnTypeCache = new IdentityHashMap<>();
     private final Map<TypeDeclaration<?>, TypeSemanticFacts> typeFactsCache = new IdentityHashMap<>();
     private final Map<MethodDeclaration, Map<TypeDeclaration<?>, MethodSemanticFacts>> methodFactsCache = new IdentityHashMap<>();
     private final Map<TypeDeclaration<?>, Set<String>> typeCacheNamesCache = new IdentityHashMap<>();
@@ -93,6 +94,10 @@ public final class SpringSemanticFacts {
 
     public boolean isRequestMapping(MethodDeclaration methodDeclaration) {
         return requestMappingCache.computeIfAbsent(methodDeclaration, ignored -> JavaSourceInspector.isRequestMapping(methodDeclaration, context));
+    }
+
+    public boolean hasSupportedAsyncReturnType(MethodDeclaration methodDeclaration) {
+        return supportedAsyncReturnTypeCache.computeIfAbsent(methodDeclaration, JavaSourceInspector::hasSupportedAsyncReturnType);
     }
 
     public MethodSemanticFacts methodFacts(TypeDeclaration<?> typeDeclaration, MethodDeclaration methodDeclaration) {

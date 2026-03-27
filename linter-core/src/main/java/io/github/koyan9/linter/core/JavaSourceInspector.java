@@ -8,6 +8,7 @@ package io.github.koyan9.linter.core;
 import com.github.javaparser.JavaParser;
 import com.github.javaparser.ParseResult;
 import com.github.javaparser.ast.CompilationUnit;
+import com.github.javaparser.ast.ImportDeclaration;
 import com.github.javaparser.ast.Node;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.EnumDeclaration;
@@ -35,6 +36,16 @@ public final class JavaSourceInspector {
 
     private static final ThreadLocal<JavaParser> PARSER = ThreadLocal.withInitial(JavaParser::new);
     private static final Pattern STRING_LITERAL_PATTERN = Pattern.compile("\"((?:\\\\.|[^\"\\\\])*)\"");
+    private static final Set<String> SUPPORTED_ASYNC_RETURN_TYPES = Set.of(
+            "java.util.concurrent.Future",
+            "java.util.concurrent.CompletableFuture",
+            "org.springframework.util.concurrent.ListenableFuture",
+            "org.springframework.scheduling.annotation.AsyncResult"
+    );
+    private static final Set<String> SUPPORTED_ASYNC_RETURN_PACKAGES = Set.of(
+            "java.util.concurrent",
+            "org.springframework.util.concurrent"
+    );
 
     private JavaSourceInspector() {
     }
@@ -269,6 +280,26 @@ public final class JavaSourceInspector {
                 || hasAnnotation(methodDeclaration, context, "RequestMapping");
     }
 
+    public static boolean hasSupportedAsyncReturnType(MethodDeclaration methodDeclaration) {
+        if (methodDeclaration.getType().isVoidType()) {
+            return true;
+        }
+        String normalizedType = normalizeTypeReference(methodDeclaration.getType().toString());
+        if (normalizedType.isBlank()) {
+            return false;
+        }
+        if (isSupportedAsyncReturnTypeName(normalizedType)) {
+            return true;
+        }
+        if (normalizedType.contains(".")) {
+            return false;
+        }
+        return methodDeclaration.findCompilationUnit()
+                .flatMap(compilationUnit -> resolveImportedType(normalizedType, compilationUnit))
+                .map(JavaSourceInspector::isSupportedAsyncReturnTypeName)
+                .orElse(false);
+    }
+
     public static boolean isInitializationCallback(TypeDeclaration<?> typeDeclaration, MethodDeclaration methodDeclaration, ProjectContext context) {
         return hasAnnotation(methodDeclaration, context, "PostConstruct")
                 || isInitializingBeanCallback(typeDeclaration, methodDeclaration);
@@ -338,6 +369,45 @@ public final class JavaSourceInspector {
         return node.getBegin().map(position -> position.line).orElse(1);
     }
 
+    private static Optional<String> resolveImportedType(String simpleName, CompilationUnit compilationUnit) {
+        String explicitImport = null;
+        for (ImportDeclaration importDeclaration : compilationUnit.getImports()) {
+            if (importDeclaration.isStatic()) {
+                continue;
+            }
+            String importName = importDeclaration.getNameAsString();
+            if (importDeclaration.isAsterisk()) {
+                continue;
+            }
+            int lastDot = importName.lastIndexOf('.');
+            if (lastDot >= 0 && importName.substring(lastDot + 1).equals(simpleName)) {
+                if (explicitImport != null && !explicitImport.equals(importName)) {
+                    return Optional.empty();
+                }
+                explicitImport = importName;
+            }
+        }
+        if (explicitImport != null) {
+            return Optional.of(explicitImport);
+        }
+
+        String wildcardMatch = null;
+        for (ImportDeclaration importDeclaration : compilationUnit.getImports()) {
+            if (importDeclaration.isStatic() || !importDeclaration.isAsterisk()) {
+                continue;
+            }
+            String candidate = importDeclaration.getNameAsString() + "." + simpleName;
+            if (!isSupportedAsyncReturnTypeName(candidate)) {
+                continue;
+            }
+            if (wildcardMatch != null && !wildcardMatch.equals(candidate)) {
+                return Optional.empty();
+            }
+            wildcardMatch = candidate;
+        }
+        return Optional.ofNullable(wildcardMatch);
+    }
+
     static String annotationSimpleName(AnnotationExpr annotationExpr) {
         String identifier = annotationExpr.getName().getIdentifier();
         return identifier == null || identifier.isBlank() ? annotationExpr.getNameAsString() : identifier;
@@ -361,6 +431,38 @@ public final class JavaSourceInspector {
 
     private static String expressionText(Expression expression) {
         return expression.toString();
+    }
+
+    private static String normalizeTypeReference(String rawType) {
+        if (rawType == null || rawType.isBlank()) {
+            return "";
+        }
+        StringBuilder builder = new StringBuilder();
+        int genericDepth = 0;
+        for (char current : rawType.toCharArray()) {
+            if (current == '<') {
+                genericDepth++;
+                continue;
+            }
+            if (current == '>') {
+                genericDepth = Math.max(0, genericDepth - 1);
+                continue;
+            }
+            if (genericDepth == 0) {
+                builder.append(current);
+            }
+        }
+        return builder.toString().replace(" ", "").trim();
+    }
+
+    private static boolean isSupportedAsyncReturnTypeName(String typeName) {
+        if (SUPPORTED_ASYNC_RETURN_TYPES.contains(typeName)) {
+            return true;
+        }
+        int lastDot = typeName.lastIndexOf('.');
+        String packageName = lastDot >= 0 ? typeName.substring(0, lastDot) : "";
+        String simpleName = lastDot >= 0 ? typeName.substring(lastDot + 1) : typeName;
+        return SUPPORTED_ASYNC_RETURN_PACKAGES.contains(packageName) && simpleName.endsWith("Future");
     }
 
     static boolean isBlankLiteral(String value) {
