@@ -7,6 +7,10 @@ The current semantic stack is in good shape: most built-in rules already consume
 work is less about adding many new rules and more about tightening false-positive and false-negative
 boundaries for a few high-impact checks.
 
+Recent low-noise expansions already covered the most obvious proxy-boundary gaps in `ASYNC` and `CACHE`,
+and added an initial async-over-transaction-phase listener review in `EVENTS`. That means the backlog
+should stay biased toward accuracy refinement instead of continuing unchecked rule-count growth.
+
 ## Priority 1
 
 ### `SPRING_ENDPOINT_SECURITY`
@@ -26,6 +30,7 @@ Recommended next tests:
 - [done] Method-level composed security annotations, including `@AliasFor` forwarding and `@PreFilter` usage
 - [done] Suppression guidance for teams with centralized security policy
 - [done] Auto-detection for servlet and reactive centralized-security beans
+- Candidate revisit only if a concrete real-world false negative appears around inherited or centralized policy hints
 
 ### `SPRING_CACHEABLE_KEY`
 
@@ -50,6 +55,7 @@ Recommended next tests:
 - [done] Composed `@CacheConfig` and single-member `@Cacheable` allowlist matching
 - [done] Exact allowlist matching without substring false negatives
 - [done] Project-wide `KeyGenerator` bean detection
+- Candidate revisit only if a concrete low-noise signal appears beyond direct `KeyGenerator`, `CachingConfigurer`, or explicit allowlists
 
 ### `SPRING_TX_SELF_INVOCATION`
 
@@ -71,6 +77,20 @@ Remaining accuracy gaps:
 Recommended next tests:
 - None at the moment; revisit when new proxy patterns appear
 
+### Async and Cache Proxy-Boundary Families
+
+Current strengths:
+- `ASYNC` now covers private methods, final methods, final classes without interfaces, self-invocation, and unsupported return types
+- `CACHE` now covers explicit key strategy review, private methods, final methods, final classes without interfaces, self-invocation, and multi-annotation combinations
+- The vulnerable sample and generated rule docs now demonstrate these proxy-boundary families more explicitly
+
+Remaining accuracy gaps:
+- None that currently justify immediate follow-up without concrete user reports
+- Future work here should prefer bug-fix-style refinements rather than adding more pattern rules by default
+
+Recommended next tests:
+- None at the moment; revisit only if a concrete false positive or false negative is reported
+
 ## Priority 2
 
 ### `SPRING_SCHEDULED_TRIGGER_CONFIGURATION`
@@ -82,6 +102,23 @@ Recommended next tests:
 - [done] Placeholder and property-driven trigger values
 - [done] Composed `@Scheduled` annotations with forwarded members
 - [done] Interactions between repeated schedules and trigger counting
+
+## Priority 3
+
+### `SPRING_TRANSACTIONAL_EVENT_LISTENER_ASYNC`
+
+Current strengths:
+- Detects direct `@TransactionalEventListener` + `@Async` combinations
+- Also detects class-level `@Async` on public transactional event-listener methods
+- Keeps the rule advisory and intentionally narrow around transaction-phase plus cross-thread delivery semantics
+
+Remaining accuracy gaps:
+- Does not model executor configuration or delivery ordering beyond the explicit async boundary
+- Package-private methods in a class-level `@Async` type are intentionally not treated as inherited async entrypoints
+
+Recommended next tests:
+- [done] Class-level `@Async` with public transactional event listeners
+- Candidate revisit if real projects rely heavily on meta-annotated event-listener wrappers or more complex listener inheritance
 
 ## Working heuristics
 

@@ -16,7 +16,7 @@ The project already covers the core linting workflow: AST-based analysis, Maven 
 
 - Keep README, release notes, and sample projects aligned with the current feature set
 - Strengthen release hygiene so tagged builds, release notes, and workflow behavior stay predictable
-- Improve copy-paste-ready examples for CI quality gates, baseline rollout, and SARIF upload workflows
+- Keep generated rule-reference output aligned with the current built-in rule surface and rollout guidance
 
 Current recommended adoption strategy:
 
@@ -32,9 +32,9 @@ Current recommended adoption strategy:
 
 ### 3. Maintainable rule growth
 
-- Keep the default rule set stable while improving the developer experience for future rule additions
-- Prefer improvements to rule metadata, test coverage, and report clarity before adding broad new rule families
-- Preserve a low-friction path for future extensibility without disrupting current Maven-first usage
+- Keep rule growth narrow, low-noise, and easy to explain to adopters
+- Prefer improvements to rule metadata, generated docs, test coverage, and report clarity before adding broad speculative rule families
+- Preserve the current lightweight external-rule path without turning it into a heavy plugin framework too early
 
 ## Suggested next 1-2 iterations
 
@@ -42,7 +42,7 @@ Track rule-accuracy follow-ups and regression-test priorities in `docs/ACCURACY_
 
 - Keep report and plugin regression coverage aligned with new configuration flags and output variants
 - Continue tightening remaining rule-accuracy boundaries where the expected behavior is testable and low-noise
-- Keep sample documentation and README guidance aligned with the latest cache, governance, and rollout workflows
+- Keep generated `rules-reference.md`, README guidance, and sample documentation aligned with the latest built-in rule surface
 - Gather real-user feedback from bundle-first adoption before committing to broader rule expansion or external extension APIs
 
 ## Recently completed
@@ -55,19 +55,22 @@ Track rule-accuracy follow-ups and regression-test priorities in `docs/ACCURACY_
 - File analysis now supports explicit concurrency controls instead of relying on the common fork-join pool
 - JSON reporting now supports a lightweight output mode for large repositories
 - The highest-value accuracy follow-ups for cache, endpoint security, self-invocation, and scheduled trigger parsing have been covered with regression tests and semantic-layer improvements
+- The project now supports lightweight external rule discovery through `ServiceLoader`, along with an adoption-suite sample and plugin validation coverage
+- Built-in proxy-boundary coverage was expanded across async, cache, and transactional event-listener scenarios with focused low-noise rules
+- English and Chinese README files now include a rule coverage matrix, and generated rule docs now include a domain coverage snapshot
 
 ## Current remaining priorities
 
 1. Continue refining `SPRING_CACHEABLE_KEY` only through explicit, low-noise project-convention signals
 2. Revisit `SPRING_ENDPOINT_SECURITY` only for high-confidence centralized-policy hints; avoid speculative config parsing
-3. Expand report and plugin regression coverage whenever new output fields or configuration flags are added
-4. Keep samples and contributor docs aligned with the current governance, cache, and rollout workflows
-5. Prefer focused semantic improvements over adding broad new rule families
+3. Expand report and plugin regression coverage whenever generated docs, output fields, or configuration flags change
+4. Keep samples, README guidance, and generated rule docs aligned with the current governance and rollout workflows
+5. Prefer focused semantic improvements in existing domains over broad new rule families
 
 ## Later candidates
 
-- Lightweight rule registration or extension mechanisms beyond the built-in rule list
-- More Spring runtime-semantics checks in adjacent areas such as scheduling, lifecycle, or async/transaction interaction
+- Better ergonomics around external rule packaging, diagnostics, and governance beyond the current lightweight `ServiceLoader` SPI
+- More Spring runtime-semantics checks in adjacent areas such as scheduling, lifecycle, or event timing
 - Additional report polish for SARIF and HTML consumption in CI-heavy environments
 
 ## Not the current priority
