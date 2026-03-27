@@ -106,6 +106,7 @@ When changing release automation:
 - prefer testing on `main` first
 - avoid retagging already-published versions
 - if a Central publication succeeds but GitHub Release creation fails, do not republish the same version; fix the workflow and create the GitHub Release separately
+- after each release, verify GitHub Actions, the GitHub Release page, and the direct Maven Central artifact URL before treating the release as complete
 
 ## References
 

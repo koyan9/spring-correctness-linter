@@ -151,6 +151,33 @@ This validates sources, javadocs, and signing configuration before a real deploy
 
 For local deploys, the default `central-publish` profile uploads for manual review only. The GitHub Actions workflow overrides this to automatic publish and waits for the deployment to reach the `published` state before creating the GitHub release.
 
+## Post-release verification
+
+After pushing the release tag, confirm all three publication surfaces:
+
+1. GitHub Actions `Release` workflow
+2. GitHub Release page
+3. Maven Central artifact availability
+
+Recommended checks:
+
+- GitHub Actions:
+  - confirm the `Release` workflow for the tag completed successfully
+  - confirm the matching `CI` workflow on the release commit also completed successfully
+- GitHub Release:
+  - confirm the release exists for the tag
+  - confirm it is not marked as draft or prerelease unless that was intentional
+  - confirm it picked up `RELEASE_NOTES_vX.Y.Z.md` when a versioned note file exists
+- Maven Central:
+  - prefer checking the direct repository URL first, for example
+    - `https://repo1.maven.org/maven2/io/github/koyan9/spring-correctness-linter-maven-plugin/X.Y.Z/...`
+  - treat `search.maven.org` as secondary confirmation because its search index may lag behind direct repository availability
+
+Practical release rule:
+
+- if the direct Maven Central URL returns `200 OK` but `search.maven.org` still shows no result, the artifact is usually published and the search index is simply behind
+- do not republish the same version just because the search index has not caught up yet
+
 ## Suggested release-note content
 
 For non-trivial releases, prefer filling these sections explicitly:

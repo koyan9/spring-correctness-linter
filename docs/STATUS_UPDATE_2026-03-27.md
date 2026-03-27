@@ -59,6 +59,10 @@ The latest sample benchmark run produced:
 - The cache invalidation model is now substantially safer and easier to inspect.
 - JSON, HTML, and Maven log outputs now agree on why cache reuse was skipped.
 - Maintainers now have a repeatable sample-based benchmark entrypoint for future cache and runtime work.
+- The `v0.1.3` tag has now been published successfully.
+- The GitHub Release for `v0.1.3` is live.
+- The `Release` and matching `CI` workflows for the `v0.1.3` release commit completed successfully.
+- The direct Maven Central artifact URL for `0.1.3` is available; `search.maven.org` visibility may still lag temporarily after publication.
 
 ## Remaining Caution
 
