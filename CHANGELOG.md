@@ -4,6 +4,8 @@ All notable changes to `spring-correctness-linter` will be documented in this fi
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-03-28
+
 ### Added
 
 - Added lightweight external rule discovery through `ServiceLoader` via `io.github.koyan9.linter.core.spi.LintRuleProvider`

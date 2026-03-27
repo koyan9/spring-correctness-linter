@@ -10,7 +10,7 @@
     <parent>
         <groupId>com.example</groupId>
         <artifactId>external-rules-app-parent</artifactId>
-        <version>0.1.3</version>
+        <version>0.1.4</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 

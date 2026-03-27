@@ -116,14 +116,14 @@ For a scenario-oriented, step-by-step adoption guide, see [quick-start.md](quick
 ### Generate a baseline
 
 ```bash
-./mvnw io.github.koyan9:spring-correctness-linter-maven-plugin:0.1.3:lint \
+./mvnw io.github.koyan9:spring-correctness-linter-maven-plugin:0.1.4:lint \
   -Dspring.correctness.linter.writeBaseline=true
 ```
 
 ### Fail on severity
 
 ```bash
-./mvnw io.github.koyan9:spring-correctness-linter-maven-plugin:0.1.3:lint \
+./mvnw io.github.koyan9:spring-correctness-linter-maven-plugin:0.1.4:lint \
   -Dspring.correctness.linter.failOnSeverity=WARNING
 ```
 
@@ -135,7 +135,7 @@ Example plugin configuration:
 <plugin>
   <groupId>io.github.koyan9</groupId>
   <artifactId>spring-correctness-linter-maven-plugin</artifactId>
-  <version>0.1.3</version>
+  <version>0.1.4</version>
   <configuration>
     <formats>
       <format>json</format>
@@ -403,7 +403,7 @@ Use these when you want a smaller rollout surface before enabling the full defau
 Generate the first baseline once with:
 
 ```bash
-./mvnw io.github.koyan9:spring-correctness-linter-maven-plugin:0.1.3:lint \
+./mvnw io.github.koyan9:spring-correctness-linter-maven-plugin:0.1.4:lint \
   "-Dspring.correctness.linter.writeBaseline=true"
 ```
 
@@ -741,7 +741,7 @@ Example plugin wiring:
 <plugin>
   <groupId>io.github.koyan9</groupId>
   <artifactId>spring-correctness-linter-maven-plugin</artifactId>
-  <version>0.1.3</version>
+  <version>0.1.4</version>
   <dependencies>
     <dependency>
       <groupId>com.example</groupId>
