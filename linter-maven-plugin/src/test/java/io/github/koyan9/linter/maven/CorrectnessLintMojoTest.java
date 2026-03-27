@@ -5,12 +5,25 @@
 
 package io.github.koyan9.linter.maven;
 
+import io.github.koyan9.linter.core.JavaSourceInspector;
+import io.github.koyan9.linter.core.LintIssue;
+import io.github.koyan9.linter.core.LintRule;
+import io.github.koyan9.linter.core.LintSeverity;
+import io.github.koyan9.linter.core.ProjectContext;
+import io.github.koyan9.linter.core.RuleDomain;
+import io.github.koyan9.linter.core.SourceUnit;
+import io.github.koyan9.linter.core.SpringSemanticFacts;
+import io.github.koyan9.linter.core.spi.LintRuleProvider;
+import com.github.javaparser.ast.body.MethodDeclaration;
+import com.github.javaparser.ast.body.TypeDeclaration;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.project.MavenProject;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.lang.reflect.Field;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -55,6 +68,49 @@ class CorrectnessLintMojoTest {
         assertTrue(Files.exists(reportsDirectory.resolve("baseline-diff.html")));
         assertTrue(Files.exists(reportsDirectory.resolve("rules-reference.md")));
         assertTrue(Files.exists(baselineFile));
+    }
+
+    @Test
+    void discoversExternalRuleProvidersDuringMojoExecution() throws Exception {
+        Path sourceDirectory = writeSource("""
+                package demo;
+
+                import org.springframework.web.bind.annotation.GetMapping;
+                import org.springframework.web.bind.annotation.RestController;
+
+                @RestController
+                class ExternalController {
+
+                    @GetMapping("/external")
+                    public String external() {
+                        return "ok";
+                    }
+                }
+                """);
+        Path reportsDirectory = tempDir.resolve("target/reports-external-provider");
+
+        CorrectnessLintMojo mojo = configuredMojo(
+                sourceDirectory,
+                reportsDirectory,
+                tempDir.resolve("spring-correctness-linter-baseline.txt")
+        );
+        setField(mojo, "applyBaseline", false);
+        setField(mojo, "enabledRules", "EXTERNAL_PROVIDER_RULE");
+        setField(mojo, "formats", new LinkedHashSet<>(Set.of("json")));
+
+        ClassLoader providerClassLoader = classLoaderForProviders(ExternalProviderRuleProvider.class);
+        Thread thread = Thread.currentThread();
+        ClassLoader originalClassLoader = thread.getContextClassLoader();
+        try {
+            thread.setContextClassLoader(providerClassLoader);
+            mojo.execute();
+        } finally {
+            thread.setContextClassLoader(originalClassLoader);
+        }
+
+        String json = Files.readString(reportsDirectory.resolve("lint-report.json"));
+        assertTrue(json.contains("\"ruleId\": \"EXTERNAL_PROVIDER_RULE\""));
+        assertTrue(json.contains("External provider observed request-mapped method 'external'."));
     }
 
     @Test
@@ -1848,6 +1904,17 @@ class CorrectnessLintMojoTest {
         return mojo;
     }
 
+    private ClassLoader classLoaderForProviders(Class<?>... providerClasses) throws Exception {
+        Path servicesDirectory = tempDir.resolve("META-INF/services");
+        Files.createDirectories(servicesDirectory);
+        Files.writeString(
+                servicesDirectory.resolve("io.github.koyan9.linter.core.spi.LintRuleProvider"),
+                String.join(System.lineSeparator(), java.util.Arrays.stream(providerClasses).map(Class::getName).toList())
+        );
+        URL[] urls = { tempDir.toUri().toURL() };
+        return new URLClassLoader(urls, getClass().getClassLoader());
+    }
+
     private void setField(Object target, String fieldName, Object value) throws Exception {
         Field field = CorrectnessLintMojo.class.getDeclaredField(fieldName);
         field.setAccessible(true);
@@ -1863,5 +1930,65 @@ class CorrectnessLintMojoTest {
             current = current.getCause();
         }
         return false;
+    }
+
+    public static final class ExternalProviderRuleProvider implements LintRuleProvider {
+
+        @Override
+        public List<LintRule> rules() {
+            return List.of(new ExternalProviderRule());
+        }
+    }
+
+    public static final class ExternalProviderRule implements LintRule {
+
+        @Override
+        public String id() {
+            return "EXTERNAL_PROVIDER_RULE";
+        }
+
+        @Override
+        public String title() {
+            return "External provider rule";
+        }
+
+        @Override
+        public String description() {
+            return "Verifies external lint rule discovery during Mojo execution.";
+        }
+
+        @Override
+        public LintSeverity severity() {
+            return LintSeverity.INFO;
+        }
+
+        @Override
+        public RuleDomain domain() {
+            return RuleDomain.GENERAL;
+        }
+
+        @Override
+        public List<LintIssue> evaluate(SourceUnit sourceUnit, ProjectContext context) {
+            SpringSemanticFacts facts = context.springFacts(sourceUnit);
+            java.util.ArrayList<LintIssue> issues = new java.util.ArrayList<>();
+            for (TypeDeclaration<?> typeDeclaration : sourceUnit.structure().typeDeclarations()) {
+                if (!facts.typeFacts(typeDeclaration).isWebController()) {
+                    continue;
+                }
+                for (MethodDeclaration method : sourceUnit.structure().methodsOf(typeDeclaration)) {
+                    if (!facts.methodFacts(typeDeclaration, method).isPublicRequestMapping()) {
+                        continue;
+                    }
+                    issues.add(new LintIssue(
+                            id(),
+                            severity(),
+                            "External provider observed request-mapped method '" + method.getNameAsString() + "'.",
+                            sourceUnit.path(),
+                            JavaSourceInspector.lineOf(method)
+                    ));
+                }
+            }
+            return issues;
+        }
     }
 }
