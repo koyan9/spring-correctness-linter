@@ -69,14 +69,31 @@ At a high level, one lint run works like this:
 
 The default rule set currently focuses on:
 
-- `@Async` misuse (private/final methods, self-invocation)
+- `@Async` misuse and boundary drift (private/final methods, final classes, self-invocation, unsupported return types, and async + transactional overlap)
 - lifecycle and startup boundary reviews such as `@PostConstruct`, `afterPropertiesSet()`, `ApplicationRunner`, and `SmartInitializingSingleton` with proxy-oriented annotations
-- `@Scheduled` misuse and scheduling boundary reviews
-- `@Transactional` misuse (private/final methods, final classes, self-invocation, high-risk propagation)
-- `@EventListener` / `@TransactionalEventListener` boundaries
-- cache key and cache annotation combination risks
-- controller security intent checks
+- `@Scheduled` trigger hygiene plus scheduler-thread boundary reviews
+- `@Transactional` misuse (private/final methods, final classes, self-invocation, and high-risk propagation)
+- `@EventListener` / `@TransactionalEventListener` combinations across transaction and async boundaries
+- cache misuse (explicit key strategy, private/final methods, final classes, self-invocation, and multi-annotation combinations)
+- controller security intent and controller profile-scoping checks
 - conditional bean conflict detection
+
+### Current Rule Matrix
+
+This matrix is a coarse view of what the built-in rules currently cover. Use `rules-reference.md` for per-rule guidance and `rules-governance.json` for the exact enabled rule set in one run.
+
+| Domain | Deterministic / proxy-boundary checks | Advisory / semantic review checks |
+| --- | --- | --- |
+| `ASYNC` | private method, final method, final class without interfaces, self-invocation, unsupported return type | void return style, async + transaction overlap |
+| `LIFECYCLE` | - | initialization and startup callbacks combined with `@Async` or `@Transactional` |
+| `SCHEDULED` | missing/conflicting trigger config, repeated trigger declarations, non-positive intervals, invalid method parameters | non-void return values, `@Scheduled` + `@Async`, `@Scheduled` + `@Transactional` |
+| `CACHE` | private method, final method, final class without interfaces, self-invocation | explicit key strategy, multi-annotation cache combination risk |
+| `TRANSACTION` | private method, final method, final class without interfaces, self-invocation | high-risk propagation review |
+| `EVENTS` | - | `@EventListener` + `@Transactional`, `@TransactionalEventListener` + `@Transactional`, `@TransactionalEventListener` + `@Async` |
+| `WEB` | - | public endpoint security intent, controller-level `@Profile` usage |
+| `CONFIGURATION` | contradictory conditional bean definitions | - |
+
+The current proxy-boundary families are most complete in `ASYNC`, `CACHE`, and `TRANSACTION`, where the built-in rules already cover the common Spring AOP failure modes: `private`, `final method`, `final class`, and self-invocation.
 
 Some rules that need type resolution (for example `SPRING_TX_SELF_INVOCATION`) use a conservative lookup strategy: same-package matches first, then explicit or wildcard imports, and finally unique simple-name matches when unambiguous. The shared implementation lives in `TypeResolutionIndex` under `linter-core/`. See `docs/RULE_DEVELOPMENT.md` for the current resolution guidance.
 
