@@ -31,6 +31,7 @@ Typical findings include:
 - `SPRING_ENDPOINT_SECURITY` from `DemoController.openEndpoint()`
 - `SPRING_PROFILE_CONTROLLER` from the controller-level `@Profile`
 - `SPRING_ASYNC_VOID`, `SPRING_ASYNC_UNSUPPORTED_RETURN_TYPE`, `SPRING_ASYNC_PRIVATE_METHOD`, and `SPRING_ASYNC_FINAL_METHOD` from the async methods in `DemoService`
+- `SPRING_ASYNC_FINAL_CLASS` from `FinalAsyncService`
 - `SPRING_TX_SELF_INVOCATION`, `SPRING_TX_PRIVATE_METHOD`, `SPRING_TX_FINAL_METHOD`, and `SPRING_TX_HIGH_RISK_PROPAGATION` from transactional patterns in `DemoService`
 - `SPRING_TX_FINAL_CLASS` from `FinalTransactionalService`
 - `SPRING_EVENT_LISTENER_TRANSACTIONAL` and `SPRING_TRANSACTIONAL_EVENT_LISTENER` from event listener boundaries

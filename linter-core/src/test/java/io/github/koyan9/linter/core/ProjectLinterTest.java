@@ -133,7 +133,7 @@ class ProjectLinterTest {
         LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
         Set<String> issueIds = report.issues().stream().map(LintIssue::ruleId).collect(Collectors.toSet());
 
-        assertEquals(29, report.rules().size());
+        assertEquals(30, report.rules().size());
         assertTrue(issueIds.contains("SPRING_ASYNC_VOID"));
         assertTrue(issueIds.contains("SPRING_ASYNC_UNSUPPORTED_RETURN_TYPE"));
         assertTrue(issueIds.contains("SPRING_ASYNC_PRIVATE_METHOD"));
@@ -270,6 +270,44 @@ class ProjectLinterTest {
 
         assertEquals(1, issues.size());
         assertTrue(issues.get(0).message().contains("runAsync"));
+    }
+
+    @Test
+    void detectsFinalAsyncClassWithoutInterface() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("FinalAsyncDemo.java"), """
+                package demo;
+
+                import org.springframework.scheduling.annotation.Async;
+
+                interface Worker {
+                    void runAsync();
+                }
+
+                final class FinalAsyncService {
+
+                    @Async
+                    public void refresh() {
+                    }
+                }
+
+                @Async
+                final class InterfaceAsyncService implements Worker {
+
+                    @Override
+                    public void runAsync() {
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        List<LintIssue> issues = linter.analyze(tempDir, tempDir.resolve("src/main/java")).issues().stream()
+                .filter(issue -> issue.ruleId().equals("SPRING_ASYNC_FINAL_CLASS"))
+                .toList();
+
+        assertEquals(1, issues.size());
+        assertTrue(issues.get(0).message().contains("FinalAsyncService"));
     }
 
     @Test
@@ -1108,7 +1146,7 @@ class ProjectLinterTest {
         LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
 
         assertEquals(0, report.issueCount());
-        assertEquals(29, report.rules().size());
+        assertEquals(30, report.rules().size());
         assertEquals(1, report.parseProblemFileCount());
         assertTrue(report.parseProblems().get(0).file().endsWith(Path.of("src/main/java/demo/Broken.java")));
     }

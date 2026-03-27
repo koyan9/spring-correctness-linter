@@ -22,6 +22,7 @@ final class BuiltInRuleRegistry {
             new RuleRegistration("SPRING_ASYNC_UNSUPPORTED_RETURN_TYPE", RuleDomain.ASYNC, AsyncUnsupportedReturnTypeRule::new),
             new RuleRegistration("SPRING_ASYNC_PRIVATE_METHOD", RuleDomain.ASYNC, AsyncPrivateMethodRule::new),
             new RuleRegistration("SPRING_ASYNC_FINAL_METHOD", RuleDomain.ASYNC, AsyncFinalMethodRule::new),
+            new RuleRegistration("SPRING_ASYNC_FINAL_CLASS", RuleDomain.ASYNC, AsyncFinalClassRule::new),
             new RuleRegistration("SPRING_ASYNC_SELF_INVOCATION", RuleDomain.ASYNC, AsyncSelfInvocationRule::new),
             new RuleRegistration("SPRING_ASYNC_TRANSACTIONAL_BOUNDARY", RuleDomain.ASYNC, AsyncTransactionalBoundaryRule::new),
             new RuleRegistration("SPRING_LIFECYCLE_ASYNC_BOUNDARY", RuleDomain.LIFECYCLE, LifecycleAsyncBoundaryRule::new),
