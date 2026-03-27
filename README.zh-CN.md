@@ -225,7 +225,7 @@ JSON 和 HTML 报告现在还会包含运行期指标，便于观察：
 | `spring.correctness.linter.writeBaselineDiff` | `true` | `true` / `false` | baseline 路径存在时写出 `baseline-diff.json` 与 `baseline-diff.html`。 |
 | `spring.correctness.linter.writeRuleDocs` | `true` | `true` / `false` | 同时输出 `rules-reference.md` 与 `rules-governance.json`（治理 / 审计工作流依赖）。 |
 | `spring.correctness.linter.ruleDocsFileName` | `rules-reference.md` | 文件名或相对路径 | 规则文档文件名（或相对路径），写入到报告目录下。 |
-| `spring.correctness.linter.lightweightReports` | `false` | `true` / `false` | 生成精简版 `lint-report.json`（仅摘要与规则选择），以减少报告体积。HTML/SARIF 不受影响。 |
+| `spring.correctness.linter.lightweightReports` | `false` | `true` / `false` | 生成精简版 `lint-report.json`（摘要 + 规则选择 + 紧凑运行时摘要），以减少报告体积。HTML/SARIF 不受影响。 |
 | `spring.correctness.linter.failOnSeverity` | 未设置 | `INFO` / `WARNING` / `ERROR` | 当可见问题达到或超过该阈值时失败。优先级高于 `failOnError`。 |
 | `spring.correctness.linter.failOnError` | `false` | `true` / `false` | 当存在可见问题时失败，仅在未设置 `failOnSeverity` 时生效。 |
 | `spring.correctness.linter.enabledRules` | 空 | 规则 ID | 仅启用指定规则。未知规则会导致构建失败。 |

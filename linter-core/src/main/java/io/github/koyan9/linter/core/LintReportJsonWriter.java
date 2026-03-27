@@ -57,6 +57,8 @@ final class LintReportJsonWriter {
         builder.append("  },\n");
         appendRuleDomainSelection(builder, report.ruleDomainSelection());
         if (detail == ReportWriter.ReportDetail.LIGHT) {
+            builder.append(",\n");
+            appendRuntimeSummary(builder, report, 2);
             builder.append("\n");
             builder.append("}\n");
             return builder.toString();
@@ -248,6 +250,43 @@ final class LintReportJsonWriter {
             builder.append('\n');
             builder.append(childIndent).append("}");
             if (index < breakdown.size() - 1) {
+                builder.append(',');
+            }
+            builder.append('\n');
+        }
+        builder.append(indent).append(']');
+    }
+
+    private void appendRuntimeSummary(StringBuilder builder, LintReport report, int indentSize) {
+        String indent = " ".repeat(indentSize);
+        String childIndent = " ".repeat(indentSize + 2);
+        builder.append(indent).append("\"runtimeSummary\": {\n");
+        builder.append(childIndent).append("\"incrementalCacheEnabled\": ").append(report.runtimeMetrics().incrementalCacheEnabled()).append(",\n");
+        builder.append(childIndent).append("\"cacheScope\": \"").append(ReportWriterSupport.escapeJson(report.runtimeMetrics().cacheScope())).append("\",\n");
+        builder.append(childIndent).append("\"totalElapsedMillis\": ").append(report.runtimeMetrics().totalElapsedMillis()).append(",\n");
+        builder.append(childIndent).append("\"sourceFileCount\": ").append(report.runtimeMetrics().sourceFileCount()).append(",\n");
+        builder.append(childIndent).append("\"analyzedFileCount\": ").append(report.runtimeMetrics().analyzedFileCount()).append(",\n");
+        builder.append(childIndent).append("\"cachedFileCount\": ").append(report.runtimeMetrics().cachedFileCount()).append(",\n");
+        builder.append(childIndent).append("\"parseProblemFileCount\": ").append(report.runtimeMetrics().parseProblemFileCount()).append(",\n");
+        builder.append(childIndent).append("\"cacheHitRatePercent\": ").append(report.runtimeMetrics().cacheHitRatePercent()).append(",\n");
+        appendStringArray(builder, "cacheMissReasons", report.runtimeMetrics().cacheMissReasons(), indentSize + 2);
+        builder.append(",\n");
+        appendLightweightSlowModules(builder, report.runtimeMetrics().slowestModules(3), indentSize + 2);
+        builder.append("\n").append(indent).append("}");
+    }
+
+    private void appendLightweightSlowModules(StringBuilder builder, java.util.List<ModuleRuntimeMetrics> slowModules, int indentSize) {
+        String indent = " ".repeat(indentSize);
+        String childIndent = " ".repeat(indentSize + 2);
+        builder.append(indent).append("\"slowModules\": [\n");
+        for (int index = 0; index < slowModules.size(); index++) {
+            ModuleRuntimeMetrics moduleMetric = slowModules.get(index);
+            builder.append(childIndent).append("{\n");
+            builder.append(childIndent).append("  \"moduleId\": \"").append(ReportWriterSupport.escapeJson(moduleMetric.moduleId())).append("\",\n");
+            builder.append(childIndent).append("  \"analyzedMillis\": ").append(moduleMetric.analyzedMillis()).append(",\n");
+            builder.append(childIndent).append("  \"cacheHitRatePercent\": ").append(moduleMetric.cacheHitRatePercent()).append("\n");
+            builder.append(childIndent).append("}");
+            if (index < slowModules.size() - 1) {
                 builder.append(',');
             }
             builder.append('\n');

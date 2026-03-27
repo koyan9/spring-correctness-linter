@@ -1370,6 +1370,8 @@ class CorrectnessLintMojoTest {
         assertTrue(json.contains("\"ruleDomainSelection\""));
         assertFalse(json.contains("\"issues\""));
         assertFalse(json.contains("\"runtimeMetrics\""));
+        assertTrue(json.contains("\"runtimeSummary\""));
+        assertTrue(json.contains("\"cacheHitRatePercent\""));
     }
 
     @Test

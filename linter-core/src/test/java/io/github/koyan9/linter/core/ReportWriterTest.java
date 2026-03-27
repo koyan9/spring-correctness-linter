@@ -186,7 +186,7 @@ class ReportWriterTest {
     }
 
     @Test
-    void writesLightweightJsonWithoutFindingsAndRuntimeSections() throws Exception {
+    void writesLightweightJsonWithCompactRuntimeSummary() throws Exception {
         Path jsonOutput = tempDir.resolve("reports/lint-report-light.json");
         LintReport report = new LintReport(
                 tempDir,
@@ -234,6 +234,9 @@ class ReportWriterTest {
         assertTrue(json.contains("\"issueCount\": 1"));
         assertTrue(json.contains("\"cachedFileCount\": 4"));
         assertTrue(json.contains("\"RULE_IGNORED\""));
+        assertTrue(json.contains("\"runtimeSummary\""));
+        assertTrue(json.contains("\"cacheMissReasons\""));
+        assertTrue(json.contains("\"modified-or-new-files\""));
         assertFalse(json.contains("\"runtimeMetrics\""));
         assertFalse(json.contains("\"issues\""));
         assertFalse(json.contains("\"parseProblems\""));

@@ -227,7 +227,7 @@ If the project standardizes on a resolvable Spring global key generator:
 
 ### Lightweight JSON output
 
-If downstream tooling only needs summary-level JSON:
+If downstream tooling only needs summary-level JSON plus compact runtime diagnostics:
 
 ```xml
 <configuration>
