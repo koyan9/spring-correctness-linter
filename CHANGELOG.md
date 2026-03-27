@@ -16,6 +16,10 @@ All notable changes to `spring-correctness-linter` will be documented in this fi
 - Added `SPRING_TRANSACTIONAL_EVENT_LISTENER_ASYNC` to flag `@TransactionalEventListener` methods that also cross an async boundary
 - Added `samples/adoption-suite/external-rules-app/` to validate end-to-end external rule discovery through normal Maven plugin dependencies
 
+### Changed
+
+- `SPRING_CACHEABLE_KEY` project-wide key-generator auto-detection now also recognizes `@Bean` methods that return source-local `KeyGenerator` implementation classes
+
 ## [0.1.3] - 2026-03-27
 
 ### Added

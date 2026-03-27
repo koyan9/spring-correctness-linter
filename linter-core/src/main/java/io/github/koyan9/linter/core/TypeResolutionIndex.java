@@ -71,6 +71,14 @@ public final class TypeResolutionIndex {
         );
     }
 
+    public Optional<TypeDescriptor> resolveTypeReference(String rawType, SourceUnit sourceUnit) {
+        return resolveTypeReference(rawType, packageName(sourceUnit), importInfo(sourceUnit));
+    }
+
+    public Optional<TypeDescriptor> resolveTypeReference(String rawType, String currentPackage, ImportInfo importInfo) {
+        return resolveTypeName(stripArraysAndVarArgs(stripGenerics(rawType)), currentPackage, importInfo);
+    }
+
     public Set<TypeDescriptor> relatedTypes(TypeDescriptor rootType) {
         Set<TypeDescriptor> relatedTypes = new LinkedHashSet<>();
         ArrayDeque<TypeDescriptor> queue = new ArrayDeque<>();
@@ -101,7 +109,13 @@ public final class TypeResolutionIndex {
             TypeDescriptor contextType,
             String currentPackage
     ) {
-        String rawName = stripGenerics(type.toString());
+        return resolveTypeName(stripGenerics(type.toString()), currentPackage, contextType.importInfo());
+    }
+
+    private Optional<TypeDescriptor> resolveTypeName(String rawName, String currentPackage, ImportInfo importInfo) {
+        if (rawName == null || rawName.isBlank()) {
+            return Optional.empty();
+        }
         if (rawName.contains(".")) {
             TypeDescriptor qualified = byFqn.get(rawName);
             if (qualified != null) {
@@ -116,7 +130,7 @@ public final class TypeResolutionIndex {
             int dotIndex = rawName.indexOf('.');
             String outerSimple = rawName.substring(0, dotIndex);
             String nestedSuffix = rawName.substring(dotIndex + 1);
-            String explicitOuter = contextType.importInfo().explicitImports().get(outerSimple);
+            String explicitOuter = importInfo.explicitImports().get(outerSimple);
             if (explicitOuter != null) {
                 TypeDescriptor nested = byFqn.get(explicitOuter + "." + nestedSuffix);
                 if (nested != null) {
@@ -124,7 +138,7 @@ public final class TypeResolutionIndex {
                 }
             }
             TypeDescriptor wildcardNestedMatch = null;
-            for (String wildcardPackage : contextType.importInfo().wildcardImports()) {
+            for (String wildcardPackage : importInfo.wildcardImports()) {
                 TypeDescriptor candidate = byFqn.get(wildcardPackage + "." + rawName);
                 if (candidate == null) {
                     continue;
@@ -142,7 +156,7 @@ public final class TypeResolutionIndex {
                 return Optional.of(inPackage);
             }
         }
-        String explicitImport = contextType.importInfo().explicitImports().get(rawName);
+        String explicitImport = importInfo.explicitImports().get(rawName);
         if (explicitImport != null) {
             TypeDescriptor explicitMatch = byFqn.get(explicitImport);
             if (explicitMatch != null) {
@@ -150,7 +164,7 @@ public final class TypeResolutionIndex {
             }
         }
         TypeDescriptor wildcardMatch = null;
-        for (String wildcardPackage : contextType.importInfo().wildcardImports()) {
+        for (String wildcardPackage : importInfo.wildcardImports()) {
             TypeDescriptor candidate = byFqn.get(wildcardPackage + "." + rawName);
             if (candidate == null) {
                 continue;
@@ -194,6 +208,17 @@ public final class TypeResolutionIndex {
     private static String stripGenerics(String typeName) {
         int genericStart = typeName.indexOf('<');
         return genericStart < 0 ? typeName : typeName.substring(0, genericStart);
+    }
+
+    private static String stripArraysAndVarArgs(String typeName) {
+        String normalized = typeName == null ? "" : typeName.trim();
+        while (normalized.endsWith("[]")) {
+            normalized = normalized.substring(0, normalized.length() - 2);
+        }
+        if (normalized.endsWith("...")) {
+            normalized = normalized.substring(0, normalized.length() - 3);
+        }
+        return normalized.trim();
     }
 
     private static String qualifiedNameOf(TypeDeclaration<?> typeDeclaration, String packageName) {

@@ -1839,6 +1839,57 @@ class CorrectnessLintMojoTest {
     }
 
     @Test
+    void autoDetectsProjectWideConcreteKeyGeneratorBean() throws Exception {
+        Path sourceDirectory = writeSource("""
+                package demo;
+
+                import org.springframework.cache.annotation.Cacheable;
+                import org.springframework.cache.interceptor.KeyGenerator;
+                import org.springframework.context.annotation.Bean;
+
+                class DemoKeyGenerator implements KeyGenerator {
+
+                    @Override
+                    public Object generate(Object target, java.lang.reflect.Method method, Object... params) {
+                        return params.length;
+                    }
+                }
+
+                class ProjectKeyGeneratorConfig {
+
+                    @Bean
+                    DemoKeyGenerator keyGenerator() {
+                        return new DemoKeyGenerator();
+                    }
+                }
+
+                class CacheService {
+
+                    @Cacheable(cacheNames = "demo")
+                    public String load(String id) {
+                        return id;
+                    }
+                }
+                """);
+        Path reportsDirectory = tempDir.resolve("target/reports-project-key-generator-concrete");
+
+        CorrectnessLintMojo mojo = configuredMojo(
+                sourceDirectory,
+                reportsDirectory,
+                tempDir.resolve("spring-correctness-linter-baseline.txt")
+        );
+        setField(mojo, "applyBaseline", false);
+        setField(mojo, "autoDetectProjectWideKeyGenerator", true);
+        setField(mojo, "formats", new LinkedHashSet<>(Set.of("json")));
+
+        mojo.execute();
+
+        String json = Files.readString(reportsDirectory.resolve("lint-report.json"));
+        assertTrue(json.contains("\"issueCount\": 0"));
+        assertFalse(json.contains("\"ruleId\": \"SPRING_CACHEABLE_KEY\""));
+    }
+
+    @Test
     void autoDetectsCachingConfigurerKeyGenerator() throws Exception {
         Path sourceDirectory = writeSource("""
                 package demo;

@@ -1205,6 +1205,51 @@ class ProjectLinterTest {
     }
 
     @Test
+    void autoDetectsProjectWideConcreteKeyGeneratorBeanWhenEnabled() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("ProjectKeyGeneratorConfig.java"), """
+                package demo;
+
+                import org.springframework.cache.annotation.Cacheable;
+                import org.springframework.cache.interceptor.KeyGenerator;
+                import org.springframework.context.annotation.Bean;
+
+                class DemoKeyGenerator implements KeyGenerator {
+
+                    @Override
+                    public Object generate(Object target, java.lang.reflect.Method method, Object... params) {
+                        return params.length;
+                    }
+                }
+
+                class ProjectKeyGeneratorConfig {
+
+                    @Bean
+                    DemoKeyGenerator keyGenerator() {
+                        return new DemoKeyGenerator();
+                    }
+                }
+
+                class CacheService {
+
+                    @Cacheable(cacheNames = "demo")
+                    public String load(String id) {
+                        return id;
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport defaultReport = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
+        assertTrue(defaultReport.issues().stream().anyMatch(issue -> issue.ruleId().equals("SPRING_CACHEABLE_KEY")));
+
+        LintOptions options = LintOptions.defaults().withAutoDetectProjectWideKeyGenerator(true);
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"), options).report();
+        assertFalse(report.issues().stream().anyMatch(issue -> issue.ruleId().equals("SPRING_CACHEABLE_KEY")));
+    }
+
+    @Test
     void autoDetectsCachingConfigurerKeyGeneratorWhenEnabled() throws Exception {
         Path sourceDirectory = tempDir.resolve("src/main/java/demo");
         Files.createDirectories(sourceDirectory);
@@ -1726,6 +1771,73 @@ class ProjectLinterTest {
         assertNotEquals(firstRun.runtimeMetrics().analysisFingerprint(), secondRun.runtimeMetrics().analysisFingerprint());
         assertTrue(secondRun.runtimeMetrics().cacheMissReasons().contains(AnalysisCacheStore.CACHE_REASON_AUTO_DETECT_CONTEXT_CHANGED));
         assertFalse(secondRun.issues().stream().anyMatch(issue -> issue.ruleId().equals("SPRING_CACHEABLE_KEY")));
+    }
+
+    @Test
+    void invalidatesIncrementalCacheWhenConcreteKeyGeneratorImplementationChanges() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("CacheService.java"), """
+                package demo;
+
+                import org.springframework.cache.annotation.Cacheable;
+
+                class CacheService {
+
+                    @Cacheable(cacheNames = "demo")
+                    public String load(String id) {
+                        return id;
+                    }
+                }
+                """);
+        Files.writeString(sourceDirectory.resolve("ProjectKeyGeneratorConfig.java"), """
+                package demo;
+
+                import org.springframework.context.annotation.Bean;
+
+                class ProjectKeyGeneratorConfig {
+
+                    @Bean
+                    DemoKeyGenerator keyGenerator() {
+                        return new DemoKeyGenerator();
+                    }
+                }
+                """);
+        Files.writeString(sourceDirectory.resolve("DemoKeyGenerator.java"), """
+                package demo;
+
+                import org.springframework.cache.interceptor.KeyGenerator;
+
+                class DemoKeyGenerator implements KeyGenerator {
+
+                    @Override
+                    public Object generate(Object target, java.lang.reflect.Method method, Object... params) {
+                        return params.length;
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        Path cacheFile = tempDir.resolve("target/analysis-cache.txt");
+        LintOptions options = new LintOptions(true, false, null, cacheFile, true)
+                .withAutoDetectProjectWideKeyGenerator(true);
+
+        LintReport firstRun = linter.analyze(tempDir, tempDir.resolve("src/main/java"), options).report();
+        assertFalse(firstRun.issues().stream().anyMatch(issue -> issue.ruleId().equals("SPRING_CACHEABLE_KEY")));
+
+        Files.writeString(sourceDirectory.resolve("DemoKeyGenerator.java"), """
+                package demo;
+
+                class DemoKeyGenerator {
+                }
+                """);
+
+        LintReport secondRun = linter.analyze(tempDir, tempDir.resolve("src/main/java"), options).report();
+
+        assertEquals(0, secondRun.cachedFileCount());
+        assertNotEquals(firstRun.runtimeMetrics().analysisFingerprint(), secondRun.runtimeMetrics().analysisFingerprint());
+        assertTrue(secondRun.runtimeMetrics().cacheMissReasons().contains(AnalysisCacheStore.CACHE_REASON_AUTO_DETECT_CONTEXT_CHANGED));
+        assertTrue(secondRun.issues().stream().anyMatch(issue -> issue.ruleId().equals("SPRING_CACHEABLE_KEY")));
     }
 
     @Test

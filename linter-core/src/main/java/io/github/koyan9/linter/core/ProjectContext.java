@@ -462,7 +462,8 @@ public final class ProjectContext {
             }
         }
         for (TypeDeclaration<?> typeDeclaration : sourceUnit.structure().typeDeclarations()) {
-            if (isCachingConfigurerType(typeDeclaration, sourceUnit)) {
+            if (isCachingConfigurerType(typeDeclaration, sourceUnit)
+                    || isKeyGeneratorImplementationType(typeDeclaration, sourceUnit)) {
                 return true;
             }
         }
@@ -475,6 +476,17 @@ public final class ProjectContext {
 
     private boolean isKeyGeneratorType(String rawType, SourceUnit sourceUnit) {
         return matchesQualifiedType(rawType, sourceUnit, KEY_GENERATOR_TYPES);
+    }
+
+    private boolean isKeyGeneratorImplementationType(TypeDeclaration<?> typeDeclaration, SourceUnit sourceUnit) {
+        TypeResolutionIndex.TypeDescriptor descriptor = typeResolutionIndex().descriptorFor(typeDeclaration, sourceUnit);
+        return typeDeclaresOrInheritsQualifiedType(
+                typeDeclaration,
+                descriptor.packageName(),
+                descriptor.importInfo(),
+                KEY_GENERATOR_TYPES,
+                new LinkedHashSet<>()
+        );
     }
 
     private boolean isCachingConfigurerType(TypeDeclaration<?> typeDeclaration, SourceUnit sourceUnit) {
@@ -499,25 +511,64 @@ public final class ProjectContext {
         if (normalized.isBlank()) {
             return false;
         }
+        TypeReferenceResolutionContext resolutionContext = typeReferenceResolutionContext(sourceUnit);
+        TypeResolutionIndex.ImportInfo importInfo = new TypeResolutionIndex.ImportInfo(
+                resolutionContext.explicitImports(),
+                resolutionContext.wildcardImports()
+        );
+        return matchesQualifiedType(
+                normalized,
+                resolutionContext.packageName(),
+                importInfo,
+                expectedQualifiedNames,
+                new LinkedHashSet<>()
+        );
+    }
+
+    private boolean matchesQualifiedType(
+            String rawType,
+            String currentPackage,
+            TypeResolutionIndex.ImportInfo importInfo,
+            Set<String> expectedQualifiedNames,
+            Set<String> visitedTypes
+    ) {
+        String normalized = normalizeTypeReference(rawType);
+        if (normalized.isBlank()) {
+            return false;
+        }
         if (expectedQualifiedNames.contains(normalized)) {
             return true;
         }
         if (normalized.contains(".")) {
-            return false;
+            Optional<TypeResolutionIndex.TypeDescriptor> resolvedType = typeResolutionIndex().resolveTypeReference(normalized, currentPackage, importInfo);
+            if (resolvedType.isEmpty()) {
+                return false;
+            }
+            TypeResolutionIndex.TypeDescriptor descriptor = resolvedType.orElseThrow();
+            if (!visitedTypes.add(descriptor.qualifiedName())) {
+                return false;
+            }
+            return typeDeclaresOrInheritsQualifiedType(
+                    descriptor.declaration(),
+                    descriptor.packageName(),
+                    descriptor.importInfo(),
+                    expectedQualifiedNames,
+                    visitedTypes
+            );
         }
-
-        TypeReferenceResolutionContext resolutionContext = typeReferenceResolutionContext(sourceUnit);
-        if (!resolutionContext.packageName().isBlank()
-                && expectedQualifiedNames.contains(resolutionContext.packageName() + "." + normalized)) {
+        if (!currentPackage.isBlank()
+                && expectedQualifiedNames.contains(currentPackage + "." + normalized)) {
             return true;
         }
-        String explicitImport = resolutionContext.explicitImports().get(normalized);
+        String explicitImport = importInfo.explicitImports().get(normalized);
         if (explicitImport != null) {
-            return expectedQualifiedNames.contains(explicitImport);
+            if (expectedQualifiedNames.contains(explicitImport)) {
+                return true;
+            }
         }
 
         String wildcardMatch = null;
-        for (String wildcardImport : resolutionContext.wildcardImports()) {
+        for (String wildcardImport : importInfo.wildcardImports()) {
             String candidate = wildcardImport + "." + normalized;
             if (!expectedQualifiedNames.contains(candidate)) {
                 continue;
@@ -527,7 +578,52 @@ public final class ProjectContext {
             }
             wildcardMatch = candidate;
         }
-        return wildcardMatch != null;
+        if (wildcardMatch != null) {
+            return true;
+        }
+
+        Optional<TypeResolutionIndex.TypeDescriptor> resolvedType = typeResolutionIndex().resolveTypeReference(normalized, currentPackage, importInfo);
+        if (resolvedType.isEmpty()) {
+            return false;
+        }
+        TypeResolutionIndex.TypeDescriptor descriptor = resolvedType.orElseThrow();
+        if (!visitedTypes.add(descriptor.qualifiedName())) {
+            return false;
+        }
+        return typeDeclaresOrInheritsQualifiedType(
+                descriptor.declaration(),
+                descriptor.packageName(),
+                descriptor.importInfo(),
+                expectedQualifiedNames,
+                visitedTypes
+        );
+    }
+
+    private boolean typeDeclaresOrInheritsQualifiedType(
+            TypeDeclaration<?> typeDeclaration,
+            String packageName,
+            TypeResolutionIndex.ImportInfo importInfo,
+            Set<String> expectedQualifiedNames,
+            Set<String> visitedTypes
+    ) {
+        String qualifiedName = qualifiedNameOf(typeDeclaration, packageName);
+        if (expectedQualifiedNames.contains(qualifiedName)) {
+            return true;
+        }
+        if (!(typeDeclaration instanceof ClassOrInterfaceDeclaration classOrInterfaceDeclaration)) {
+            return false;
+        }
+        for (ClassOrInterfaceType implementedType : classOrInterfaceDeclaration.getImplementedTypes()) {
+            if (matchesQualifiedType(implementedType.toString(), packageName, importInfo, expectedQualifiedNames, visitedTypes)) {
+                return true;
+            }
+        }
+        for (ClassOrInterfaceType extendedType : classOrInterfaceDeclaration.getExtendedTypes()) {
+            if (matchesQualifiedType(extendedType.toString(), packageName, importInfo, expectedQualifiedNames, visitedTypes)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private TypeReferenceResolutionContext typeReferenceResolutionContext(SourceUnit sourceUnit) {
