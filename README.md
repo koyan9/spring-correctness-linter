@@ -570,7 +570,7 @@ Treat custom security annotations as explicit intent:
 
 ## FAQ
 
-Q: Why do I see â€œUnknown rule id(s)â€?failures?
+Q: Why do I see "Unknown rule id(s)" failures?
 A: Rule ids are validated and normalized to uppercase. Verify the ID exists in `rules-reference.md`.
 
 Q: I set `failOnError=true`, but the build still passes.
@@ -794,7 +794,7 @@ The project currently provides a practical Spring correctness linting workflow s
 - lightweight external rule extension through `ServiceLoader`
 - proxy-boundary coverage that is now strongest in `ASYNC`, `CACHE`, and `TRANSACTION`
 - English and Chinese rule coverage matrices that make the current built-in rule surface easier to inspect
-- `v0.1.4` is now published on GitHub Releases and visible through direct Maven Central artifact URLs
+- `v0.1.6` is the current maintained release line, with successful GitHub Release and workflow completion
 
 ## Milestones
 
@@ -802,5 +802,5 @@ The project currently provides a practical Spring correctness linting workflow s
 - For the current near-term direction, see `docs/ROADMAP.md`.
 - For the current rule-accuracy follow-ups, see `docs/ACCURACY_BACKLOG.md`.
 - For the latest staged summary of rule-growth and extensibility work, see `docs/STATUS_UPDATE_2026-03-27_proxy-boundary-expansion.md`.
-- For the latest release-closure summary, see `docs/STATUS_UPDATE_2026-03-28_v0.1.4-release.md`.
+- For the latest release-closure summary, see `docs/STATUS_UPDATE_2026-03-28_v0.1.6-release.md`.
 

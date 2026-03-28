@@ -44,7 +44,8 @@ Track rule-accuracy follow-ups and regression-test priorities in `docs/ACCURACY_
 - Continue tightening remaining rule-accuracy boundaries where the expected behavior is testable and low-noise
 - Keep generated `rules-reference.md`, README guidance, and sample documentation aligned with the latest built-in rule surface
 - Gather real-user feedback from bundle-first adoption before committing to broader rule expansion or external extension APIs
-- Keep `v0.1.5` scoped as an accuracy-and-stability release rather than another broad rule-growth batch; see `docs/V0.1.5_CANDIDATE_SCOPE.md`
+- Treat `docs/V0.1.5_CANDIDATE_SCOPE.md` as a historical reference for the completed accuracy-and-stability batch
+- No new release candidate is currently scoped after `v0.1.6`; revisit planning only when active development resumes
 
 ## Recently completed
 
@@ -67,7 +68,7 @@ Track rule-accuracy follow-ups and regression-test priorities in `docs/ACCURACY_
 3. Expand report and plugin regression coverage whenever generated docs, output fields, or configuration flags change
 4. Keep samples, README guidance, and generated rule docs aligned with the current governance and rollout workflows
 5. Prefer focused semantic improvements in existing domains over broad new rule families
-6. Keep the next release candidate (`v0.1.5`) constrained to one or two explainable themes, ideally accuracy refinement plus release-pipeline stability
+6. If development resumes after `v0.1.6`, keep the next release candidate constrained to one or two explainable themes, ideally accuracy refinement plus release-pipeline stability
 
 ## Later candidates
 

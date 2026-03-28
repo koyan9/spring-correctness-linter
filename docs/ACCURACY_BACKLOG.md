@@ -11,7 +11,9 @@ Recent low-noise expansions already covered the most obvious proxy-boundary gaps
 and added an initial async-over-transaction-phase listener review in `EVENTS`. That means the backlog
 should stay biased toward accuracy refinement instead of continuing unchecked rule-count growth.
 
-When selecting `v0.1.5` work, prefer the narrow scope described in `docs/V0.1.5_CANDIDATE_SCOPE.md`.
+The `v0.1.5` candidate scope in `docs/V0.1.5_CANDIDATE_SCOPE.md` is now historical reference
+material for the completed `v0.1.5` / `v0.1.6` accuracy-and-stability batch. No additional
+accuracy iteration is currently scheduled while maintenance is paused on `v0.1.6`.
 
 ## Priority 1
 

@@ -79,8 +79,8 @@
 
 - The project now provides a practical Spring correctness linting workflow suitable for local development, CI enforcement, legacy baseline adoption, multi-module repository governance, and policy-oriented rollout workflows.
 - The built-in rule surface is now materially broader, but recent growth stayed concentrated on low-noise, testable Spring proxy-boundary semantics rather than speculative framework heuristics.
-- The `v0.1.4` release is now live, with both GitHub Release publication and direct Maven Central artifact availability confirmed.
-- Future work should continue focusing on incremental polish, rule-accuracy discipline, and real-user adoption feedback rather than large new feature batches.
+- The `v0.1.6` release is now the current maintained release line, with successful GitHub Release publication plus successful `Release` and `CI` workflow completion.
+- Future work is intentionally paused after `v0.1.6`; roadmap and rule-growth planning should be revisited only when active development resumes.
 - For a detailed summary of the latest proxy-boundary and extensibility batch, see `docs/STATUS_UPDATE_2026-03-27_proxy-boundary-expansion.md`.
-- For a detailed summary of the `v0.1.4` release closure and follow-up fixes, see `docs/STATUS_UPDATE_2026-03-28_v0.1.4-release.md`.
+- For a detailed summary of the `v0.1.6` release closure, see `docs/STATUS_UPDATE_2026-03-28_v0.1.6-release.md`.
 - For the current near-term direction, see `docs/ROADMAP.md`.
