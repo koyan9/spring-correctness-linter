@@ -47,6 +47,42 @@ jobs:
           test -n "${MAVEN_GPG_PASSPHRASE}" || { echo "Missing secret: MAVEN_GPG_PASSPHRASE"; exit 1; }
           git rev-parse --verify "refs/tags/${RELEASE_TAG}"
 
+      - name: Validate release metadata matches tag
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ env.RELEASE_TAG }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import sys
+          import xml.etree.ElementTree as ET
+
+          namespace = {"m": "http://maven.apache.org/POM/4.0.0"}
+          root = ET.parse("pom.xml").getroot()
+          root_version = root.findtext("m:version", namespaces=namespace)
+          root_scm_tag = root.findtext("m:scm/m:tag", namespaces=namespace)
+          release_tag = os.environ["RELEASE_TAG"]
+          expected_tag = f"v{root_version}" if root_version else None
+
+          if not root_version or not root_scm_tag:
+              print("Root pom.xml is missing release version or scm.tag metadata.", file=sys.stderr)
+              sys.exit(1)
+          if release_tag != expected_tag:
+              print(
+                  f"Release tag mismatch: workflow tag '{release_tag}' does not match root pom version '{root_version}' (expected '{expected_tag}').",
+                  file=sys.stderr,
+              )
+              sys.exit(1)
+          if release_tag != root_scm_tag:
+              print(
+                  f"Release tag mismatch: workflow tag '{release_tag}' does not match root scm.tag '{root_scm_tag}'.",
+                  file=sys.stderr,
+              )
+              sys.exit(1)
+
+          print(f"Release metadata verified for tag {release_tag}.")
+          PY
+
       - name: Set up JDK
         uses: actions/setup-java@v5
         with:
@@ -69,13 +105,35 @@ jobs:
           RELEASE_TAG: ${{ env.RELEASE_TAG }}
         run: |
           VERSION="${RELEASE_TAG#v}"
-          URL="https://repo1.maven.org/maven2/io/github/koyan9/spring-correctness-linter-maven-plugin/${VERSION}/spring-correctness-linter-maven-plugin-${VERSION}.jar"
-          if curl -fsI "$URL" >/dev/null; then
+          CORE_URL="https://repo1.maven.org/maven2/io/github/koyan9/spring-correctness-linter-core/${VERSION}/spring-correctness-linter-core-${VERSION}.pom"
+          PLUGIN_URL="https://repo1.maven.org/maven2/io/github/koyan9/spring-correctness-linter-maven-plugin/${VERSION}/spring-correctness-linter-maven-plugin-${VERSION}.pom"
+
+          core_visible=false
+          plugin_visible=false
+
+          if curl -fsI "$CORE_URL" >/dev/null; then
+            core_visible=true
+          fi
+          if curl -fsI "$PLUGIN_URL" >/dev/null; then
+            plugin_visible=true
+          fi
+
+          echo "core_visible=${core_visible}" >> "$GITHUB_OUTPUT"
+          echo "plugin_visible=${plugin_visible}" >> "$GITHUB_OUTPUT"
+
+          if [[ "$core_visible" == "true" && "$plugin_visible" == "true" ]]; then
             echo "already_published=true" >> "$GITHUB_OUTPUT"
-            echo "Artifacts for ${VERSION} are already visible in Maven Central; deploy will be skipped."
+            echo "Core and plugin artifacts for ${VERSION} are already visible in Maven Central; deploy will be skipped."
+          elif [[ "$core_visible" == "true" || "$plugin_visible" == "true" ]]; then
+            echo "already_published=false" >> "$GITHUB_OUTPUT"
+            echo "Partial Maven Central visibility detected for ${VERSION}." >&2
+            echo "  core:   ${core_visible} (${CORE_URL})" >&2
+            echo "  plugin: ${plugin_visible} (${PLUGIN_URL})" >&2
+            echo "Refusing to continue because rerunning deploy against a partially visible release is ambiguous." >&2
+            exit 1
           else
             echo "already_published=false" >> "$GITHUB_OUTPUT"
-            echo "Artifacts for ${VERSION} are not visible in Maven Central yet; deploy will run."
+            echo "Core and plugin artifacts for ${VERSION} are not visible in Maven Central yet; deploy will run."
           fi
 
       - name: Publish to Maven Central

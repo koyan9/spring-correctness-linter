@@ -1250,6 +1250,44 @@ class ProjectLinterTest {
     }
 
     @Test
+    void autoDetectsComponentScannedKeyGeneratorWhenEnabled() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("ComponentKeyGenerator.java"), """
+                package demo;
+
+                import org.springframework.cache.annotation.Cacheable;
+                import org.springframework.cache.interceptor.KeyGenerator;
+                import org.springframework.stereotype.Component;
+
+                @Component
+                class DemoKeyGenerator implements KeyGenerator {
+
+                    @Override
+                    public Object generate(Object target, java.lang.reflect.Method method, Object... params) {
+                        return params.length;
+                    }
+                }
+
+                class CacheService {
+
+                    @Cacheable(cacheNames = "demo")
+                    public String load(String id) {
+                        return id;
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport defaultReport = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
+        assertTrue(defaultReport.issues().stream().anyMatch(issue -> issue.ruleId().equals("SPRING_CACHEABLE_KEY")));
+
+        LintOptions options = LintOptions.defaults().withAutoDetectProjectWideKeyGenerator(true);
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"), options).report();
+        assertFalse(report.issues().stream().anyMatch(issue -> issue.ruleId().equals("SPRING_CACHEABLE_KEY")));
+    }
+
+    @Test
     void autoDetectsCachingConfigurerKeyGeneratorWhenEnabled() throws Exception {
         Path sourceDirectory = tempDir.resolve("src/main/java/demo");
         Files.createDirectories(sourceDirectory);
@@ -1307,6 +1345,51 @@ class ProjectLinterTest {
                     @Override
                     public KeyGenerator keyGenerator() {
                         return null;
+                    }
+                }
+
+                class CacheService {
+
+                    @Cacheable(cacheNames = "demo")
+                    public String load(String id) {
+                        return id;
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintOptions options = LintOptions.defaults().withAutoDetectProjectWideKeyGenerator(true);
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"), options).report();
+
+        assertTrue(report.issues().stream().anyMatch(issue -> issue.ruleId().equals("SPRING_CACHEABLE_KEY")));
+    }
+
+    @Test
+    void doesNotAutoDetectCustomComponentBySimpleNameForKeyGenerator() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("CustomComponentKeyGenerator.java"), """
+                package demo;
+
+                import org.springframework.cache.annotation.Cacheable;
+                import org.springframework.cache.interceptor.KeyGenerator;
+
+                import java.lang.annotation.ElementType;
+                import java.lang.annotation.Retention;
+                import java.lang.annotation.RetentionPolicy;
+                import java.lang.annotation.Target;
+
+                @Target(ElementType.TYPE)
+                @Retention(RetentionPolicy.RUNTIME)
+                @interface Component {
+                }
+
+                @Component
+                class DemoKeyGenerator implements KeyGenerator {
+
+                    @Override
+                    public Object generate(Object target, java.lang.reflect.Method method, Object... params) {
+                        return params.length;
                     }
                 }
 
@@ -1789,6 +1872,53 @@ class ProjectLinterTest {
     }
 
     @Test
+    void invalidatesIncrementalCacheWhenComponentSecurityFilterChainContextChanges() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("PublicController.java"), """
+                package demo;
+
+                import org.springframework.web.bind.annotation.GetMapping;
+                import org.springframework.web.bind.annotation.RestController;
+
+                @RestController
+                class PublicController {
+
+                    @GetMapping("/open")
+                    public String open() {
+                        return "ok";
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        Path cacheFile = tempDir.resolve("target/analysis-cache.txt");
+        LintOptions options = new LintOptions(true, false, null, cacheFile, true)
+                .withAutoDetectCentralizedSecurity(true);
+
+        LintReport firstRun = linter.analyze(tempDir, tempDir.resolve("src/main/java"), options).report();
+        assertTrue(firstRun.issues().stream().anyMatch(issue -> issue.ruleId().equals("SPRING_ENDPOINT_SECURITY")));
+
+        Files.writeString(sourceDirectory.resolve("DemoSecurityFilterChain.java"), """
+                package demo;
+
+                import org.springframework.security.web.SecurityFilterChain;
+                import org.springframework.stereotype.Component;
+
+                @Component
+                class DemoSecurityFilterChain implements SecurityFilterChain {
+                }
+                """);
+
+        LintReport secondRun = linter.analyze(tempDir, tempDir.resolve("src/main/java"), options).report();
+
+        assertEquals(0, secondRun.cachedFileCount());
+        assertNotEquals(firstRun.runtimeMetrics().analysisFingerprint(), secondRun.runtimeMetrics().analysisFingerprint());
+        assertTrue(secondRun.runtimeMetrics().cacheMissReasons().contains(AnalysisCacheStore.CACHE_REASON_AUTO_DETECT_CONTEXT_CHANGED));
+        assertFalse(secondRun.issues().stream().anyMatch(issue -> issue.ruleId().equals("SPRING_ENDPOINT_SECURITY")));
+    }
+
+    @Test
     void invalidatesIncrementalCacheWhenProjectWideKeyGeneratorContextChanges() throws Exception {
         Path sourceDirectory = tempDir.resolve("src/main/java/demo");
         Files.createDirectories(sourceDirectory);
@@ -1825,6 +1955,56 @@ class ProjectLinterTest {
                     @Bean
                     KeyGenerator keyGenerator() {
                         return (target, method, params) -> params.length;
+                    }
+                }
+                """);
+
+        LintReport secondRun = linter.analyze(tempDir, tempDir.resolve("src/main/java"), options).report();
+
+        assertEquals(0, secondRun.cachedFileCount());
+        assertNotEquals(firstRun.runtimeMetrics().analysisFingerprint(), secondRun.runtimeMetrics().analysisFingerprint());
+        assertTrue(secondRun.runtimeMetrics().cacheMissReasons().contains(AnalysisCacheStore.CACHE_REASON_AUTO_DETECT_CONTEXT_CHANGED));
+        assertFalse(secondRun.issues().stream().anyMatch(issue -> issue.ruleId().equals("SPRING_CACHEABLE_KEY")));
+    }
+
+    @Test
+    void invalidatesIncrementalCacheWhenComponentKeyGeneratorContextChanges() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("CacheService.java"), """
+                package demo;
+
+                import org.springframework.cache.annotation.Cacheable;
+
+                class CacheService {
+
+                    @Cacheable(cacheNames = "demo")
+                    public String load(String id) {
+                        return id;
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        Path cacheFile = tempDir.resolve("target/analysis-cache.txt");
+        LintOptions options = new LintOptions(true, false, null, cacheFile, true)
+                .withAutoDetectProjectWideKeyGenerator(true);
+
+        LintReport firstRun = linter.analyze(tempDir, tempDir.resolve("src/main/java"), options).report();
+        assertTrue(firstRun.issues().stream().anyMatch(issue -> issue.ruleId().equals("SPRING_CACHEABLE_KEY")));
+
+        Files.writeString(sourceDirectory.resolve("DemoKeyGenerator.java"), """
+                package demo;
+
+                import org.springframework.cache.interceptor.KeyGenerator;
+                import org.springframework.stereotype.Component;
+
+                @Component
+                class DemoKeyGenerator implements KeyGenerator {
+
+                    @Override
+                    public Object generate(Object target, java.lang.reflect.Method method, Object... params) {
+                        return params.length;
                     }
                 }
                 """);
@@ -3673,6 +3853,7 @@ class ProjectLinterTest {
         assertFalse(report.issues().stream().anyMatch(issue -> issue.ruleId().equals("SPRING_ENDPOINT_SECURITY")));
     }
 
+    @Test
     void autoDetectsConcreteSecurityFilterChainImplementationForCentralizedSecurity() throws Exception {
         Path sourceDirectory = tempDir.resolve("src/main/java/demo");
         Files.createDirectories(sourceDirectory);
@@ -3693,6 +3874,41 @@ class ProjectLinterTest {
                     DemoSecurityFilterChain filterChain() {
                         return new DemoSecurityFilterChain();
                     }
+                }
+
+                @RestController
+                class PublicController {
+
+                    @GetMapping("/open")
+                    public String open() {
+                        return "ok";
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintReport defaultReport = linter.analyze(tempDir, tempDir.resolve("src/main/java"));
+        assertTrue(defaultReport.issues().stream().anyMatch(issue -> issue.ruleId().equals("SPRING_ENDPOINT_SECURITY")));
+
+        LintOptions options = LintOptions.defaults().withAutoDetectCentralizedSecurity(true);
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"), options).report();
+        assertFalse(report.issues().stream().anyMatch(issue -> issue.ruleId().equals("SPRING_ENDPOINT_SECURITY")));
+    }
+
+    @Test
+    void autoDetectsComponentScannedSecurityFilterChainForCentralizedSecurity() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("SecurityChainComponent.java"), """
+                package demo;
+
+                import org.springframework.security.web.SecurityFilterChain;
+                import org.springframework.stereotype.Component;
+                import org.springframework.web.bind.annotation.GetMapping;
+                import org.springframework.web.bind.annotation.RestController;
+
+                @Component
+                class DemoSecurityFilterChain implements SecurityFilterChain {
                 }
 
                 @RestController
@@ -3773,6 +3989,48 @@ class ProjectLinterTest {
                     SecurityFilterChain filterChain() {
                         return null;
                     }
+                }
+
+                @RestController
+                class PublicController {
+
+                    @GetMapping("/open")
+                    public String open() {
+                        return "ok";
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        LintOptions options = LintOptions.defaults().withAutoDetectCentralizedSecurity(true);
+        LintReport report = linter.analyze(tempDir, tempDir.resolve("src/main/java"), options).report();
+
+        assertTrue(report.issues().stream().anyMatch(issue -> issue.ruleId().equals("SPRING_ENDPOINT_SECURITY")));
+    }
+
+    @Test
+    void doesNotAutoDetectCustomComponentBySimpleNameForSecurityFilterChain() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("CustomSecurityComponent.java"), """
+                package demo;
+
+                import org.springframework.security.web.SecurityFilterChain;
+                import org.springframework.web.bind.annotation.GetMapping;
+                import org.springframework.web.bind.annotation.RestController;
+
+                import java.lang.annotation.ElementType;
+                import java.lang.annotation.Retention;
+                import java.lang.annotation.RetentionPolicy;
+                import java.lang.annotation.Target;
+
+                @Target(ElementType.TYPE)
+                @Retention(RetentionPolicy.RUNTIME)
+                @interface Component {
+                }
+
+                @Component
+                class DemoSecurityFilterChain implements SecurityFilterChain {
                 }
 
                 @RestController

@@ -57,14 +57,14 @@ jobs:
 ### 一次性生成 baseline
 
 ```bash
-./mvnw io.github.koyan9:spring-correctness-linter-maven-plugin:0.1.4:lint \
+./mvnw io.github.koyan9:spring-correctness-linter-maven-plugin:0.1.5:lint \
   "-Dspring.correctness.linter.writeBaseline=true"
 ```
 
 Reactor 项目可使用：
 
 ```bash
-./mvnw io.github.koyan9:spring-correctness-linter-maven-plugin:0.1.4:lint \
+./mvnw io.github.koyan9:spring-correctness-linter-maven-plugin:0.1.5:lint \
   "-Dspring.correctness.linter.scanReactorModules=true" \
   "-Dspring.correctness.linter.splitBaselineByModule=true"
 ```

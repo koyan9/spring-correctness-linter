@@ -1035,6 +1035,47 @@ class CorrectnessLintMojoTest {
     }
 
     @Test
+    void autoDetectsComponentScannedSecurityFilterChainForCentralizedSecurity() throws Exception {
+        Path sourceDirectory = writeSource("""
+                package demo;
+
+                import org.springframework.security.web.SecurityFilterChain;
+                import org.springframework.stereotype.Component;
+                import org.springframework.web.bind.annotation.GetMapping;
+                import org.springframework.web.bind.annotation.RestController;
+
+                @Component
+                class DemoSecurityFilterChain implements SecurityFilterChain {
+                }
+
+                @RestController
+                class PublicController {
+
+                    @GetMapping("/open")
+                    public String open() {
+                        return "ok";
+                    }
+                }
+                """);
+        Path reportsDirectory = tempDir.resolve("target/reports-centralized-security-component");
+
+        CorrectnessLintMojo mojo = configuredMojo(
+                sourceDirectory,
+                reportsDirectory,
+                tempDir.resolve("spring-correctness-linter-baseline.txt")
+        );
+        setField(mojo, "applyBaseline", false);
+        setField(mojo, "autoDetectCentralizedSecurity", true);
+        setField(mojo, "formats", new LinkedHashSet<>(Set.of("json")));
+
+        mojo.execute();
+
+        String json = Files.readString(reportsDirectory.resolve("lint-report.json"));
+        assertTrue(json.contains("\"issueCount\": 0"));
+        assertFalse(json.contains("\"ruleId\": \"SPRING_ENDPOINT_SECURITY\""));
+    }
+
+    @Test
     void honorsConfiguredSecurityAnnotations() throws Exception {
         Path sourceDirectory = writeSource("""
                 package demo;
@@ -1968,6 +2009,50 @@ class CorrectnessLintMojoTest {
                 }
                 """);
         Path reportsDirectory = tempDir.resolve("target/reports-project-key-generator-concrete");
+
+        CorrectnessLintMojo mojo = configuredMojo(
+                sourceDirectory,
+                reportsDirectory,
+                tempDir.resolve("spring-correctness-linter-baseline.txt")
+        );
+        setField(mojo, "applyBaseline", false);
+        setField(mojo, "autoDetectProjectWideKeyGenerator", true);
+        setField(mojo, "formats", new LinkedHashSet<>(Set.of("json")));
+
+        mojo.execute();
+
+        String json = Files.readString(reportsDirectory.resolve("lint-report.json"));
+        assertTrue(json.contains("\"issueCount\": 0"));
+        assertFalse(json.contains("\"ruleId\": \"SPRING_CACHEABLE_KEY\""));
+    }
+
+    @Test
+    void autoDetectsComponentScannedKeyGenerator() throws Exception {
+        Path sourceDirectory = writeSource("""
+                package demo;
+
+                import org.springframework.cache.annotation.Cacheable;
+                import org.springframework.cache.interceptor.KeyGenerator;
+                import org.springframework.stereotype.Component;
+
+                @Component
+                class DemoKeyGenerator implements KeyGenerator {
+
+                    @Override
+                    public Object generate(Object target, java.lang.reflect.Method method, Object... params) {
+                        return params.length;
+                    }
+                }
+
+                class CacheService {
+
+                    @Cacheable(cacheNames = "demo")
+                    public String load(String id) {
+                        return id;
+                    }
+                }
+                """);
+        Path reportsDirectory = tempDir.resolve("target/reports-component-key-generator");
 
         CorrectnessLintMojo mojo = configuredMojo(
                 sourceDirectory,

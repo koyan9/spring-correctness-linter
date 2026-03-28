@@ -6,14 +6,15 @@
 package com.example.adoption.cache;
 
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.cache.annotation.CachingConfigurerSupport;
 import org.springframework.cache.interceptor.KeyGenerator;
+import org.springframework.stereotype.Component;
 
-class CacheConventionConfig extends CachingConfigurerSupport {
+@Component
+class CacheConventionConfig implements KeyGenerator {
 
     @Override
-    public KeyGenerator keyGenerator() {
-        return (target, method, params) -> params.length;
+    public Object generate(Object target, java.lang.reflect.Method method, Object... params) {
+        return params.length;
     }
 }
 

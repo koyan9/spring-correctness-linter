@@ -59,6 +59,7 @@ Before pushing a release tag, confirm:
 - `CHANGELOG.md` reflects the release contents
 - `RELEASE_NOTES_vX.Y.Z.md` exists for non-trivial releases
 - `README.md` and `README.zh-CN.md` are aligned if user-facing behavior changed
+- the annotated release tag you plan to push matches the root `pom.xml` version and root `scm.tag`
 - local verification passes
 - Central publication credentials and GPG material are still valid
 
@@ -105,7 +106,9 @@ When changing release automation:
 
 - prefer testing on `main` first
 - avoid retagging already-published versions
+- if you use the manual workflow fallback, pass the exact release tag that matches the root `pom.xml` version and `scm.tag`
 - if a Central publication succeeds but GitHub Release creation fails, do not republish the same version; fix the workflow and create the GitHub Release separately
+- if only one of the direct Central artifact URLs is visible, treat it as a partial publication state and inspect before rerunning deploy
 - after each release, verify GitHub Actions, the GitHub Release page, and the direct Maven Central artifact URL before treating the release as complete
 - use `powershell -ExecutionPolicy Bypass -File scripts\\check-release-status.ps1 -Version X.Y.Z` to capture the post-release status in a repeatable way
 - if the release tag exists but GitHub Release or Maven Central is still missing, work through the `If the tagged release fails` section in `docs/RELEASE_PROCESS.md` before retagging or changing versions

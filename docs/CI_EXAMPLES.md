@@ -62,14 +62,14 @@ not to clean up all legacy issues at once.
 ### One-time baseline generation
 
 ```bash
-./mvnw io.github.koyan9:spring-correctness-linter-maven-plugin:0.1.4:lint \
+./mvnw io.github.koyan9:spring-correctness-linter-maven-plugin:0.1.5:lint \
   "-Dspring.correctness.linter.writeBaseline=true"
 ```
 
 For reactor projects:
 
 ```bash
-./mvnw io.github.koyan9:spring-correctness-linter-maven-plugin:0.1.4:lint \
+./mvnw io.github.koyan9:spring-correctness-linter-maven-plugin:0.1.5:lint \
   "-Dspring.correctness.linter.scanReactorModules=true" \
   "-Dspring.correctness.linter.splitBaselineByModule=true"
 ```

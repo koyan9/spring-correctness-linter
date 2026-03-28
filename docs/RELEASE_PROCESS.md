@@ -46,11 +46,13 @@ The workflow currently:
 
 - runs only for `v*` tags or explicit manual fallback
 - checks out the requested Git tag instead of the branch tip
+- fails early if the requested release tag does not match the root `pom.xml` version and root `scm.tag`
 - imports Maven Central credentials and GPG signing material from GitHub Secrets
 - runs `mvn -B -q verify`
-- checks whether the tagged version is already visible in Maven Central
+- checks whether both tagged `spring-correctness-linter-core` and `spring-correctness-linter-maven-plugin` artifacts are already visible in Maven Central
 - runs `mvn -B -q -Pcentral-publish -DskipTests -Dcentral.publish.auto=true -Dcentral.publish.waitUntil=validated deploy`
-- skips the deploy step on reruns when Central already contains the release, and instead rebuilds signed local artifacts for the GitHub release step
+- skips the deploy step on reruns only when both artifacts are already visible in Central, and instead rebuilds signed local artifacts for the GitHub release step
+- fails fast when Central visibility is partial so maintainers do not accidentally rerun deploy against an ambiguous half-published state
 - collects generated JARs, POMs, and ASCII-armored signatures from `linter-core` and `linter-maven-plugin`
 - uses `RELEASE_NOTES_vX.Y.Z.md` when present, otherwise falls back to `RELEASE_NOTES_TEMPLATE.md`
 - creates the GitHub release after Central upload and validation succeed, without waiting for the package to finish propagating to every public endpoint
@@ -191,16 +193,18 @@ Use this checklist when the tag exists, but the GitHub Release page is missing o
 2. Confirm whether the `Release` workflow failed, whether the matching `CI` workflow on the release commit failed, or both
 3. If the `Release` workflow failed before Central publication, fix the underlying problem first and rerun `.github/workflows/release.yml` with the existing tag
 4. If the direct Maven Central URL returns `200` but the GitHub Release page is still missing, do not republish the same version; fix the release step and create the GitHub Release separately
-5. If the release-preparation build fails only on Windows around stale Javadoc output, prefer `mvnw.cmd -q -Prelease-artifacts clean verify` over a non-clean rerun before assuming the workflow is broken
-6. If local release-prep commands succeed but GitHub Actions still fail, inspect the failing workflow logs before changing project code:
+5. If only one of the direct `core` / `maven-plugin` Maven Central URLs returns `200`, treat that as a partial publication state and investigate before rerunning deploy
+6. If the release-preparation build fails only on Windows around stale Javadoc output, prefer `mvnw.cmd -q -Prelease-artifacts clean verify` over a non-clean rerun before assuming the workflow is broken
+7. If local release-prep commands succeed but GitHub Actions still fail, inspect the failing workflow logs before changing project code:
    - `Verify project` failure on `CI` usually means the tagged or pushed commit is not actually reproducible on GitHub runners yet
    - `build-and-release` failure on `Release` usually means either the publish step or a release-only packaging step failed
-7. Re-check GitHub Secrets when `Release` fails early:
+8. Re-check GitHub Secrets when `Release` fails early:
    - `MAVEN_CENTRAL_USERNAME`
    - `MAVEN_CENTRAL_PASSWORD`
    - `MAVEN_GPG_PRIVATE_KEY`
    - `MAVEN_GPG_PASSPHRASE`
-8. Re-check version alignment before retagging:
+9. Re-check tag and version alignment before retagging or manually rerunning the workflow:
+   - the requested workflow tag input must equal `vX.Y.Z`
    - root `pom.xml` version
    - root `pom.xml` `scm.tag`
    - `linter-core/pom.xml` parent version

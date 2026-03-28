@@ -34,14 +34,14 @@ Each app is intentionally small and focused:
 ### `centralized-security-app`
 
 - public controller endpoints
-- a centralized `SecurityFilterChain` bean
+- a component-scanned `SecurityFilterChain` implementation
 - `autoDetectCentralizedSecurity=true` suppressing controller-security noise
 - expected result: `0` visible issues
 
 ### `cache-convention-app`
 
 - parameterized `@Cacheable` methods without explicit key declarations
-- a project-wide key convention through `CachingConfigurerSupport`
+- a component-scanned `KeyGenerator` implementation
 - `autoDetectProjectWideKeyGenerator=true` suppressing cache-key noise
 - expected result: `0` visible issues
 

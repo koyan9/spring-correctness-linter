@@ -38,6 +38,14 @@ public final class ProjectContext {
             "org.springframework.cache.annotation.CachingConfigurer",
             "org.springframework.cache.annotation.CachingConfigurerSupport"
     );
+    private static final Set<String> COMPONENT_STEREOTYPE_TYPES = Set.of(
+            "org.springframework.stereotype.Component",
+            "org.springframework.stereotype.Service",
+            "org.springframework.stereotype.Repository",
+            "org.springframework.stereotype.Controller",
+            "org.springframework.web.bind.annotation.RestController",
+            "org.springframework.context.annotation.Configuration"
+    );
 
     private final Path projectRoot;
     private final Path sourceDirectory;
@@ -230,6 +238,9 @@ public final class ProjectContext {
                         break;
                     }
                 }
+                if (!found && declaresComponentScannedSecurityFilterChain(sourceUnit)) {
+                    found = true;
+                }
                 if (found) {
                     break;
                 }
@@ -264,6 +275,9 @@ public final class ProjectContext {
                 if (!found && declaresProjectWideKeyGenerator(sourceUnit)) {
                     found = true;
                 }
+                if (!found && declaresComponentScannedKeyGenerator(sourceUnit)) {
+                    found = true;
+                }
                 if (found) {
                     break;
                 }
@@ -288,6 +302,36 @@ public final class ProjectContext {
                 if (isKeyGeneratorType(method.getType().toString(), sourceUnit)) {
                     return true;
                 }
+            }
+        }
+        return false;
+    }
+
+    private boolean declaresComponentScannedKeyGenerator(SourceUnit sourceUnit) {
+        for (TypeDeclaration<?> typeDeclaration : sourceUnit.structure().typeDeclarations()) {
+            if (!isConcreteComponentCandidate(typeDeclaration)) {
+                continue;
+            }
+            if (!isKeyGeneratorImplementationType(typeDeclaration, sourceUnit)) {
+                continue;
+            }
+            if (hasDirectSpringComponentStereotype(typeDeclaration, sourceUnit)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean declaresComponentScannedSecurityFilterChain(SourceUnit sourceUnit) {
+        for (TypeDeclaration<?> typeDeclaration : sourceUnit.structure().typeDeclarations()) {
+            if (!isConcreteComponentCandidate(typeDeclaration)) {
+                continue;
+            }
+            if (!isSecurityFilterChainImplementationType(typeDeclaration, sourceUnit)) {
+                continue;
+            }
+            if (hasDirectSpringComponentStereotype(typeDeclaration, sourceUnit)) {
+                return true;
             }
         }
         return false;
@@ -462,7 +506,8 @@ public final class ProjectContext {
             }
         }
         for (TypeDeclaration<?> typeDeclaration : sourceUnit.structure().typeDeclarations()) {
-            if (isCachingConfigurerType(typeDeclaration, sourceUnit)
+            if (isSecurityFilterChainImplementationType(typeDeclaration, sourceUnit)
+                    || isCachingConfigurerType(typeDeclaration, sourceUnit)
                     || isKeyGeneratorImplementationType(typeDeclaration, sourceUnit)) {
                 return true;
             }
@@ -476,6 +521,17 @@ public final class ProjectContext {
 
     private boolean isKeyGeneratorType(String rawType, SourceUnit sourceUnit) {
         return matchesQualifiedType(rawType, sourceUnit, KEY_GENERATOR_TYPES);
+    }
+
+    private boolean isSecurityFilterChainImplementationType(TypeDeclaration<?> typeDeclaration, SourceUnit sourceUnit) {
+        TypeResolutionIndex.TypeDescriptor descriptor = typeResolutionIndex().descriptorFor(typeDeclaration, sourceUnit);
+        return typeDeclaresOrInheritsQualifiedType(
+                typeDeclaration,
+                descriptor.packageName(),
+                descriptor.importInfo(),
+                SECURITY_FILTER_CHAIN_TYPES,
+                new LinkedHashSet<>()
+        );
     }
 
     private boolean isKeyGeneratorImplementationType(TypeDeclaration<?> typeDeclaration, SourceUnit sourceUnit) {
@@ -504,6 +560,19 @@ public final class ProjectContext {
             }
         }
         return false;
+    }
+
+    private boolean hasDirectSpringComponentStereotype(TypeDeclaration<?> typeDeclaration, SourceUnit sourceUnit) {
+        return typeDeclaration.getAnnotations().stream()
+                .map(annotationExpr -> annotationExpr.getNameAsString())
+                .anyMatch(annotationName -> matchesQualifiedType(annotationName, sourceUnit, COMPONENT_STEREOTYPE_TYPES));
+    }
+
+    private boolean isConcreteComponentCandidate(TypeDeclaration<?> typeDeclaration) {
+        if (typeDeclaration instanceof ClassOrInterfaceDeclaration classOrInterfaceDeclaration) {
+            return !classOrInterfaceDeclaration.isInterface() && !classOrInterfaceDeclaration.isAbstract();
+        }
+        return true;
     }
 
     private boolean matchesQualifiedType(String rawType, SourceUnit sourceUnit, Set<String> expectedQualifiedNames) {

@@ -4,6 +4,15 @@ All notable changes to `spring-correctness-linter` will be documented in this fi
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-03-28
+
+### Changed
+
+- `autoDetectProjectWideKeyGenerator` now also recognizes component-scanned Spring `KeyGenerator` implementations in addition to `@Bean` and `CachingConfigurer`-based signals
+- Release workflow now fails early when the requested release tag does not match the root `pom.xml` version and `scm.tag`
+- `autoDetectCentralizedSecurity` now also recognizes component-scanned Spring `SecurityFilterChain` / `SecurityWebFilterChain` implementations
+- Release workflow rerun checks now require both core and plugin artifacts to be visible in Maven Central and fail fast on partial visibility
+
 ## [0.1.4] - 2026-03-28
 
 ### Added

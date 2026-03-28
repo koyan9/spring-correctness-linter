@@ -32,7 +32,7 @@ Add this plugin to the target project's `pom.xml`:
 <plugin>
   <groupId>io.github.koyan9</groupId>
   <artifactId>spring-correctness-linter-maven-plugin</artifactId>
-  <version>0.1.4</version>
+  <version>0.1.5</version>
   <configuration>
     <formats>
       <format>json</format>
@@ -115,7 +115,7 @@ If the project already has historical issues, baseline first.
 Generate the baseline once:
 
 ```bash
-mvn -q io.github.koyan9:spring-correctness-linter-maven-plugin:0.1.4:lint \
+mvn -q io.github.koyan9:spring-correctness-linter-maven-plugin:0.1.5:lint \
   "-Dspring.correctness.linter.writeBaseline=true"
 ```
 
@@ -190,7 +190,7 @@ If endpoint security is enforced outside controllers:
 </configuration>
 ```
 
-Or enable detection of resolvable Spring Security chain beans:
+Or enable detection of resolvable Spring Security chain beans, including component-scanned implementations:
 
 ```xml
 <configuration>
@@ -217,7 +217,7 @@ Allow specific caches to use Spring default keys:
 </configuration>
 ```
 
-If the project standardizes on a resolvable Spring global key generator:
+If the project standardizes on a resolvable Spring global key generator, a component-scanned `KeyGenerator`, or a `CachingConfigurer` / `CachingConfigurerSupport` key generator:
 
 ```xml
 <configuration>

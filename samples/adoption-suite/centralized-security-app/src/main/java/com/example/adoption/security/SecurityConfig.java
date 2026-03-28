@@ -5,17 +5,26 @@
 
 package com.example.adoption.security;
 
-import org.springframework.context.annotation.Bean;
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import jakarta.servlet.Filter;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.stereotype.Component;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-class SecurityConfig {
+import java.util.List;
 
-    @Bean
-    SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        return http.build();
+@Component
+class SecurityConfig implements SecurityFilterChain {
+
+    @Override
+    public boolean matches(HttpServletRequest request) {
+        return true;
+    }
+
+    @Override
+    public List<Filter> getFilters() {
+        return List.of();
     }
 }
 

@@ -30,7 +30,7 @@
 <plugin>
   <groupId>io.github.koyan9</groupId>
   <artifactId>spring-correctness-linter-maven-plugin</artifactId>
-  <version>0.1.4</version>
+  <version>0.1.5</version>
   <configuration>
     <formats>
       <format>json</format>
@@ -111,7 +111,7 @@ mvn -q verify
 如果项目里已经有历史问题，先生成 baseline：
 
 ```bash
-mvn -q io.github.koyan9:spring-correctness-linter-maven-plugin:0.1.4:lint \
+mvn -q io.github.koyan9:spring-correctness-linter-maven-plugin:0.1.5:lint \
   "-Dspring.correctness.linter.writeBaseline=true"
 ```
 
@@ -213,7 +213,7 @@ mvn -q io.github.koyan9:spring-correctness-linter-maven-plugin:0.1.4:lint \
 </configuration>
 ```
 
-如果项目统一约定了全局 key generator：
+如果项目统一约定了全局 key generator、组件扫描注册的 `KeyGenerator`，或 `CachingConfigurer` / `CachingConfigurerSupport` 暴露的 key generator：
 
 ```xml
 <configuration>

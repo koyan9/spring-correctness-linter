@@ -116,14 +116,14 @@ For a scenario-oriented, step-by-step adoption guide, see [quick-start.md](quick
 ### Generate a baseline
 
 ```bash
-./mvnw io.github.koyan9:spring-correctness-linter-maven-plugin:0.1.4:lint \
+./mvnw io.github.koyan9:spring-correctness-linter-maven-plugin:0.1.5:lint \
   -Dspring.correctness.linter.writeBaseline=true
 ```
 
 ### Fail on severity
 
 ```bash
-./mvnw io.github.koyan9:spring-correctness-linter-maven-plugin:0.1.4:lint \
+./mvnw io.github.koyan9:spring-correctness-linter-maven-plugin:0.1.5:lint \
   -Dspring.correctness.linter.failOnSeverity=WARNING
 ```
 
@@ -135,7 +135,7 @@ Example plugin configuration:
 <plugin>
   <groupId>io.github.koyan9</groupId>
   <artifactId>spring-correctness-linter-maven-plugin</artifactId>
-  <version>0.1.4</version>
+  <version>0.1.5</version>
   <configuration>
     <formats>
       <format>json</format>
@@ -251,10 +251,10 @@ Rule ids are normalized to uppercase. Rule domains are case-insensitive and acce
 | `spring.correctness.linter.disabledRuleDomains` | _empty_ | Same as above | Disables selected rule domains. |
 | `spring.correctness.linter.severityOverrides` | _empty_ | `RULE_ID=INFO|WARNING|ERROR` | Overrides per-rule severities. Unknown rule IDs fail the build. |
 | `spring.correctness.linter.assumeCentralizedSecurity` | `false` | `true` / `false` | Skips `SPRING_ENDPOINT_SECURITY` when security is enforced centrally. |
-| `spring.correctness.linter.autoDetectCentralizedSecurity` | `false` | `true` / `false` | Auto-skips `SPRING_ENDPOINT_SECURITY` when a resolvable Spring `SecurityFilterChain` or `SecurityWebFilterChain` bean is detected in the source tree. |
+| `spring.correctness.linter.autoDetectCentralizedSecurity` | `false` | `true` / `false` | Auto-skips `SPRING_ENDPOINT_SECURITY` when the source tree exposes a resolvable Spring `SecurityFilterChain` or `SecurityWebFilterChain` bean, including component-scanned implementations. |
 | `spring.correctness.linter.securityAnnotations` | _empty_ | Annotation names | Treats additional annotations as explicit security intent. Input values are normalized to simple annotation names (leading `@` and package prefixes are ignored), so the same simple name in different packages cannot be distinguished. |
 | `spring.correctness.linter.cacheDefaultKeyCacheNames` | _empty_ | Cache names or `*` | Allows default cache keys for specific cache names. `*` allows all caches. |
-| `spring.correctness.linter.autoDetectProjectWideKeyGenerator` | `false` | `true` / `false` | Auto-skips `SPRING_CACHEABLE_KEY` when a resolvable Spring `@Bean KeyGenerator` or `CachingConfigurer` / `CachingConfigurerSupport` key generator is detected in the source tree. |
+| `spring.correctness.linter.autoDetectProjectWideKeyGenerator` | `false` | `true` / `false` | Auto-skips `SPRING_CACHEABLE_KEY` when the source tree exposes a resolvable Spring `@Bean KeyGenerator`, a `CachingConfigurer` / `CachingConfigurerSupport` key generator, or a component-scanned Spring `KeyGenerator` implementation. |
 | `spring.correctness.linter.cacheFile` | `${project.build.directory}/spring-correctness-linter/analysis-cache.txt` | Path | Incremental cache file path (ignored when cache is disabled or split by module). |
 | `spring.correctness.linter.useIncrementalCache` | `true` | `true` / `false` | Enables incremental cache reuse guarded by file content plus the effective semantic analysis fingerprint. |
 | `spring.correctness.linter.parallelFileAnalysis` | `true` | `true` / `false` | Enables per-file parallel analysis when multiple source files are present. |
@@ -270,7 +270,7 @@ disabling the endpoint-security rule globally or by providing your internal secu
 ```xml
 <configuration>
   <assumeCentralizedSecurity>true</assumeCentralizedSecurity>
-  <!-- Or detect SecurityFilterChain / SecurityWebFilterChain automatically -->
+  <!-- Or detect SecurityFilterChain / SecurityWebFilterChain beans automatically -->
   <!-- <autoDetectCentralizedSecurity>true</autoDetectCentralizedSecurity> -->
   <securityAnnotations>InternalEndpoint,TeamSecure</securityAnnotations>
   <!-- Values are normalized to simple annotation names, so package prefixes are ignored. -->
@@ -288,7 +288,7 @@ If some caches intentionally rely on Spring's default key generation, you can al
 </configuration>
 ```
 
-If the project standardizes on a global `KeyGenerator` bean or a `CachingConfigurer` / `CachingConfigurerSupport` key generator, you can opt into auto-detection:
+If the project standardizes on a global `KeyGenerator` bean, a component-scanned Spring `KeyGenerator` implementation, or a `CachingConfigurer` / `CachingConfigurerSupport` key generator, you can opt into auto-detection:
 
 ```xml
 <configuration>
@@ -403,7 +403,7 @@ Use these when you want a smaller rollout surface before enabling the full defau
 Generate the first baseline once with:
 
 ```bash
-./mvnw io.github.koyan9:spring-correctness-linter-maven-plugin:0.1.4:lint \
+./mvnw io.github.koyan9:spring-correctness-linter-maven-plugin:0.1.5:lint \
   "-Dspring.correctness.linter.writeBaseline=true"
 ```
 
@@ -741,7 +741,7 @@ Example plugin wiring:
 <plugin>
   <groupId>io.github.koyan9</groupId>
   <artifactId>spring-correctness-linter-maven-plugin</artifactId>
-  <version>0.1.4</version>
+  <version>0.1.5</version>
   <dependencies>
     <dependency>
       <groupId>com.example</groupId>
