@@ -11,6 +11,8 @@ Recent low-noise expansions already covered the most obvious proxy-boundary gaps
 and added an initial async-over-transaction-phase listener review in `EVENTS`. That means the backlog
 should stay biased toward accuracy refinement instead of continuing unchecked rule-count growth.
 
+When selecting `v0.1.5` work, prefer the narrow scope described in `docs/V0.1.5_CANDIDATE_SCOPE.md`.
+
 ## Priority 1
 
 ### `SPRING_ENDPOINT_SECURITY`
