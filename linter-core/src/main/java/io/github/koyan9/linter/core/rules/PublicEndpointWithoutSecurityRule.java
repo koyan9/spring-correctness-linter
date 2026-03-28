@@ -102,7 +102,9 @@ public final class PublicEndpointWithoutSecurityRule extends AbstractSpringRule 
                 MethodSemanticFacts methodFacts = facts.methodFacts(typeDeclaration, method);
                 boolean methodSecured = methodFacts.hasExplicitSecurityIntent()
                         || hasCustomSecurityIntent(methodFacts.annotationNames(), context.options().customSecurityAnnotations());
-                if (methodFacts.isPublicRequestMapping()
+                boolean requestMapped = methodFacts.isPublicRequestMapping()
+                        || (method.isPublic() && securityInheritance.requestMappedMethodSignatures().contains(signatureOf(method)));
+                if (requestMapped
                         && !classSecured
                         && !methodSecured
                         && !securityInheritance.securedMethodSignatures().contains(signatureOf(method))) {
@@ -132,6 +134,7 @@ public final class PublicEndpointWithoutSecurityRule extends AbstractSpringRule 
     ) {
         boolean inheritedClassSecured = false;
         Set<MethodSignature> securedMethods = new LinkedHashSet<>();
+        Set<MethodSignature> requestMappedMethods = new LinkedHashSet<>();
         for (TypeResolutionIndex.TypeDescriptor relatedType : typeIndex.relatedTypes(rootType)) {
             TypeSemanticFacts typeFacts = facts.typeFacts(relatedType.declaration());
             if (typeFacts.hasExplicitSecurityIntent()
@@ -140,13 +143,16 @@ public final class PublicEndpointWithoutSecurityRule extends AbstractSpringRule 
             }
             for (MethodDeclaration method : relatedType.structure().methodsOf(relatedType.declaration())) {
                 MethodSemanticFacts methodFacts = facts.methodFacts(relatedType.declaration(), method);
+                if (methodFacts.requestMapping()) {
+                    requestMappedMethods.add(signatureOf(method));
+                }
                 if (methodFacts.hasExplicitSecurityIntent()
                         || hasCustomSecurityIntent(methodFacts.annotationNames(), customSecurityAnnotations)) {
                     securedMethods.add(signatureOf(method));
                 }
             }
         }
-        return new SecurityInheritance(inheritedClassSecured, securedMethods);
+        return new SecurityInheritance(inheritedClassSecured, securedMethods, requestMappedMethods);
     }
 
     private MethodSignature signatureOf(MethodDeclaration method) {
@@ -220,9 +226,14 @@ public final class PublicEndpointWithoutSecurityRule extends AbstractSpringRule 
         }
     }
 
-    private record SecurityInheritance(boolean classSecured, Set<MethodSignature> securedMethodSignatures) {
+    private record SecurityInheritance(
+            boolean classSecured,
+            Set<MethodSignature> securedMethodSignatures,
+            Set<MethodSignature> requestMappedMethodSignatures
+    ) {
         private SecurityInheritance {
             securedMethodSignatures = Set.copyOf(securedMethodSignatures);
+            requestMappedMethodSignatures = Set.copyOf(requestMappedMethodSignatures);
         }
     }
 }

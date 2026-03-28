@@ -3843,6 +3843,67 @@ class ProjectLinterTest {
     }
 
     @Test
+    void flagsInheritedRequestMappingsWithoutInheritedSecurity() throws Exception {
+        Path sourceDirectory = tempDir.resolve("src/main/java/demo");
+        Files.createDirectories(sourceDirectory);
+        Files.writeString(sourceDirectory.resolve("InheritedRequestMappings.java"), """
+                package demo;
+
+                import org.springframework.security.access.prepost.PreAuthorize;
+                import org.springframework.web.bind.annotation.GetMapping;
+                import org.springframework.web.bind.annotation.RestController;
+
+                interface OpenApi {
+
+                    @GetMapping("/open")
+                    String open();
+                }
+
+                interface SecuredApi {
+
+                    @GetMapping("/secure")
+                    @PreAuthorize("hasRole('ADMIN')")
+                    String secure();
+                }
+
+                abstract class BaseApi {
+
+                    @GetMapping("/base")
+                    public abstract String base();
+                }
+
+                @RestController
+                class EndpointController extends BaseApi implements OpenApi, SecuredApi {
+
+                    @Override
+                    public String open() {
+                        return "ok";
+                    }
+
+                    @Override
+                    public String secure() {
+                        return "ok";
+                    }
+
+                    @Override
+                    public String base() {
+                        return "ok";
+                    }
+                }
+                """);
+
+        ProjectLinter linter = new ProjectLinter(SpringBootRuleSet.defaultRules());
+        List<LintIssue> issues = linter.analyze(tempDir, tempDir.resolve("src/main/java")).issues().stream()
+                .filter(issue -> issue.ruleId().equals("SPRING_ENDPOINT_SECURITY"))
+                .toList();
+
+        assertEquals(2, issues.size());
+        assertTrue(issues.stream().anyMatch(issue -> issue.message().contains("open")));
+        assertTrue(issues.stream().anyMatch(issue -> issue.message().contains("base")));
+        assertFalse(issues.stream().anyMatch(issue -> issue.message().contains("secure")));
+    }
+
+    @Test
     void flagsInheritedSecurityOverloadsWithDifferentParameterTypes() throws Exception {
         Path sourceDirectory = tempDir.resolve("src/main/java/demo");
         Files.createDirectories(sourceDirectory);
