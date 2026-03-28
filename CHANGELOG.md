@@ -4,6 +4,10 @@ All notable changes to `spring-correctness-linter` will be documented in this fi
 
 ## [Unreleased]
 
+### Fixed
+
+- Added the missing `jakarta.servlet-api` dependency to `samples/adoption-suite/centralized-security-app` so the component-scanned `SecurityFilterChain` sample compiles on GitHub Actions and local clean environments
+
 ## [0.1.5] - 2026-03-28
 
 ### Changed
