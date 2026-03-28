@@ -10,7 +10,7 @@
     <parent>
         <groupId>com.example</groupId>
         <artifactId>adoption-suite-parent</artifactId>
-        <version>0.1.5</version>
+        <version>0.1.6</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
@@ -57,3 +57,4 @@
         </plugins>
     </build>
 </project>
+

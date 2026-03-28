@@ -116,14 +116,14 @@ For a scenario-oriented, step-by-step adoption guide, see [quick-start.md](quick
 ### Generate a baseline
 
 ```bash
-./mvnw io.github.koyan9:spring-correctness-linter-maven-plugin:0.1.5:lint \
+./mvnw io.github.koyan9:spring-correctness-linter-maven-plugin:0.1.6:lint \
   -Dspring.correctness.linter.writeBaseline=true
 ```
 
 ### Fail on severity
 
 ```bash
-./mvnw io.github.koyan9:spring-correctness-linter-maven-plugin:0.1.5:lint \
+./mvnw io.github.koyan9:spring-correctness-linter-maven-plugin:0.1.6:lint \
   -Dspring.correctness.linter.failOnSeverity=WARNING
 ```
 
@@ -135,7 +135,7 @@ Example plugin configuration:
 <plugin>
   <groupId>io.github.koyan9</groupId>
   <artifactId>spring-correctness-linter-maven-plugin</artifactId>
-  <version>0.1.5</version>
+  <version>0.1.6</version>
   <configuration>
     <formats>
       <format>json</format>
@@ -403,7 +403,7 @@ Use these when you want a smaller rollout surface before enabling the full defau
 Generate the first baseline once with:
 
 ```bash
-./mvnw io.github.koyan9:spring-correctness-linter-maven-plugin:0.1.5:lint \
+./mvnw io.github.koyan9:spring-correctness-linter-maven-plugin:0.1.6:lint \
   "-Dspring.correctness.linter.writeBaseline=true"
 ```
 
@@ -570,7 +570,7 @@ Treat custom security annotations as explicit intent:
 
 ## FAQ
 
-Q: Why do I see “Unknown rule id(s)” failures?
+Q: Why do I see “Unknown rule id(s)�?failures?
 A: Rule ids are validated and normalized to uppercase. Verify the ID exists in `rules-reference.md`.
 
 Q: I set `failOnError=true`, but the build still passes.
@@ -741,7 +741,7 @@ Example plugin wiring:
 <plugin>
   <groupId>io.github.koyan9</groupId>
   <artifactId>spring-correctness-linter-maven-plugin</artifactId>
-  <version>0.1.5</version>
+  <version>0.1.6</version>
   <dependencies>
     <dependency>
       <groupId>com.example</groupId>
@@ -803,3 +803,4 @@ The project currently provides a practical Spring correctness linting workflow s
 - For the current rule-accuracy follow-ups, see `docs/ACCURACY_BACKLOG.md`.
 - For the latest staged summary of rule-growth and extensibility work, see `docs/STATUS_UPDATE_2026-03-27_proxy-boundary-expansion.md`.
 - For the latest release-closure summary, see `docs/STATUS_UPDATE_2026-03-28_v0.1.4-release.md`.
+

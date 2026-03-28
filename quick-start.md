@@ -32,7 +32,7 @@ Add this plugin to the target project's `pom.xml`:
 <plugin>
   <groupId>io.github.koyan9</groupId>
   <artifactId>spring-correctness-linter-maven-plugin</artifactId>
-  <version>0.1.5</version>
+  <version>0.1.6</version>
   <configuration>
     <formats>
       <format>json</format>
@@ -115,7 +115,7 @@ If the project already has historical issues, baseline first.
 Generate the baseline once:
 
 ```bash
-mvn -q io.github.koyan9:spring-correctness-linter-maven-plugin:0.1.5:lint \
+mvn -q io.github.koyan9:spring-correctness-linter-maven-plugin:0.1.6:lint \
   "-Dspring.correctness.linter.writeBaseline=true"
 ```
 
@@ -371,3 +371,4 @@ Use `samples/adoption-suite/` when you want to validate consumer-style rollout p
 - [docs/ACCURACY_BACKLOG.md](docs/ACCURACY_BACKLOG.md)
 - [docs/RELEASE_PROCESS.md](docs/RELEASE_PROCESS.md)
 - [docs/CI_EXAMPLES.md](docs/CI_EXAMPLES.md)
+
