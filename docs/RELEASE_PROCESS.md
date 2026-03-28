@@ -104,7 +104,7 @@ The parent `pom.xml` now provides a `central-publish` profile that:
 - attaches javadocs
 - signs artifacts with GPG
 - publishes through `org.sonatype.central:central-publishing-maven-plugin`
-- defaults to manual Central publication locally and can be overridden in CI with `-Dcentral.publish.auto=true -Dcentral.publish.waitUntil=published`
+- defaults to manual Central publication locally and can be overridden in CI with `-Dcentral.publish.auto=true -Dcentral.publish.waitUntil=validated`
 
 Recommended secure `settings.xml` pattern:
 
@@ -149,7 +149,7 @@ Recommended dry run before the real publish:
 
 This validates sources, javadocs, and signing configuration before a real deploy attempt.
 
-For local deploys, the default `central-publish` profile uploads for manual review only. The GitHub Actions workflow overrides this to automatic publish and waits for the deployment to reach the `published` state before creating the GitHub release.
+For local deploys, the default `central-publish` profile uploads for manual review only. The GitHub Actions workflow overrides this to automatic publish and waits for the deployment to reach the `validated` state before creating the GitHub release.
 
 ## Post-release verification
 
@@ -200,6 +200,12 @@ Use this checklist when the tag exists, but the GitHub Release page is missing o
    - `MAVEN_CENTRAL_PASSWORD`
    - `MAVEN_GPG_PRIVATE_KEY`
    - `MAVEN_GPG_PASSPHRASE`
+8. Re-check version alignment before retagging:
+   - root `pom.xml` version
+   - root `pom.xml` `scm.tag`
+   - `linter-core/pom.xml` parent version
+   - `linter-maven-plugin/pom.xml` parent version
+   - sample `pom.xml` files and docs that show copy-paste plugin coordinates
 
 ## Suggested release-note content
 

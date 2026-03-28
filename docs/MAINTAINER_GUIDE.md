@@ -65,7 +65,7 @@ Before pushing a release tag, confirm:
 Recommended local checks:
 
 - `mvnw.cmd -q verify`
-- `mvnw.cmd -q -Prelease-artifacts verify`
+- `mvnw.cmd -q -Prelease-artifacts clean verify`
 - `mvnw.cmd -q -Pcentral-publish -DskipTests verify`
 - `mvnw.cmd -q -f samples/vulnerable-sample/pom.xml -DskipTests verify`
 - `mvnw.cmd -q -f samples/reactor-sample/pom.xml -DskipTests verify`
@@ -109,6 +109,7 @@ When changing release automation:
 - after each release, verify GitHub Actions, the GitHub Release page, and the direct Maven Central artifact URL before treating the release as complete
 - use `powershell -ExecutionPolicy Bypass -File scripts\\check-release-status.ps1 -Version X.Y.Z` to capture the post-release status in a repeatable way
 - if the release tag exists but GitHub Release or Maven Central is still missing, work through the `If the tagged release fails` section in `docs/RELEASE_PROCESS.md` before retagging or changing versions
+- when preparing a version bump, verify that both module `pom.xml` files inherit the same parent version as the root release version
 
 ## References
 

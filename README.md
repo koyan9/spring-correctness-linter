@@ -794,6 +794,7 @@ The project currently provides a practical Spring correctness linting workflow s
 - lightweight external rule extension through `ServiceLoader`
 - proxy-boundary coverage that is now strongest in `ASYNC`, `CACHE`, and `TRANSACTION`
 - English and Chinese rule coverage matrices that make the current built-in rule surface easier to inspect
+- `v0.1.4` is now published on GitHub Releases and visible through direct Maven Central artifact URLs
 
 ## Milestones
 
@@ -801,3 +802,4 @@ The project currently provides a practical Spring correctness linting workflow s
 - For the current near-term direction, see `docs/ROADMAP.md`.
 - For the current rule-accuracy follow-ups, see `docs/ACCURACY_BACKLOG.md`.
 - For the latest staged summary of rule-growth and extensibility work, see `docs/STATUS_UPDATE_2026-03-27_proxy-boundary-expansion.md`.
+- For the latest release-closure summary, see `docs/STATUS_UPDATE_2026-03-28_v0.1.4-release.md`.
